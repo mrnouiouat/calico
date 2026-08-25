@@ -8,6 +8,7 @@ venv/
 target/
 dbt_packages/
 logs/
+.user.yml
 
 # Data & secrets
 .env
