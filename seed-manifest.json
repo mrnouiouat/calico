@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "target_repository": "mrnouiouat/calico",
+  "seed_paths": [
+    ".github/workflows/privacy-gate.yml",
+    ".gitignore",
+    "CLAUDE.md",
+    "docs/ag-registry-migration-2026-08.md",
+    "docs/redactions/ag-registry-migration-2026-08.json",
+    "policies/publishable-tree.json",
+    "seed-manifest.json",
+    "tests/__init__.py",
+    "tests/test_redaction_contract.py",
+    "tests/test_repository_contract.py",
+    "tests/tools/__init__.py",
+    "tests/tools/privacy_scan/__init__.py",
+    "tests/tools/privacy_scan/test_git_objects.py",
+    "tests/tools/privacy_scan/test_non_echo.py",
+    "tests/tools/privacy_scan/test_policy.py",
+    "tests/tools/privacy_scan/test_scanner.py",
+    "tests/tools/privacy_scan/test_seed_manifest.py",
+    "tools/__init__.py",
+    "tools/privacy_scan/__init__.py",
+    "tools/privacy_scan/__main__.py",
+    "tools/privacy_scan/git_objects.py",
+    "tools/privacy_scan/policy.py",
+    "tools/privacy_scan/scanner.py"
+  ]
+}

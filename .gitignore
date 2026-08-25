@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Data & secrets
+.env
+.env.*
+*.duckdb
+*.db
+data/mitos.db
+data/raw/
+data/registry-archive/
+data/generated-diffs/
+*.pdf
