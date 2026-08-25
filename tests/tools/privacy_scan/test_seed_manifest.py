@@ -221,25 +221,41 @@ class TemporaryStagingEquivalenceTests(unittest.TestCase):
 
 
 class TargetRootCommitTests(unittest.TestCase):
-    """Proves the real target repository's committed HEAD matches the
-    manifest exactly, with exactly one independently created root commit and
-    no reachable Calico-build object or unlisted/forbidden path."""
+    """Proves the real target repository's independently created root commit
+    matches the manifest exactly, with exactly one root commit in the whole
+    reachable history and no reachable Calico-build object or unlisted/
+    forbidden path anywhere in HEAD's tree.
+
+    The manifest describes Task 1's root commit only -- it deliberately
+    excludes the pre-smoke candidate paths that Task 2 commits in a later,
+    descendant commit once the runtime proof succeeds (see
+    `_PRE_SMOKE_EXCLUDED_PATHS`). Comparing the manifest against the *root*
+    commit (not current HEAD) keeps this contract accurate across both
+    tasks' commits.
+    """
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.manifest = _load_manifest()
 
-    def _head_paths(self) -> list[str]:
-        result = _run_git(["ls-tree", "-rz", "--name-only", "--full-tree", "HEAD"], REPO_ROOT)
+    def _paths_at(self, treeish: str) -> list[str]:
+        result = _run_git(["ls-tree", "-rz", "--name-only", "--full-tree", treeish], REPO_ROOT)
         raw = result.stdout.split(b"\x00")
         return sorted(p.decode("utf-8") for p in raw if p)
+
+    def _root_commit(self) -> str:
+        result = _run_git(["rev-list", "--max-parents=0", "--all"], REPO_ROOT)
+        roots = [line for line in result.stdout.decode("ascii").splitlines() if line]
+        self.assertEqual(len(roots), 1, "expected exactly one root commit")
+        return roots[0]
 
     def test_exactly_one_root_commit(self) -> None:
         result = _run_git(["rev-list", "--max-parents=0", "--all", "--count"], REPO_ROOT)
         self.assertEqual(result.stdout.decode("ascii").strip(), "1")
 
-    def test_head_tree_matches_manifest_seed_paths_exactly(self) -> None:
-        self.assertEqual(self._head_paths(), sorted(self.manifest["seed_paths"]))
+    def test_root_commit_tree_matches_manifest_seed_paths_exactly(self) -> None:
+        root = self._root_commit()
+        self.assertEqual(self._paths_at(root), sorted(self.manifest["seed_paths"]))
 
     def test_no_remote_configured(self) -> None:
         result = _run_git(["remote"], REPO_ROOT)
@@ -249,14 +265,15 @@ class TargetRootCommitTests(unittest.TestCase):
         alternates = REPO_ROOT / ".git" / "objects" / "info" / "alternates"
         self.assertFalse(alternates.exists())
 
-    def test_committed_tree_carries_no_forbidden_prefix(self) -> None:
-        for path in self._head_paths():
+    def test_head_tree_carries_no_forbidden_prefix(self) -> None:
+        for path in self._paths_at("HEAD"):
             for forbidden in _FORBIDDEN_PREFIXES:
                 self.assertFalse(path.startswith(forbidden))
 
-    def test_committed_tree_carries_no_pre_smoke_excluded_path(self) -> None:
-        head = set(self._head_paths())
-        self.assertTrue(head.isdisjoint(_PRE_SMOKE_EXCLUDED_PATHS))
+    def test_root_commit_tree_carries_no_pre_smoke_excluded_path(self) -> None:
+        root = self._root_commit()
+        root_paths = set(self._paths_at(root))
+        self.assertTrue(root_paths.isdisjoint(_PRE_SMOKE_EXCLUDED_PATHS))
 
 
 if __name__ == "__main__":
