@@ -353,11 +353,19 @@ class ToolchainFixtureContractTests(unittest.TestCase):
         for term in self.FORBIDDEN_DOMAIN_TERMS:
             self.assertNotIn(term, content)
 
+    #: Directories that are never part of the tracked candidate tree -- the
+    #: Git object database, the local gitignored virtual environment (which
+    #: vendors dbt's own bundled project/macro templates once Task 2 creates
+    #: it), and dbt's own gitignored run artifacts (which recompile/copy the
+    #: fixture's model once `dbt build` runs) must never be mistaken for
+    #: production repository content.
+    _EXCLUDED_DIR_NAMES = (".git", ".venv", "target", "dbt_packages", "logs")
+
     def test_fixture_is_the_only_dbt_model_in_repository(self) -> None:
         sql_files = sorted(
             path
             for path in REPO_ROOT.rglob("*.sql")
-            if ".git" not in path.parts
+            if not set(path.parts) & set(self._EXCLUDED_DIR_NAMES)
         )
         relative = sorted(str(path.relative_to(REPO_ROOT)).replace("\\", "/") for path in sql_files)
         self.assertEqual(relative, [self.MODEL_SQL])
@@ -366,7 +374,7 @@ class ToolchainFixtureContractTests(unittest.TestCase):
         project_files = [
             path
             for path in REPO_ROOT.rglob("dbt_project.yml")
-            if ".git" not in path.parts
+            if not set(path.parts) & set(self._EXCLUDED_DIR_NAMES)
         ]
         relative = sorted(str(path.relative_to(REPO_ROOT)).replace("\\", "/") for path in project_files)
         self.assertEqual(relative, [self.PROJECT_YML])
