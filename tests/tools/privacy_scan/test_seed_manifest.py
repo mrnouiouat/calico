@@ -257,9 +257,25 @@ class TargetRootCommitTests(unittest.TestCase):
         root = self._root_commit()
         self.assertEqual(self._paths_at(root), sorted(self.manifest["seed_paths"]))
 
-    def test_no_remote_configured(self) -> None:
+    def test_no_remote_or_only_the_authorized_target_origin(self) -> None:
+        """Plan 04 admitted the root commit before any remote existed. Plan 05
+        Task 1 deliberately adds a single `origin` remote pointed at the
+        authorized target (`mrnouiouat/calico`) once local gates pass -- this
+        contract accepts either state but rejects any other remote name or
+        target, per D-01/D-02 (never repoint at/attach Calico-build or any
+        other remote)."""
         result = _run_git(["remote"], REPO_ROOT)
-        self.assertEqual(result.stdout.strip(), b"")
+        remotes = [line for line in result.stdout.decode("ascii").splitlines() if line]
+        self.assertIn(len(remotes), (0, 1))
+        if remotes:
+            self.assertEqual(remotes, ["origin"])
+            url_result = _run_git(["remote", "get-url", "origin"], REPO_ROOT)
+            url = url_result.stdout.decode("utf-8").strip()
+            self.assertTrue(
+                url.rstrip("/").endswith("mrnouiouat/calico.git")
+                or url.rstrip("/").endswith("mrnouiouat/calico"),
+                "origin remote does not point at the authorized target",
+            )
 
     def test_no_alternates_object_database(self) -> None:
         alternates = REPO_ROOT / ".git" / "objects" / "info" / "alternates"
