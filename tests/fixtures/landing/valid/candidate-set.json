@@ -1,0 +1,21 @@
+{
+  "manifest_version": 1,
+  "objects": {
+    "charities-may-not-operate": {
+      "content_length": 331,
+      "relative_path": "charities-may-not-operate.csv"
+    },
+    "charities-may-operate": {
+      "content_length": 371,
+      "relative_path": "charities-may-operate.csv"
+    },
+    "charities-not-operating": {
+      "content_length": 341,
+      "relative_path": "charities-not-operating.csv"
+    },
+    "charities-undetermined-status": {
+      "content_length": 353,
+      "relative_path": "charities-undetermined-status.csv"
+    }
+  }
+}

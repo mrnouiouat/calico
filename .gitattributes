@@ -1,0 +1,7 @@
+# These CP1252-encoded landing CSV fixtures are byte-exact regression inputs
+# (explicit CRLF/LF/CR physical terminators, deliberately non-UTF-8 bytes).
+# Marking them binary/-text prevents any newline or encoding normalization
+# on add/checkout across machines with different core.autocrlf settings, so
+# the committed bytes always match what the parser contract expects
+# (Plan 02-08, D-02/D-03).
+tests/fixtures/landing/**/*.csv -text -diff
