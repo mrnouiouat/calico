@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calico.internal/contracts/admission-result-v1.schema.json",
+  "title": "Calico landing admission result (v1)",
+  "description": "Closed, non-echo admission result shape (D-04/D-05). Every field is either a fixed-vocabulary status/code, a safe release-identity value, or null -- never a raw registry row, matched excluded value, or absolute path.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "as_of_date",
+    "release_revision",
+    "revision_fingerprint",
+    "reasons"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "status": {
+      "enum": ["accepted", "rejected", "no_new_release", "operational_error"]
+    },
+    "as_of_date": { "type": ["string", "null"] },
+    "release_revision": { "type": ["integer", "null"] },
+    "revision_fingerprint": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reasons": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reason" }
+    }
+  },
+  "$defs": {
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "logical_list",
+        "safe_line_number",
+        "safe_location",
+        "safe_count"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "candidate.invalid_mapping",
+            "transfer.length_mismatch",
+            "container.open_failed",
+            "contract.unsupported_xlsx",
+            "parse.decode_failed",
+            "parse.header_mismatch",
+            "parse.arity_mismatch",
+            "parse.line_record_mismatch",
+            "date.blank",
+            "date.mismatch",
+            "registration.unknown_format",
+            "registration.duplicate",
+            "canonical.serialization_failed",
+            "revision.invalid_same_date",
+            "store.busy"
+          ]
+        },
+        "logical_list": {
+          "type": ["string", "null"],
+          "enum": [
+            "charities-may-operate",
+            "charities-not-operating",
+            "charities-undetermined-status",
+            "charities-may-not-operate",
+            null
+          ]
+        },
+        "safe_line_number": { "type": ["integer", "null"] },
+        "safe_location": { "type": ["string", "null"] },
+        "safe_count": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}
