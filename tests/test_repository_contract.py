@@ -361,6 +361,14 @@ class ToolchainFixtureContractTests(unittest.TestCase):
     #: production repository content.
     _EXCLUDED_DIR_NAMES = (".git", ".venv", "target", "dbt_packages", "logs")
 
+    #: The one named exception to "no other SQL file exists": Phase 2's
+    #: evidence-repair tool bundles a fixed, evidence-only DuckDB script
+    #: that is never a dbt model and is never loaded by any dbt project
+    #: (`tools/evidence_repair/__main__.py` loads it directly). Named
+    #: explicitly here -- never a broad directory exemption -- so any
+    #: *other* new `.sql` file still fails this test.
+    _NON_DBT_SQL_ALLOWLIST = ("tools/evidence_repair/spike_002_confirmation.sql",)
+
     def test_fixture_is_the_only_dbt_model_in_repository(self) -> None:
         sql_files = sorted(
             path
@@ -368,7 +376,7 @@ class ToolchainFixtureContractTests(unittest.TestCase):
             if not set(path.parts) & set(self._EXCLUDED_DIR_NAMES)
         )
         relative = sorted(str(path.relative_to(REPO_ROOT)).replace("\\", "/") for path in sql_files)
-        self.assertEqual(relative, [self.MODEL_SQL])
+        self.assertEqual(relative, sorted([self.MODEL_SQL, *self._NON_DBT_SQL_ALLOWLIST]))
 
     def test_no_production_dbt_project_exists_outside_fixture(self) -> None:
         project_files = [
