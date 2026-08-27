@@ -355,6 +355,37 @@ def valid_same_date_revision(
         yield candidate
 
 
+#: Exact baseline data-row counts per logical list (`row_index` values
+#: `replace_field` accepts), used only by `slash_separated_as_of_date`
+#: below to rewrite every row's As-of Date, not just one.
+_BASELINE_ROW_COUNTS: dict[str, int] = {
+    "charities-may-operate": 3,
+    "charities-not-operating": 2,
+    "charities-undetermined-status": 2,
+    "charities-may-not-operate": 2,
+}
+
+
+@contextmanager
+def slash_separated_as_of_date() -> Iterator[MutatedCandidate]:
+    """Rewrite every row's As-of Date to the real registry source's
+    `YYYY/MM/DD` separator -- the committed baseline uses ISO `YYYY-MM-DD`
+    as a simplification; the real source publishes this column
+    slash-separated. Same calendar date as the baseline (`2020-01-15`),
+    only the separator changes, across every row of every logical list so
+    the shared-date rule still agrees. Proves `calico_landing.admission`
+    normalizes this real-world format to the strict ISO release-identity
+    contract `calico_landing.store` requires, rather than passing the raw
+    source separator straight through.
+    """
+
+    with mutated_candidate() as candidate:
+        for logical_list, row_count in _BASELINE_ROW_COUNTS.items():
+            for row_index in range(row_count):
+                candidate.replace_field(logical_list, row_index, AS_OF_DATE_COLUMN, "2020/01/15")
+        yield candidate
+
+
 @contextmanager
 def invalid_same_date_revision(
     logical_list: str = "charities-may-operate",
@@ -393,4 +424,5 @@ __all__ = [
     "cp1252_high_byte_field",
     "valid_same_date_revision",
     "invalid_same_date_revision",
+    "slash_separated_as_of_date",
 ]

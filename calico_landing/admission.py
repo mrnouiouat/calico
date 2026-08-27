@@ -23,9 +23,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import uuid
+from datetime import date
 from pathlib import Path
 
 from calico_landing.candidate import (
@@ -112,6 +114,35 @@ def _cleanup_run_dir(run_dir: Path, staging_root: Path) -> None:
     shutil.rmtree(run_dir, ignore_errors=True)
 
 
+#: The source registry publishes the "As-of Date" column with a `/`
+#: separator (e.g. `2026/07/15`); the release-identity contract this value
+#: feeds (`calico_landing.store._validate_as_of_date`) requires strict ISO
+#: `YYYY-MM-DD`. Accepts either separator so a future source correction to
+#: the ISO form is not itself treated as a regression.
+_AS_OF_DATE_RAW_PATTERN = re.compile(r"^(\d{4})[/-](\d{2})[/-](\d{2})$")
+
+
+def _normalize_as_of_date(raw_value: str) -> str | None:
+    """Normalize one source "As-of Date" field to strict ISO `YYYY-MM-DD`.
+
+    Returns `None` on anything that is not a genuine calendar date in
+    either separator form -- the caller's existing `as_of_date is None`
+    fallback (`operational_error`) already handles that safely without
+    this function ever needing to echo the offending raw value.
+    """
+
+    match = _AS_OF_DATE_RAW_PATTERN.match(raw_value)
+    if match is None:
+        return None
+    year, month, day = match.groups()
+    candidate = f"{year}-{month}-{day}"
+    try:
+        date.fromisoformat(candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
 def _best_effort_as_of_date(
     contract: CsvContract, parsed_lists: dict[str, ParsedList]
 ) -> str | None:
@@ -125,7 +156,7 @@ def _best_effort_as_of_date(
         for record in parsed.records:
             value = record.fields[date_index].strip()
             if value:
-                return value
+                return _normalize_as_of_date(value)
     return None
 
 

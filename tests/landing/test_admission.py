@@ -178,6 +178,26 @@ class AcceptedRevisionTests(unittest.TestCase):
             )
             self.assertEqual(_staging_leftovers(store_root), [])
 
+    def test_slash_separated_source_as_of_date_normalizes_to_iso(self) -> None:
+        # The real AG registry publishes "As-of Date" slash-separated
+        # (e.g. "2026/07/15"), discovered during Plan 02-07's real-release
+        # admission -- the committed baseline uses ISO dashes as a
+        # simplification. `_best_effort_as_of_date` must normalize this to
+        # the strict ISO form `calico_landing.store` requires as the
+        # release identity, not pass the raw source separator through.
+        with fb.slash_separated_as_of_date() as candidate:
+            with tempfile.TemporaryDirectory() as store_dir:
+                store_root = Path(store_dir)
+
+                result = admit(candidate.root, store_root)
+
+                self.assertEqual(result.status, "accepted")
+                self.assertEqual(result.release_revision, 1)
+                self.assertEqual(result.as_of_date, "2020-01-15")
+
+                promoted = read_promoted_releases(store_root)
+                self.assertEqual(set(promoted.keys()), {"2020-01-15"})
+
     def test_unescaped_quote_in_name_round_trips_as_accepted(self) -> None:
         # The committed baseline's charities-may-operate.csv already carries
         # an unescaped quote in one Name field (GATE-A-EVIDENCE.md Section 4
