@@ -17,7 +17,7 @@
 -- population view below is a plain four-list union, never a keyed join.
 --
 -- No block here ever returns a raw field value other than a nonblank
--- `State Charity Reg#` value from the two `membership_release*` blocks --
+-- `State Charity Reg#` value from the three `membership_release*` blocks --
 -- those ordered key sequences are streamed directly into a running
 -- SHA-256 digest by the caller and are never otherwise persisted, printed,
 -- or included in any output document (D-11).
@@ -101,5 +101,16 @@ FROM (SELECT DISTINCT reg_key FROM release0_population WHERE reg_key <> '') AS p
 WHERE NOT EXISTS (
     SELECT 1
     FROM release1_population AS successor
+    WHERE successor.reg_key = predecessor_keys.reg_key AND successor.reg_key <> ''
+);
+
+-- @query: exit_count_release1_to_release2
+-- Same narrowly scoped transition confirmation, one release later: how
+-- many release1 keys are absent from release2.
+SELECT COUNT(*) AS exit_count
+FROM (SELECT DISTINCT reg_key FROM release1_population WHERE reg_key <> '') AS predecessor_keys
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM release2_population AS successor
     WHERE successor.reg_key = predecessor_keys.reg_key AND successor.reg_key <> ''
 );

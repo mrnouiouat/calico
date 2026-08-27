@@ -290,6 +290,7 @@ class DeriveSuccessTests(unittest.TestCase):
                 spike_002 = json.loads(
                     (output_path / _SPIKE_002_SUCCESSOR).read_text(encoding="utf-8")
                 )
+                self.assertEqual(len(spike_002["coverage"]), 3)
                 for coverage_entry in spike_002["coverage"]:
                     self.assertEqual(coverage_entry["total_row_count"], 9)
                     self.assertEqual(coverage_entry["keyed_row_count"], 8)
@@ -297,14 +298,20 @@ class DeriveSuccessTests(unittest.TestCase):
                     self.assertEqual(coverage_entry["delinquent_row_count"], 2)
                     self.assertEqual(coverage_entry["coverage_status"], "corrected")
 
-                # Identical membership across release0/release1 (only the
-                # As-of Date column differs between synthetic releases).
+                # Identical membership across all three synthetic releases
+                # (only the As-of Date column differs between them).
                 membership = spike_002["keyed_membership"]
+                self.assertEqual(len(membership), 3)
                 self.assertEqual(membership[0]["sha256"], membership[1]["sha256"])
+                self.assertEqual(membership[1]["sha256"], membership[2]["sha256"])
                 for entry in membership:
                     self.assertEqual(entry["membership_status"], "confirmed_by_recomputation")
-                self.assertEqual(spike_002["transition_confirmation"]["exit_count"], 0)
-                self.assertEqual(spike_002["transition_confirmation"]["status"], "confirmed_by_recomputation")
+
+                transitions = spike_002["transition_confirmations"]
+                self.assertEqual(len(transitions), 2)
+                for transition in transitions:
+                    self.assertEqual(transition["exit_count"], 0)
+                    self.assertEqual(transition["status"], "confirmed_by_recomputation")
 
                 august = json.loads((output_path / _AUGUST_SUCCESSOR).read_text(encoding="utf-8"))
                 self.assertEqual(august["release_total"], 9)

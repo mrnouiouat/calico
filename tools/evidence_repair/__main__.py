@@ -695,16 +695,18 @@ def _run_derive(args: argparse.Namespace) -> int:
         membership_hashes = [
             _hash_ordered_keys(connection, sql_blocks["membership_release0"]),
             _hash_ordered_keys(connection, sql_blocks["membership_release1"]),
+            _hash_ordered_keys(connection, sql_blocks["membership_release2"]),
         ]
 
-        (exit_count,) = _fetch_one(connection, sql_blocks["exit_count_release0_to_release1"])
+        (exit_count_0_to_1,) = _fetch_one(connection, sql_blocks["exit_count_release0_to_release1"])
+        (exit_count_1_to_2,) = _fetch_one(connection, sql_blocks["exit_count_release1_to_release2"])
 
     generated_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     documents = _build_documents(
         releases=releases,
         totals=totals,
         membership_hashes=membership_hashes,
-        exit_count=exit_count,
+        exit_counts=(exit_count_0_to_1, exit_count_1_to_2),
         elapsed_ms=elapsed_ms,
         peak_bytes=peak_bytes,
         august_predecessor=august_predecessor,
@@ -753,7 +755,7 @@ def _build_documents(
     releases: tuple[_AdmittedRelease, ...],
     totals: list[dict[str, int]],
     membership_hashes: list[str],
-    exit_count: int,
+    exit_counts: tuple[int, int],
     elapsed_ms: int,
     peak_bytes: int,
     august_predecessor: Path,
@@ -794,44 +796,39 @@ def _build_documents(
         "schema_version": "spike-002-successor-v1",
         "coverage": [
             {
-                "as_of_date": releases[0].as_of_date,
-                "release_revision": releases[0].release_revision,
-                "total_row_count": totals[0]["total_count"],
-                "keyed_row_count": totals[0]["keyed_count"],
-                "keyless_row_count": totals[0]["keyless_count"],
-                "delinquent_row_count": totals[0]["delinquent_count"],
+                "as_of_date": releases[index].as_of_date,
+                "release_revision": releases[index].release_revision,
+                "total_row_count": totals[index]["total_count"],
+                "keyed_row_count": totals[index]["keyed_count"],
+                "keyless_row_count": totals[index]["keyless_count"],
+                "delinquent_row_count": totals[index]["delinquent_count"],
                 "coverage_status": _CLAIM_STATUS_CORRECTED,
-            },
-            {
-                "as_of_date": releases[1].as_of_date,
-                "release_revision": releases[1].release_revision,
-                "total_row_count": totals[1]["total_count"],
-                "keyed_row_count": totals[1]["keyed_count"],
-                "keyless_row_count": totals[1]["keyless_count"],
-                "delinquent_row_count": totals[1]["delinquent_count"],
-                "coverage_status": _CLAIM_STATUS_CORRECTED,
-            },
+            }
+            for index in range(3)
         ],
         "keyed_membership": [
             {
-                "as_of_date": releases[0].as_of_date,
-                "release_revision": releases[0].release_revision,
-                "sha256": membership_hashes[0],
+                "as_of_date": releases[index].as_of_date,
+                "release_revision": releases[index].release_revision,
+                "sha256": membership_hashes[index],
                 "membership_status": _CLAIM_STATUS_CONFIRMED,
+            }
+            for index in range(3)
+        ],
+        "transition_confirmations": [
+            {
+                "from_as_of_date": releases[0].as_of_date,
+                "to_as_of_date": releases[1].as_of_date,
+                "exit_count": exit_counts[0],
+                "status": _CLAIM_STATUS_CONFIRMED,
             },
             {
-                "as_of_date": releases[1].as_of_date,
-                "release_revision": releases[1].release_revision,
-                "sha256": membership_hashes[1],
-                "membership_status": _CLAIM_STATUS_CONFIRMED,
+                "from_as_of_date": releases[1].as_of_date,
+                "to_as_of_date": releases[2].as_of_date,
+                "exit_count": exit_counts[1],
+                "status": _CLAIM_STATUS_CONFIRMED,
             },
         ],
-        "transition_confirmation": {
-            "from_as_of_date": releases[0].as_of_date,
-            "to_as_of_date": releases[1].as_of_date,
-            "exit_count": exit_count,
-            "status": _CLAIM_STATUS_CONFIRMED,
-        },
     }
 
     august_bytes = _dump_json(august_document)
