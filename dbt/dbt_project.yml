@@ -1,0 +1,25 @@
+name: 'calico_registry'
+version: '1.0.0'
+config-version: 2
+
+# The runner (`calico_dbt.runner`) always invokes dbt with explicit
+# `--profiles-dir/--target-path/--log-path` arguments pointed at its own
+# owned OS temporary root (T-03-01..T-03-08); no production database,
+# profile, target, log, or package artifact is ever created inside this
+# worktree. The relative paths below are declared only so a bare `dbt`
+# invocation has a syntactically valid, gitignored destination -- they are
+# never the paths actually used by either build mode.
+profile: 'calico_dbt'
+
+model-paths: ['models']
+test-paths: ['tests']
+target-path: 'target'
+log-path: 'logs'
+packages-install-path: 'dbt_packages'
+clean-targets:
+  - 'target'
+  - 'dbt_packages'
+
+models:
+  calico_registry:
+    +materialized: view

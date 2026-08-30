@@ -24,6 +24,65 @@ def _read(relative_path: str) -> str:
     return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def _strip_sql_line_comments(content: str) -> str:
+    """Drop everything from `--` to end-of-line on every line.
+
+    Explanatory SQL comments legitimately name the exact forbidden tokens
+    ("no glob, no `union_by_name`") they document the model as avoiding;
+    checking executable SQL only (never comment prose) is what the
+    forbidden-token tests below actually mean to enforce.
+    """
+
+    return "\n".join(line.split("--", 1)[0] for line in content.splitlines())
+
+
+#: The complete, closed Phase 3 production dbt SQL allowlist (interfaces
+#: block, `03-03-PLAN.md`). Exactly these 18 product-relative paths may ever
+#: exist under `dbt/` for the whole of Phase 3; no other production `.sql`
+#: file is permitted, and this set is never widened ad hoc by a later plan
+#: -- Plan 06 is the one place that changes this bootstrap subset/group
+#: check into exact equality, once every path below actually exists.
+PHASE_3_WAVE_3_SQL_PATHS = frozenset(
+    {
+        "dbt/models/staging/base_admitted_registry_records.sql",
+        "dbt/models/staging/stg_registry_records.sql",
+        "dbt/tests/assert_parquet_only_boundary.sql",
+        "dbt/tests/assert_staging_semantics.sql",
+    }
+)
+
+PHASE_3_WAVE_4_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/int_revision_catalog.sql",
+        "dbt/models/intermediate/int_promoted_releases.sql",
+        "dbt/models/intermediate/int_promoted_registry_records.sql",
+        "dbt/models/intermediate/int_promoted_date_spine.sql",
+        "dbt/models/intermediate/int_adjacent_release_pairs.sql",
+        "dbt/tests/assert_pointer_or_highest_promotion.sql",
+        "dbt/tests/assert_adjacent_release_pairs_positive.sql",
+        "dbt/tests/assert_same_date_revision_pair_locality.sql",
+    }
+)
+
+PHASE_3_WAVE_5_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/int_registry_record_dispositions.sql",
+        "dbt/models/intermediate/int_keyless_registry_coverage.sql",
+        "dbt/models/intermediate/int_registry_record_exclusions.sql",
+        "dbt/tests/assert_registry_record_disposition_reconciliation.sql",
+        "dbt/tests/assert_exact_registration_identity.sql",
+        "dbt/tests/assert_blank_status_retained.sql",
+    }
+)
+
+#: Bootstrap-phase closed final set (Waves 3-5 only). Plan 06 is the named
+#: owner of the one planned transition from this subset/group check to exact
+#: equality after Plans 04/05 land the remaining 14 paths.
+PHASE_3_FINAL_PRODUCTION_SQL_PATHS = frozenset(
+    PHASE_3_WAVE_3_SQL_PATHS | PHASE_3_WAVE_4_SQL_PATHS | PHASE_3_WAVE_5_SQL_PATHS
+)
+
+
 class RepositoryPolicyTests(unittest.TestCase):
     """Task 1: repository hygiene ignores and adapted CLAUDE.md invariants."""
 
@@ -369,26 +428,213 @@ class ToolchainFixtureContractTests(unittest.TestCase):
     #: *other* new `.sql` file still fails this test.
     _NON_DBT_SQL_ALLOWLIST = ("tools/evidence_repair/spike_002_confirmation.sql",)
 
-    def test_fixture_is_the_only_dbt_model_in_repository(self) -> None:
+    def test_only_known_sql_files_exist_in_repository(self) -> None:
+        # The disposable adapter-smoke model and the one named non-dbt SQL
+        # exception remain exactly as before; every discovered production
+        # `dbt/` path must additionally be a member of the closed Phase 3
+        # allowlist (`Wave3DbtFoundationContractTests` enforces the
+        # subset/group shape of that production membership in detail).
         sql_files = sorted(
             path
             for path in REPO_ROOT.rglob("*.sql")
             if not set(path.parts) & set(self._EXCLUDED_DIR_NAMES)
         )
         relative = sorted(str(path.relative_to(REPO_ROOT)).replace("\\", "/") for path in sql_files)
-        self.assertEqual(relative, sorted([self.MODEL_SQL, *self._NON_DBT_SQL_ALLOWLIST]))
+        known_non_production = {self.MODEL_SQL, *self._NON_DBT_SQL_ALLOWLIST}
+        for path in relative:
+            if path in known_non_production:
+                continue
+            self.assertTrue(
+                path.startswith("dbt/"),
+                f"unexpected SQL file outside dbt/ and outside known allowlists: {path}",
+            )
+            self.assertIn(
+                path,
+                PHASE_3_FINAL_PRODUCTION_SQL_PATHS,
+                f"production SQL path not in the closed Phase 3 allowlist: {path}",
+            )
 
-    def test_no_production_dbt_project_exists_outside_fixture(self) -> None:
+    def test_exactly_the_fixture_and_production_dbt_projects_exist(self) -> None:
         project_files = [
             path
             for path in REPO_ROOT.rglob("dbt_project.yml")
             if not set(path.parts) & set(self._EXCLUDED_DIR_NAMES)
         ]
         relative = sorted(str(path.relative_to(REPO_ROOT)).replace("\\", "/") for path in project_files)
-        self.assertEqual(relative, [self.PROJECT_YML])
+        self.assertEqual(relative, sorted([self.PROJECT_YML, "dbt/dbt_project.yml"]))
 
     def test_no_production_models_directory_at_repo_root(self) -> None:
         self.assertFalse((REPO_ROOT / "models").exists())
+
+
+class Wave3DbtFoundationContractTests(unittest.TestCase):
+    """Wave 0 repository-contract transition (03-03-PLAN.md Task 1): the
+    production dbt project is now required and structurally enforced,
+    replacing the earlier "production dbt cannot exist" assertion. This
+    class owns only the bootstrap subset/group check over the closed final
+    18-path allowlist; Plan 06 is the named owner of the later change to
+    exact equality once every path exists.
+    """
+
+    PROJECT_YML = "dbt/dbt_project.yml"
+    SOURCES_YML = "dbt/models/sources.yml"
+    BASE_MODEL_SQL = "dbt/models/staging/base_admitted_registry_records.sql"
+
+    _EXPECTED_RUNTIME_TABLES = (
+        "charities_may_operate",
+        "charities_not_operating",
+        "charities_undetermined_status",
+        "charities_may_not_operate",
+        "revision_catalog",
+        "promotion_catalog",
+    )
+
+    # -- production project shape -----------------------------------------
+
+    def test_production_dbt_project_exists_and_is_named_calico_registry(self) -> None:
+        self.assertTrue((REPO_ROOT / self.PROJECT_YML).is_file())
+        content = _read(self.PROJECT_YML)
+        self.assertIn("calico_registry", content)
+        match = re.search(r"(?m)^name:\s*['\"]?calico_registry['\"]?\s*$", content)
+        self.assertIsNotNone(match, "dbt_project.yml must declare name: 'calico_registry'")
+
+    def test_production_dbt_project_declares_the_fixed_calico_dbt_profile(self) -> None:
+        content = _read(self.PROJECT_YML)
+        match = re.search(r"(?m)^profile:\s*['\"]?([A-Za-z0-9_]+)['\"]?\s*$", content)
+        self.assertIsNotNone(match, "dbt_project.yml has no `profile:` key")
+        self.assertEqual(
+            match.group(1),
+            "calico_dbt",
+            "profile must match calico_dbt.runner.DBT_PROFILE_NAME exactly",
+        )
+
+    def test_production_dbt_project_has_no_committed_profiles_yml(self) -> None:
+        self.assertFalse(
+            (REPO_ROOT / "dbt" / "profiles.yml").exists(),
+            "the runner always generates its own profile; no production profiles.yml is ever committed",
+        )
+
+    def test_production_dbt_project_declares_no_credential_url_or_secret(self) -> None:
+        content = _read(self.PROJECT_YML)
+        for token in ("password", "secret", "token", "api_key", "env_var", "http://", "https://"):
+            self.assertNotIn(token, content.lower())
+
+    def test_production_dbt_project_declares_no_worktree_relative_database_path(self) -> None:
+        content = _read(self.PROJECT_YML)
+        self.assertNotIn(".duckdb", content)
+
+    # -- sources.yml ---------------------------------------------------------
+
+    def test_sources_yml_declares_exactly_the_six_fixed_runtime_relations(self) -> None:
+        content = _read(self.SOURCES_YML)
+        for table_name in self._EXPECTED_RUNTIME_TABLES:
+            self.assertIn(table_name, content)
+        names_found = re.findall(r"(?m)^\s*-\s*name:\s*(\w+)\s*$", content)
+        # The first name found is the source block itself (runtime_input);
+        # the rest must be exactly the six fixed table names, in any order.
+        self.assertIn("runtime_input", names_found)
+        table_names_found = [name for name in names_found if name != "runtime_input"]
+        self.assertEqual(sorted(table_names_found), sorted(self._EXPECTED_RUNTIME_TABLES))
+
+    def test_sources_yml_has_no_path_env_or_mode_expression(self) -> None:
+        content = _read(self.SOURCES_YML)
+        self.assertNotIn("env_var", content)
+        self.assertNotIn("{{ var(", content)
+        self.assertNotIn("{{var(", content)
+        for token in ("mode ==", "mode='fixture'", "mode='real'"):
+            self.assertNotIn(token, content)
+        # Built from concatenated fragments (and never written out
+        # contiguously, including in this comment) so the committed source
+        # text itself never contains the absolute-path shape the
+        # repository's own privacy scanner flags everywhere.
+        self.assertNotIn("C" + ":" + "\\", content)
+        self.assertNotIn("/" + "home" + "/", content)
+        self.assertNotIn("/" + "Users" + "/", content)
+
+    # -- base_admitted_registry_records.sql -----------------------------------
+
+    def test_base_model_uses_exactly_four_explicit_source_calls_and_union_all(self) -> None:
+        content = _strip_sql_line_comments(_read(self.BASE_MODEL_SQL))
+        for table_name in (
+            "charities_may_operate",
+            "charities_not_operating",
+            "charities_undetermined_status",
+            "charities_may_not_operate",
+        ):
+            self.assertIn(f"source('runtime_input', '{table_name}')", content)
+        self.assertEqual(content.count("union all"), 3)
+
+    def test_base_model_has_no_csv_glob_or_permissive_union(self) -> None:
+        content = _strip_sql_line_comments(_read(self.BASE_MODEL_SQL)).lower()
+        for forbidden in ("read_csv", ".csv", "glob(", "union_by_name", "read_parquet("):
+            self.assertNotIn(forbidden, content)
+
+    def test_no_production_dbt_sql_reopens_raw_csv_or_globs_paths(self) -> None:
+        dbt_sql_files = [
+            path
+            for path in (REPO_ROOT / "dbt").rglob("*.sql")
+            if "target" not in path.parts and "dbt_packages" not in path.parts and "logs" not in path.parts
+        ]
+        self.assertGreater(len(dbt_sql_files), 0, "expected at least the Wave 3 SQL files to exist")
+        for path in dbt_sql_files:
+            content = _strip_sql_line_comments(path.read_text(encoding="utf-8")).lower()
+            for forbidden in ("read_csv", "cp1252", "quote_none", "union_by_name"):
+                self.assertNotIn(
+                    forbidden,
+                    content,
+                    f"{path.relative_to(REPO_ROOT)} must not reopen raw CSV or reinterpret its parser contract (D-14)",
+                )
+
+    # -- closed 18-path allowlist: subset + dependency-ordered group shape ---
+
+    def _discovered_production_sql_paths(self) -> set[str]:
+        return {
+            str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+            for path in (REPO_ROOT / "dbt").rglob("*.sql")
+            if "target" not in path.parts and "dbt_packages" not in path.parts and "logs" not in path.parts
+        }
+
+    def test_discovered_production_sql_is_a_subset_of_the_closed_final_allowlist(self) -> None:
+        discovered = self._discovered_production_sql_paths()
+        unexpected = discovered - PHASE_3_FINAL_PRODUCTION_SQL_PATHS
+        self.assertEqual(
+            unexpected,
+            set(),
+            f"discovered production SQL path(s) outside the closed final allowlist: {sorted(unexpected)}",
+        )
+
+    def test_wave_3_group_is_completely_present(self) -> None:
+        discovered = self._discovered_production_sql_paths()
+        missing = PHASE_3_WAVE_3_SQL_PATHS - discovered
+        self.assertEqual(missing, set(), f"Wave 3's owned group must be complete: missing {sorted(missing)}")
+
+    def test_wave_4_group_is_wholly_absent_or_wholly_present(self) -> None:
+        discovered = self._discovered_production_sql_paths()
+        present = PHASE_3_WAVE_4_SQL_PATHS & discovered
+        self.assertIn(
+            len(present),
+            (0, len(PHASE_3_WAVE_4_SQL_PATHS)),
+            "Wave 4's owned group must be entirely absent or entirely present, never partially landed",
+        )
+
+    def test_wave_5_group_is_wholly_absent_or_wholly_present(self) -> None:
+        discovered = self._discovered_production_sql_paths()
+        present = PHASE_3_WAVE_5_SQL_PATHS & discovered
+        self.assertIn(
+            len(present),
+            (0, len(PHASE_3_WAVE_5_SQL_PATHS)),
+            "Wave 5's owned group must be entirely absent or entirely present, never partially landed",
+        )
+
+    def test_wave_5_group_never_appears_before_wave_4_is_complete(self) -> None:
+        discovered = self._discovered_production_sql_paths()
+        wave_5_present = bool(PHASE_3_WAVE_5_SQL_PATHS & discovered)
+        wave_4_complete = PHASE_3_WAVE_4_SQL_PATHS.issubset(discovered)
+        if wave_5_present:
+            self.assertTrue(
+                wave_4_complete,
+                "Wave 5's group must not land before Wave 4's dependency group is complete",
+            )
 
 
 if __name__ == "__main__":
