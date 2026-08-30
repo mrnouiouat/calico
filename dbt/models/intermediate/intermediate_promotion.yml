@@ -1,0 +1,133 @@
+version: 2
+
+models:
+  - name: int_revision_catalog
+    description: >
+      All-revision audit catalog (D-05). One row per immutable admitted
+      revision preflight verified for this build -- every accepted
+      revision is present here for audit, not only the one promoted per
+      date. Selected directly from `runtime_input.revision_catalog`.
+    columns:
+      - name: as_of_date
+        description: "The release date this revision was admitted under."
+        tests:
+          - not_null
+      - name: release_revision
+        description: "The immutable revision number for this as_of_date."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "The ordered-source-hash fingerprint identifying this exact revision."
+        tests:
+          - not_null
+      - name: parser_contract_version
+        description: "The admission parser contract version this revision was admitted under."
+        tests:
+          - not_null
+
+  - name: int_promoted_releases
+    description: >
+      Exactly one pointer-or-highest revision per as_of_date (D-06). The
+      Phase 2 atomic pointer is authoritative when
+      `runtime_input.promotion_catalog` carries an entry for that date;
+      otherwise the highest accepted revision from
+      `runtime_input.revision_catalog` wins. Full-key pointer/catalog
+      agreement is independently enforced by
+      `assert_pointer_or_highest_promotion.sql`.
+    columns:
+      - name: as_of_date
+        description: "One row per as_of_date -- the analytical timeline grain."
+        tests:
+          - unique
+          - not_null
+      - name: release_revision
+        description: "The winning revision number for this as_of_date."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "The winning revision's fingerprint."
+        tests:
+          - not_null
+      - name: parser_contract_version
+        description: "The winning revision's admission parser contract version."
+        tests:
+          - not_null
+
+  - name: int_promoted_registry_records
+    description: >
+      `stg_registry_records` rows restricted to the one promoted revision
+      per as_of_date (D-05), joined on the complete
+      (as_of_date, release_revision, revision_fingerprint) key. Contains
+      no rows from a nonpromoted same-date revision.
+    columns:
+      - name: as_of_date
+        description: "Bound release identity: the promoted as_of_date this row belongs to."
+        tests:
+          - not_null
+      - name: release_revision
+        description: "Bound release identity: always the promoted revision number for this date."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "Bound release identity: always the promoted revision's fingerprint."
+        tests:
+          - not_null
+
+  - name: int_promoted_date_spine
+    description: >
+      One row per promoted as_of_date (D-07), carrying that date's
+      winning full release identity. Named separately from
+      `int_promoted_releases` so adjacency has one clearly identified
+      upstream timeline relation.
+    columns:
+      - name: as_of_date
+        description: "One row per distinct promoted date -- the timeline grain adjacency is built over."
+        tests:
+          - unique
+          - not_null
+      - name: release_revision
+        description: "The promoted revision number for this date."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "The promoted revision's fingerprint for this date."
+        tests:
+          - not_null
+
+  - name: int_adjacent_release_pairs
+    description: >
+      One row per consecutive pair of distinct promoted dates (D-07),
+      derived from a single `lead()` over `int_promoted_date_spine`.
+      Every gap is strictly positive
+      (`assert_adjacent_release_pairs_positive.sql`) and every pair-side
+      fingerprint is the current promoted winner for its date
+      (`assert_same_date_revision_pair_locality.sql`).
+    columns:
+      - name: from_as_of_date
+        description: "The earlier promoted date in this adjacent pair."
+        tests:
+          - not_null
+      - name: from_release_revision
+        description: "The earlier date's promoted revision number."
+        tests:
+          - not_null
+      - name: from_revision_fingerprint
+        description: "The earlier date's promoted revision fingerprint."
+        tests:
+          - not_null
+      - name: to_as_of_date
+        description: "The later promoted date in this adjacent pair."
+        tests:
+          - not_null
+      - name: to_release_revision
+        description: "The later date's promoted revision number."
+        tests:
+          - not_null
+      - name: to_revision_fingerprint
+        description: "The later date's promoted revision fingerprint."
+        tests:
+          - not_null
+      - name: gap_days
+        description: "The exact positive day distance between from_as_of_date and to_as_of_date."
+        tests:
+          - not_null

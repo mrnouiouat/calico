@@ -70,12 +70,19 @@ DBT_PROFILE_NAME = "calico_dbt"
 SELECT_ALIASES: dict[str, str] = {
     "staging-base": "base_admitted_registry_records",
     "source-staging": "source:runtime_input+",
-    "promotion": "int_promoted_releases int_promoted_registry_records",
-    "adjacency": "int_promoted_date_spine int_adjacent_release_pairs",
-    "promotion-adjacency": (
-        "int_promoted_releases int_promoted_registry_records "
-        "int_promoted_date_spine int_adjacent_release_pairs"
-    ),
+    # Ancestor-inclusive (`+`): a standalone verification build of
+    # `int_promoted_registry_records` needs `stg_registry_records` (and its
+    # own `base_admitted_registry_records` ancestor) to already exist, or
+    # `dbt build` fails with a missing-relation error rather than proving
+    # the promotion join. `int_promoted_releases` itself has no model
+    # ancestors (it reads the two fixed `runtime_input` sources directly),
+    # so including it is free.
+    "promotion": "+int_promoted_registry_records",
+    # Ancestor-inclusive for the same reason: `int_adjacent_release_pairs`
+    # needs its `int_promoted_date_spine` ancestor (which in turn needs
+    # `int_promoted_releases`) to already exist.
+    "adjacency": "+int_adjacent_release_pairs",
+    "promotion-adjacency": "+int_promoted_registry_records +int_adjacent_release_pairs",
     # Both directions: a standalone verification build of this alias must
     # also build its upstream staging dependency, or `dbt build` fails with
     # a missing-relation error rather than proving the disposition rule.
@@ -296,6 +303,13 @@ def _run_dbt_build(selection: str | None, *, project_dir: Path, profiles_dir: Pa
     sub = ["build"]
     if selection is not None:
         sub += ["--select", *selection.split()]
+        # `cautious`, not the `eager` default: a partial-selection verify
+        # build must never pull in a singular test whose *other* parent
+        # (e.g. a sibling Wave 4 model not part of this alias) was not
+        # itself selected/built -- that test would immediately fail with a
+        # missing-relation error even though the alias's own owned models
+        # and tests are all correct.
+        sub += ["--indirect-selection", "cautious"]
     cmd = _dbt_command(
         sub,
         project_dir=project_dir,
