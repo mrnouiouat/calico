@@ -39,9 +39,11 @@ def _strip_sql_line_comments(content: str) -> str:
 #: The complete, closed Phase 3 production dbt SQL allowlist (interfaces
 #: block, `03-03-PLAN.md`). Exactly these 18 product-relative paths may ever
 #: exist under `dbt/` for the whole of Phase 3; no other production `.sql`
-#: file is permitted, and this set is never widened ad hoc by a later plan
-#: -- Plan 06 is the one place that changes this bootstrap subset/group
-#: check into exact equality, once every path below actually exists.
+#: file is permitted, and this set is never widened ad hoc by a later plan.
+#: Plan 06 closed the final handoff: `Wave3DbtFoundationContractTests` now
+#: enforces exact equality between discovered production SQL and this full
+#: set, replacing the earlier bootstrap subset/group-shape checks that were
+#: only valid while Waves 4-5 had not yet landed.
 PHASE_3_WAVE_3_SQL_PATHS = frozenset(
     {
         "dbt/models/staging/base_admitted_registry_records.sql",
@@ -470,10 +472,13 @@ class ToolchainFixtureContractTests(unittest.TestCase):
 class Wave3DbtFoundationContractTests(unittest.TestCase):
     """Wave 0 repository-contract transition (03-03-PLAN.md Task 1): the
     production dbt project is now required and structurally enforced,
-    replacing the earlier "production dbt cannot exist" assertion. This
-    class owns only the bootstrap subset/group check over the closed final
-    18-path allowlist; Plan 06 is the named owner of the later change to
-    exact equality once every path exists.
+    replacing the earlier "production dbt cannot exist" assertion.
+
+    Plan 06 closes the final handoff this class was set up for: now that
+    Waves 4-5 have landed every remaining allowlisted path, the earlier
+    bootstrap subset/group-shape checks (present-or-absent, dependency
+    ordering) are replaced by one exact-equality assertion between
+    discovered production SQL and the full closed 18-path allowlist.
     """
 
     PROJECT_YML = "dbt/dbt_project.yml"
@@ -585,7 +590,7 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
                     f"{path.relative_to(REPO_ROOT)} must not reopen raw CSV or reinterpret its parser contract (D-14)",
                 )
 
-    # -- closed 18-path allowlist: subset + dependency-ordered group shape ---
+    # -- closed 18-path allowlist: final exact-equality handoff (Plan 06) ---
 
     def _discovered_production_sql_paths(self) -> set[str]:
         return {
@@ -594,47 +599,20 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
             if "target" not in path.parts and "dbt_packages" not in path.parts and "logs" not in path.parts
         }
 
-    def test_discovered_production_sql_is_a_subset_of_the_closed_final_allowlist(self) -> None:
+    def test_discovered_production_sql_exactly_equals_the_closed_final_allowlist(self) -> None:
+        # Plan 06's own handoff: Waves 3-5 have all landed, so discovery must
+        # now equal -- not merely be a subset of -- the complete 18-path
+        # allowlist. Both a missing planned path and an unplanned extra path
+        # fail this test.
         discovered = self._discovered_production_sql_paths()
+        missing = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
         unexpected = discovered - PHASE_3_FINAL_PRODUCTION_SQL_PATHS
         self.assertEqual(
-            unexpected,
-            set(),
-            f"discovered production SQL path(s) outside the closed final allowlist: {sorted(unexpected)}",
+            (missing, unexpected),
+            (set(), set()),
+            "discovered production SQL must exactly equal the closed 18-path "
+            f"allowlist: missing={sorted(missing)}, unexpected={sorted(unexpected)}",
         )
-
-    def test_wave_3_group_is_completely_present(self) -> None:
-        discovered = self._discovered_production_sql_paths()
-        missing = PHASE_3_WAVE_3_SQL_PATHS - discovered
-        self.assertEqual(missing, set(), f"Wave 3's owned group must be complete: missing {sorted(missing)}")
-
-    def test_wave_4_group_is_wholly_absent_or_wholly_present(self) -> None:
-        discovered = self._discovered_production_sql_paths()
-        present = PHASE_3_WAVE_4_SQL_PATHS & discovered
-        self.assertIn(
-            len(present),
-            (0, len(PHASE_3_WAVE_4_SQL_PATHS)),
-            "Wave 4's owned group must be entirely absent or entirely present, never partially landed",
-        )
-
-    def test_wave_5_group_is_wholly_absent_or_wholly_present(self) -> None:
-        discovered = self._discovered_production_sql_paths()
-        present = PHASE_3_WAVE_5_SQL_PATHS & discovered
-        self.assertIn(
-            len(present),
-            (0, len(PHASE_3_WAVE_5_SQL_PATHS)),
-            "Wave 5's owned group must be entirely absent or entirely present, never partially landed",
-        )
-
-    def test_wave_5_group_never_appears_before_wave_4_is_complete(self) -> None:
-        discovered = self._discovered_production_sql_paths()
-        wave_5_present = bool(PHASE_3_WAVE_5_SQL_PATHS & discovered)
-        wave_4_complete = PHASE_3_WAVE_4_SQL_PATHS.issubset(discovered)
-        if wave_5_present:
-            self.assertTrue(
-                wave_4_complete,
-                "Wave 5's group must not land before Wave 4's dependency group is complete",
-            )
 
 
 if __name__ == "__main__":

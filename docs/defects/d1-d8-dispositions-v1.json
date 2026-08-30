@@ -1,0 +1,216 @@
+{
+  "contract_version": 1,
+  "defects": [
+    {
+      "id": "D1",
+      "name": "Misleading Last Renewal meaning",
+      "v1_disposition": "Expose only the source-reported field under an explicitly source-reported, semantically unresolved name; never model or document it as an accepted-submission date.",
+      "phase_3_evidence_status": "implemented_and_tested",
+      "owner": { "phase": "Phase 3", "tier": "dbt staging" },
+      "evidence": [
+        {
+          "type": "document",
+          "path": "dbt/models/staging/staging.yml",
+          "identifier": "stg_registry_records.source_reported_last_renewal_date"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_staging_semantics.sql",
+          "identifier": null
+        }
+      ],
+      "note": "Renamed to source_reported_last_renewal_date with an explicit semantic-uncertainty description; assert_staging_semantics.sql proves the required name exists and that no accepted-submission-shaped alias is ever present.",
+      "downstream_obligations": [
+        {
+          "owning_phase": "Phase 5",
+          "requirement": "Compute the three locked Last Renewal transition-diagnostic measures against observed exits, and prove that clearing this field is never treated as the event definition.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "D2",
+      "name": "Private-foundation undercount",
+      "v1_disposition": "Out of v1. No IRS or private-foundation segmentation source, model, or derived flag is introduced anywhere in the dbt project or product analytical code.",
+      "phase_3_evidence_status": "explicit_exclusion",
+      "owner": { "phase": "Phase 3", "tier": "documentation" },
+      "evidence": [
+        {
+          "type": "python_test",
+          "path": "tests/dbt_foundation/test_disposition_matrix.py",
+          "identifier": "tests.dbt_foundation.test_disposition_matrix.ExclusionAbsenceTests.test_no_irs_or_private_foundation_terms_in_analytical_paths"
+        }
+      ],
+      "note": "The excluded federal identifier column is retained in staging only for internal row-level reconciliation and is never used, exposed, or joined as identity; no IRS/private-foundation model or field exists.",
+      "downstream_obligations": []
+    },
+    {
+      "id": "D3",
+      "name": "Direction-dependent Date Status Set",
+      "v1_disposition": "Expose only the source-reported current-status date under an explicit source-reported name; prohibit exact-onset naming or use anywhere in Phase 3.",
+      "phase_3_evidence_status": "implemented_and_tested",
+      "owner": { "phase": "Phase 3", "tier": "dbt staging" },
+      "evidence": [
+        {
+          "type": "document",
+          "path": "dbt/models/staging/staging.yml",
+          "identifier": "stg_registry_records.source_reported_current_status_date"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_staging_semantics.sql",
+          "identifier": null
+        }
+      ],
+      "note": "Renamed to source_reported_current_status_date; assert_staging_semantics.sql proves the required name exists and that no exact-onset-shaped alias is ever present.",
+      "downstream_obligations": [
+        {
+          "owning_phase": "Phase 4",
+          "requirement": "Derive transition onset and exit only as release-interval bounds, and never substitute the source-reported current-status date as an exact transition onset.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "D4",
+      "name": "Substring web lookup",
+      "v1_disposition": "Longitudinal identity is the exact trimmed full nonblank State Charity registration number; no fuzzy or substring official-web join is ingested or used.",
+      "phase_3_evidence_status": "implemented_and_tested",
+      "owner": { "phase": "Phase 3", "tier": "dbt intermediate" },
+      "evidence": [
+        {
+          "type": "document",
+          "path": "dbt/models/staging/staging.yml",
+          "identifier": "stg_registry_records.state_charity_registration_number"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_exact_registration_identity.sql",
+          "identifier": null
+        }
+      ],
+      "note": "assert_exact_registration_identity.sql proves exact retention with no FEIN fallback and no FEIN aliasing; no fuzzy-web join field or model exists anywhere in Phase 3.",
+      "downstream_obligations": [
+        {
+          "owning_phase": "Phase 8",
+          "requirement": "Require name narrowing followed by explicit selection of a displayed exact organization/full-registration-number candidate, including duplicate-name disambiguation, before any history is shown; never a fuzzy substring web join.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "D5",
+      "name": "IRS revocation event log",
+      "v1_disposition": "Out of v1. No IRS revocation source, model, or event relation is introduced anywhere in the dbt project or product analytical code.",
+      "phase_3_evidence_status": "explicit_exclusion",
+      "owner": { "phase": "Phase 3", "tier": "documentation" },
+      "evidence": [
+        {
+          "type": "python_test",
+          "path": "tests/dbt_foundation/test_disposition_matrix.py",
+          "identifier": "tests.dbt_foundation.test_disposition_matrix.ExclusionAbsenceTests.test_no_irs_or_private_foundation_terms_in_analytical_paths"
+        }
+      ],
+      "note": "No IRS revocation source, model, or event relation exists; the defect note is retained here for any future extension decision.",
+      "downstream_obligations": []
+    },
+    {
+      "id": "D6",
+      "name": "Incomplete identifier catalog",
+      "v1_disposition": "Keep Phase 2 admission as the sole owner of identifier-family classification; Phase 3 consumes only admitted Parquet and adds no raw identifier-family parser.",
+      "phase_3_evidence_status": "linked_to_phase_2",
+      "owner": { "phase": "Phase 2", "tier": "Python admission" },
+      "evidence": [
+        {
+          "type": "contract",
+          "path": "contracts/ag-registry-csv-v1.json",
+          "identifier": null
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_admission.py",
+          "identifier": "tests.landing.test_admission.RejectionMatrixTests.test_unknown_registration_family_rejected_blank_keys_stay_accepted"
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_admission.py",
+          "identifier": "tests.landing.test_admission.NonEchoTests.test_unknown_registration_family_sentinel_never_echoed"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_parquet_only_boundary.sql",
+          "identifier": null
+        }
+      ],
+      "note": "Identifier-family classification remains owned and tested by Phase 2 admission; Phase 3 adds only the Parquet-only boundary proof that dbt never reopens raw CSV identifier parsing.",
+      "downstream_obligations": []
+    },
+    {
+      "id": "D7",
+      "name": "Inconsistent encoding",
+      "v1_disposition": "Keep Phase 2's strict CP1252 decode with no replacement-character path as the sole owner; Phase 3 reads only admitted Parquet.",
+      "phase_3_evidence_status": "linked_to_phase_2",
+      "owner": { "phase": "Phase 2", "tier": "Python admission" },
+      "evidence": [
+        {
+          "type": "contract",
+          "path": "contracts/ag-registry-csv-v1.json",
+          "identifier": null
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.DecodeFailureTests.test_invalid_cp1252_byte_rejected"
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.DecodeFailureTests.test_embedded_replacement_character_rejected"
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.Cp1252PunctuationTests.test_cp1252_high_punctuation_round_trips"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_parquet_only_boundary.sql",
+          "identifier": null
+        }
+      ],
+      "note": "CP1252 strict-decode/no-U+FFFD admission remains owned and tested by Phase 2; Phase 3 adds no replacement-character path and never reopens raw CSV.",
+      "downstream_obligations": []
+    },
+    {
+      "id": "D8",
+      "name": "Claimed embedded newlines",
+      "v1_disposition": "Keep Phase 2's corrected diagnosis (unmatched quote plus default-parser fusion, not embedded newlines) as the sole owner; physical-line/record reconciliation stays in Phase 2.",
+      "phase_3_evidence_status": "linked_to_phase_2",
+      "owner": { "phase": "Phase 2", "tier": "Python admission" },
+      "evidence": [
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.UnescapedQuoteTests.test_unescaped_quote_stays_data_in_one_record"
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.UnescapedQuoteTests.test_multiple_unescaped_quotes_do_not_fuse_two_records"
+        },
+        {
+          "type": "python_test",
+          "path": "tests/landing/test_parser.py",
+          "identifier": "tests.landing.test_parser.BlankLineReconciliationTests.test_interior_and_trailing_blank_lines_are_skipped"
+        },
+        {
+          "type": "dbt_singular_test",
+          "path": "dbt/tests/assert_parquet_only_boundary.sql",
+          "identifier": null
+        }
+      ],
+      "note": "Unmatched-quote/physical-line reconciliation remains owned and tested by Phase 2; the embedded-newline diagnosis stays explicitly rejected and no newline-aware or raw-CSV code exists in Phase 3.",
+      "downstream_obligations": []
+    }
+  ]
+}

@@ -23,6 +23,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from calico_dbt import runner
 from tests.fixtures.dbt_foundation.fixture_builder import gate_b_fixture_store
@@ -268,10 +269,17 @@ class FixtureModeBuildTests(RunnerTestCase):
 
 class RealModeBuildTests(RunnerTestCase):
     def test_real_mode_fails_closed_when_committed_catalog_is_absent(self) -> None:
+        # Plan 06 populates the fixed, committed `_REAL_CATALOG_PATH` for the
+        # three real admitted releases, so this fail-closed path can no
+        # longer be exercised through the real committed file; it is
+        # exercised here by pointing the module constant at a path that
+        # never exists, isolated to this one test via `patch.object`.
         with tempfile.TemporaryDirectory(prefix="calico-real-store-") as store_dir:
-            outcome = runner.build(
-                mode="real", store=store_dir, _dbt_project_dir_override=self.project_dir
-            )
+            missing_catalog_path = Path(store_dir) / "does-not-exist-catalog.json"
+            with patch.object(runner, "_REAL_CATALOG_PATH", missing_catalog_path):
+                outcome = runner.build(
+                    mode="real", store=store_dir, _dbt_project_dir_override=self.project_dir
+                )
         self.assertEqual(outcome.status, "failed")
         self.assertEqual(outcome.category, "runner.catalog_not_found")
 
