@@ -43,18 +43,20 @@ _UNKEYED_COVERAGE_SQL = _INTERMEDIATE_DIR / "int_unkeyed_coverage.sql"
 _ENTITY_TRANSITIONS_SQL = _INTERMEDIATE_DIR / "int_entity_transitions.sql"
 _TRANSITION_MATRIX_SQL = _INTERMEDIATE_DIR / "int_transition_matrix.sql"
 
-#: The exact total dbt model count now that Plan 02's four models and
+#: The exact total dbt model count now that Plan 02's four models,
 #: Plan 04's three models (04-04-PLAN.md: stg_capture_attempts,
-#: int_capture_runs, int_release_flags) both exist alongside the ten
-#: already-delivered Phase 3 models (Wave 3-5). An unselected `runner.build`
-#: always builds the whole project regardless of which plan's test is
-#: driving it, so this constant tracks total project model count, not only
-#: this file's own Plan 02 models -- forward-fixed the same way this plan
-#: forward-fixed test_catalog.py's and test_repository_contract.py's own
-#: stale exact-count assertions. A mismatch here means either a model
-#: failed to build or an unexpected extra/missing model exists in the
-#: project.
-_EXPECTED_TOTAL_MODEL_COUNT = 17
+#: int_capture_runs, int_release_flags), and Plan 03's two models
+#: (04-03-PLAN.md: int_entity_observation_sequence, int_delinquency_spells)
+#: all exist alongside the ten already-delivered Phase 3 models (Wave 3-5).
+#: An unselected `runner.build` always builds the whole project regardless
+#: of which plan's test is driving it, so this constant tracks total
+#: project model count, not only this file's own Plan 02 models --
+#: forward-fixed the same way Plan 04 forward-fixed test_catalog.py's and
+#: test_repository_contract.py's own stale exact-count assertions, and the
+#: same way this file's own constant was forward-fixed from 14 to 17 when
+#: Plan 04 landed. A mismatch here means either a model failed to build or
+#: an unexpected extra/missing model exists in the project.
+_EXPECTED_TOTAL_MODEL_COUNT = 19
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

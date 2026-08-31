@@ -1,0 +1,137 @@
+version: 2
+
+models:
+  - name: int_entity_observation_sequence
+    description: >
+      Grain: one row per promoted full release identity
+      (as_of_date, release_revision, revision_fingerprint) plus the exact
+      full nonblank State Charity registration number -- identical to
+      `int_keyed_snapshots`'s own grain, since this relation is a pure
+      windowed extension of it, not a second owner (D-01). An internal
+      helper only, never one of the ten required grains: it exists so
+      `int_delinquency_spells` never has to recompute a global observation
+      ordinal or per-key `lag`/`lead` itself. Every neighbor window is
+      computed over the *complete* keyed observation sequence before any
+      filtering to the published delinquent population, so the immediately
+      preceding/following non-delinquent row is always available to tell
+      an observed entry/exit apart from a censored or lost boundary.
+      Materialized as a `view`: a light windowed pass-through, not a reused
+      heavy transform.
+    columns:
+      - name: as_of_date
+        description: "Bound release identity: the promoted as_of_date this observation belongs to."
+        tests:
+          - not_null
+      - name: release_revision
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        tests:
+          - not_null
+      - name: observation_ordinal
+        description: >
+          The global row-number ordinal of `as_of_date` within the
+          complete promoted date spine, one-indexed. Never null: every row
+          here already joined to a promoted date.
+        tests:
+          - not_null
+      - name: state_charity_registration_number
+        description: "The sole longitudinal identity key this observation belongs to (D-05)."
+        tests:
+          - not_null
+      - name: is_delinquent
+        description: "Carried unchanged from `int_keyed_snapshots` (D-06). Never recomputed here."
+        tests:
+          - not_null
+      - name: prior_observation_ordinal
+        description: >
+          The immediately preceding promoted-date ordinal at which this
+          exact key was observed in `int_keyed_snapshots`, computed before
+          any delinquency filtering. Null only when this is the key's
+          first-ever keyed observation.
+      - name: next_observation_ordinal
+        description: >
+          The immediately following promoted-date ordinal at which this
+          exact key was observed, computed before any delinquency
+          filtering. Null only when this is the key's last-ever keyed
+          observation in the panel.
+
+  - name: int_delinquency_spells
+    description: >
+      Grain: one row per exact registration key plus deterministic spell
+      number (D-08, D-21 representative model). Each row is one contiguous
+      *observed* delinquency spell within the published delinquent
+      population -- built in SQL from the complete ordered observation
+      sequence in `int_entity_observation_sequence` with gaps-and-islands,
+      never an inferred period of continuous real-world noncompliance.
+      Bounds are strictly observation bounds (D-017): `onset_left` and
+      `exit_right` are only ever populated from an immediately adjacent
+      observed non-delinquent neighbor row, never invented from a
+      source-reported date. A missing accepted release always breaks
+      continuity (D-11) -- reappearance after a gap starts a new
+      left-censored spell and re-entry after a confirmed observed exit
+      also starts a new spell; `assert_delinquency_spell_invariants.sql`
+      independently recomputes every island, bound, and terminal state
+      directly from `int_keyed_snapshots`/`int_promoted_date_spine` and
+      proves grain uniqueness (dbt's generic `unique` test cannot express
+      a composite key without an added dependency). Materialized as an
+      immediate full-refresh `table`: a reused heavy transform.
+    columns:
+      - name: state_charity_registration_number
+        description: "The sole longitudinal identity key this spell belongs to (D-05)."
+        tests:
+          - not_null
+      - name: spell_number
+        description: "Deterministic, cumulative, one-indexed sequence number of this spell for this exact key."
+        tests:
+          - not_null
+      - name: onset_left
+        description: >
+          The last accepted observation date outside delinquency
+          immediately preceding this spell's first delinquent observation
+          (D-09). Null whenever this spell is left-censored -- first-seen
+          delinquent or started immediately after an observation gap.
+      - name: onset_right
+        description: "The first delinquent observation date of this spell (D-09). Never null."
+        tests:
+          - not_null
+      - name: exit_left
+        description: "The last delinquent observation date of this spell (D-10). Never null."
+        tests:
+          - not_null
+      - name: exit_right
+        description: >
+          The first later accepted observation date outside delinquency,
+          populated only when this spell's terminal state is
+          `observed_exit` (D-10). Null for both `lost_to_observation` and
+          `right_censored` spells -- distinct states are never folded
+          together by a shared null value.
+      - name: is_left_censored
+        description: "True whenever `onset_left` is null: first-seen delinquent or started after a gap (D-09)."
+        tests:
+          - not_null
+      - name: is_right_censored
+        description: "True only when this spell is still observed delinquent on the global panel's final promoted date (D-10)."
+        tests:
+          - not_null
+      - name: is_lost_to_observation
+        description: >
+          True only when this spell's exact key disappears from the panel
+          before the panel's final promoted date, with no immediately
+          adjacent observed exit (D-10). Distinct from `is_right_censored`:
+          loss is a known information gap, never folded into ordinary
+          right censoring.
+        tests:
+          - not_null
+      - name: terminal_state
+        description: >
+          The closed, mutually exclusive D-10 terminal-state vocabulary
+          this spell's `is_right_censored`/`is_lost_to_observation` flags
+          and `exit_right` population are all derived from.
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - observed_exit
+                - lost_to_observation
+                - right_censored
