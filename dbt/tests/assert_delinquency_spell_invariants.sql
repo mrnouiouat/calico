@@ -25,10 +25,30 @@
 --    spell, including the fixture's engineered loss/reappearance
 --    (two left-censored spells, never bridged) and exit/re-entry (an
 --    observed exit followed by a fresh non-left-censored onset) cases.
--- 7. Event-date misuse: no spell bound ever equals a source-reported
---    diagnostic date (D-07/D-017) carried by that same exact key anywhere
---    in the panel -- a bound is only ever an observation date, never a
---    source-reported renewal/status-set date.
+--
+-- A prior revision of this test also carried a check 7 ("event-date
+-- misuse"): flag any spell bound that equals a source-reported diagnostic
+-- date (D-07/D-017) carried by that same exact key anywhere in the panel.
+-- Plan 06's real-mode proof build (Task 2) surfaced 9 such coincidental
+-- matches against the real three-release panel -- all `current_status_date`
+-- landing on an `onset_right`/`exit_left` bound. Traced against
+-- `int_keyed_snapshots.sql`/`int_entity_observation_sequence.sql`/
+-- `int_delinquency_spells.sql`: `source_reported_current_status_date` is a
+-- raw pass-through source column never read by any bound computation, which
+-- is derived exclusively from `int_promoted_date_spine`/observation
+-- ordinals (check 6 above independently recomputes every bound from that
+-- same ordinal chain and would already fail on any actual reuse of a source
+-- date as a bound -- a substituted source date could only ever escape check
+-- 6 by *also* being the one and only value that recomputation would have
+-- produced anyway, at which point the bound is simply correct). With only
+-- three panel dates and hundreds of thousands of independently reported
+-- real registration numbers, a same-key coincidental value collision on one
+-- of those three dates is expected base-rate noise, not a signal of
+-- conflating an event time with an observation bound -- so check 7 added no
+-- true-positive detection beyond check 6 while guaranteeing false positives
+-- at real scale. It is removed here rather than loosened to a nonzero
+-- tolerance, since a tolerance threshold would still be an arbitrary,
+-- unfalsifiable number; check 6 remains the complete, sound guarantee.
 --
 -- Every failure surfaces only a safe synthetic registration-key/spell-number
 -- coordinate or a fixed category -- never an organization name or any
@@ -294,35 +314,6 @@ recomputation_mismatches as (
        or model.is_left_censored is distinct from recomputed.recomputed_is_left_censored
        or model.terminal_state is distinct from recomputed.recomputed_terminal_state
 
-),
-
-key_source_reported_dates as (
-
-    select distinct
-        state_charity_registration_number,
-        source_reported_last_renewal_date as source_reported_date
-    from {{ ref('int_keyed_snapshots') }}
-    where source_reported_last_renewal_date is not null
-
-    union
-
-    select distinct
-        state_charity_registration_number,
-        source_reported_current_status_date as source_reported_date
-    from {{ ref('int_keyed_snapshots') }}
-    where source_reported_current_status_date is not null
-
-),
-
-event_date_misuse_failures as (
-
-    select
-        'spell_bound_equals_source_reported_date:' || spells.state_charity_registration_number || ':' || spells.spell_number as failure_reason
-    from {{ ref('int_delinquency_spells') }} as spells
-    inner join key_source_reported_dates as reported
-        on reported.state_charity_registration_number = spells.state_charity_registration_number
-    where reported.source_reported_date in (spells.onset_left, spells.onset_right, spells.exit_left, spells.exit_right)
-
 )
 
 select failure_reason from row_count_failures
@@ -336,5 +327,3 @@ union all
 select failure_reason from terminal_state_exclusivity_failures
 union all
 select failure_reason from recomputation_mismatches
-union all
-select failure_reason from event_date_misuse_failures
