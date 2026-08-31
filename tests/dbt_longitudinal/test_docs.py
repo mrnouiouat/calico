@@ -54,6 +54,12 @@ _SAFE_DOCS_PROOF_KEYS = frozenset(
 def _spy_on_mkdtemp():
     """Return (context_manager_factory, captured_list) so a test can learn
     the exact temp root `docs()` created without adding a production seam.
+
+    Patching `tempfile.mkdtemp` is process-global, and the fixture admission
+    pipeline this test drives through legitimately creates several of its
+    own unrelated scratch directories (e.g. one per admitted revision) --
+    so `captured` is filtered to only the `"calico-dbt-docs-"`-prefixed path
+    `runner.docs()` itself creates, never assuming it is the only caller.
     """
 
     real_mkdtemp = tempfile.mkdtemp
@@ -61,7 +67,8 @@ def _spy_on_mkdtemp():
 
     def spy(*args, **kwargs):
         path = real_mkdtemp(*args, **kwargs)
-        captured.append(path)
+        if Path(path).name.startswith("calico-dbt-docs-"):
+            captured.append(path)
         return path
 
     return patch("calico_dbt.runner.tempfile.mkdtemp", side_effect=spy), captured

@@ -3,12 +3,35 @@ version: 2
 models:
   - name: base_admitted_registry_records
     description: >
-      All-revision audit base (D-05, D-08): an explicit `union all` over the
-      four fixed `runtime_input` registry source relations. Every source
-      value and every bound release-identity/provenance column passes
-      through unchanged -- no cast, no trim, no rename, no glob, and no
-      `union_by_name`. Contains every admitted revision preflight verified
-      for this build, not only the promoted one per date.
+      Grain: one source row per source object (REQ-model-grains landed
+      source record; 04-06-PLAN.md D-01). All-revision audit base (D-05,
+      D-08): an explicit `union all` over the four fixed `runtime_input`
+      registry source relations. Every source value and every bound
+      release-identity/provenance column passes through unchanged -- no
+      cast, no trim, no rename, no glob, and no `union_by_name`. Contains
+      every admitted revision preflight verified for this build, not only
+      the promoted one per date.
+    columns:
+      - name: as_of_date
+        description: "Bound release identity: the as_of_date of the admitted revision this row belongs to."
+        tests:
+          - not_null
+      - name: release_revision
+        description: "Bound release identity: the revision number of the admitted revision this row belongs to."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "Bound release identity: the ordered-source-hash fingerprint of the admitted revision this row belongs to."
+        tests:
+          - not_null
+      - name: source_list
+        description: "Structural provenance: which of the four fixed published logical lists this row was admitted from."
+        tests:
+          - not_null
+      - name: source_line_no
+        description: "Structural provenance: the physical source line number this row was parsed from within its logical list's canonical object."
+        tests:
+          - not_null
 
   - name: stg_registry_records
     description: >

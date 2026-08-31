@@ -87,6 +87,22 @@ SELECT_ALIASES: dict[str, str] = {
     # also build its upstream staging dependency, or `dbt build` fails with
     # a missing-relation error rather than proving the disposition rule.
     "dispositions": "+int_registry_record_dispositions+",
+    # Phase 4 closure (04-06-PLAN.md Task 1): one ancestor-inclusive alias
+    # per Plan 02-05 SQL group, mirroring
+    # `tests.test_repository_contract.PHASE_4_SQL_GROUPS`'s own four named
+    # groups so a targeted verification build always matches the same
+    # boundary the repository contract enforces. Never a caller-supplied
+    # selector -- every alias resolves to exactly these fixed internal
+    # selection strings.
+    "longitudinal-transitions": (
+        "+int_keyed_snapshots +int_unkeyed_coverage +int_entity_transitions +int_transition_matrix"
+    ),
+    "longitudinal-facts": "+int_entity_observation_sequence +int_delinquency_spells",
+    "capture-facts": "+stg_capture_attempts +int_capture_runs +int_release_flags",
+    "public-models": (
+        "+int_public_organization_eligibility +mart_registry_population_coverage "
+        "+dim_public_organizations +fct_public_status_observations"
+    ),
 }
 
 #: The fixed product-relative real-mode proof destination (D-15). Always
@@ -153,6 +169,55 @@ class BuildOutcome:
     status: str
     category: str | None
     proof: SafeBuildProof | None
+
+    @property
+    def succeeded(self) -> bool:
+        return self.status == "success"
+
+
+DOCS_PROOF_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True)
+class SafeDocsProof:
+    """One closed, deterministic, JSON-serializable fixture-only docs proof
+    (D-15, D-20). Every field is a fixed schema/command ID, the fixed
+    `"fixture"` mode, a fixed status, or a safe count -- never a path, row,
+    excluded value, or raw child output.
+    """
+
+    proof_schema_version: int
+    command_schema_version: int
+    mode: str
+    status: str
+    dbt_selected_node_count: int
+    dbt_model_count: int
+    dbt_test_count: int
+    docs_node_count: int
+    docs_artifact_count: int
+
+    def to_json(self) -> str:
+        document = {
+            "proof_schema_version": self.proof_schema_version,
+            "command_schema_version": self.command_schema_version,
+            "mode": self.mode,
+            "status": self.status,
+            "dbt_selected_node_count": self.dbt_selected_node_count,
+            "dbt_model_count": self.dbt_model_count,
+            "dbt_test_count": self.dbt_test_count,
+            "docs_node_count": self.docs_node_count,
+            "docs_artifact_count": self.docs_artifact_count,
+        }
+        return json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+@dataclass(frozen=True)
+class DocsOutcome:
+    """The safe, non-echo result of one `docs()` call."""
+
+    status: str
+    category: str | None
+    proof: SafeDocsProof | None
 
     @property
     def succeeded(self) -> bool:
@@ -348,6 +413,44 @@ def _run_results_counts(target_path: Path) -> tuple[int, int]:
     return (model_count, test_count)
 
 
+def _run_dbt_docs_generate(
+    *, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path
+) -> None:
+    cmd = _dbt_command(
+        ["docs", "generate"],
+        project_dir=project_dir,
+        profiles_dir=profiles_dir,
+        target_path=target_path,
+        log_path=log_path,
+    )
+    result = _run_dbt(cmd)
+    if result.returncode != 0:
+        raise RunnerError("runner.dbt_docs_generate_failed")
+
+
+def _docs_safe_counts(target_path: Path) -> tuple[int, int]:
+    """Read only safe counts from the generated `catalog.json` plus a count
+    of generated artifact files -- never a name, path, or content beyond
+    those two counts (D-15).
+    """
+
+    catalog_path = target_path / "catalog.json"
+    try:
+        document = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return (0, 0)
+
+    nodes = document.get("nodes")
+    node_count = len(nodes) if isinstance(nodes, dict) else 0
+
+    try:
+        artifact_count = sum(1 for entry in target_path.iterdir() if entry.is_file())
+    except OSError:
+        artifact_count = 0
+
+    return (node_count, artifact_count)
+
+
 def _build_fixture_catalog(store_root: Path, admissions) -> cat.InputCatalog:
     manifests = []
     for admission in admissions:
@@ -375,6 +478,53 @@ def _load_real_catalog() -> cat.InputCatalog:
         return cat.load_input_catalog(_REAL_CATALOG_PATH)
     except cat.CatalogError as exc:
         raise RunnerError("runner.catalog_not_found") from exc
+
+
+def _prepare_environment(
+    *,
+    mode: str,
+    store: str | Path | None,
+    temp_root: Path,
+    fixture_store_factory: Callable[[], AbstractContextManager] | None,
+) -> tuple[AbstractContextManager | None, "pf.RuntimeInputBinding"]:
+    """Shared fixture-admit-or-real-verify plus preflight-bind plus
+    profile-write lifecycle both `build()` and `docs()` call identically
+    (D-01..D-04/D-20).
+
+    Returns the still-open fixture context (`None` in real mode) and the
+    resulting `RuntimeInputBinding`. Writes `profiles.yml` into `temp_root`
+    as a side effect. The caller owns closing the returned fixture context
+    (`__exit__`) once it is done with it -- this function never closes it
+    itself, since the fixture store's admitted objects must stay readable
+    for the whole build/docs lifecycle that follows.
+    """
+
+    fixture_context = None
+    if mode == "fixture":
+        factory = fixture_store_factory
+        if factory is None:
+            from tests.fixtures.dbt_foundation.fixture_builder import gate_b_fixture_store
+
+            factory = gate_b_fixture_store
+        fixture_context = factory()
+        fixture_store = fixture_context.__enter__()
+        catalog = _build_fixture_catalog(fixture_store.store_root, fixture_store.admissions)
+        resolved_store_root = fixture_store.store_root
+    else:
+        # Store legitimacy (existence, non-worktree) is the explicit D-02
+        # gate and is checked before the committed catalog is even loaded,
+        # so a store-path mistake is never masked by a not-yet-populated
+        # catalog document.
+        resolved_store_root = _resolve_real_store(store)
+        catalog = _load_real_catalog()
+
+    binding = pf.prepare_runtime_input(
+        store_root=resolved_store_root, catalog=catalog, temp_root=temp_root
+    )
+
+    _write_profile(temp_root, binding.duckdb_path)
+
+    return fixture_context, binding
 
 
 def _resolve_real_store(store: str | Path) -> Path:
@@ -458,29 +608,9 @@ def build(
 
         fixture_context = None
         try:
-            if mode == "fixture":
-                factory = fixture_store_factory
-                if factory is None:
-                    from tests.fixtures.dbt_foundation.fixture_builder import gate_b_fixture_store
-
-                    factory = gate_b_fixture_store
-                fixture_context = factory()
-                fixture_store = fixture_context.__enter__()
-                catalog = _build_fixture_catalog(fixture_store.store_root, fixture_store.admissions)
-                resolved_store_root = fixture_store.store_root
-            else:
-                # Store legitimacy (existence, non-worktree) is the explicit
-                # D-02 gate and is checked before the committed catalog is
-                # even loaded, so a store-path mistake is never masked by a
-                # not-yet-populated catalog document.
-                resolved_store_root = _resolve_real_store(store)
-                catalog = _load_real_catalog()
-
-            binding = pf.prepare_runtime_input(
-                store_root=resolved_store_root, catalog=catalog, temp_root=temp_root
+            fixture_context, binding = _prepare_environment(
+                mode=mode, store=store, temp_root=temp_root, fixture_store_factory=fixture_store_factory
             )
-
-            _write_profile(temp_root, binding.duckdb_path)
 
             selected_nodes = _ls_selected_nodes(
                 selection,
@@ -537,6 +667,94 @@ def build(
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
+def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
+    """Run one full pinned fixture-mode dbt build, then pinned dbt 1.10.23
+    `docs generate`, inside the same kind of runner-owned temporary root
+    `build()` itself uses (D-20).
+
+    Always fixture mode -- there is no `mode`/`store` argument, because the
+    docs proof must never run against a real, private store (T-04-06B).
+    Returns a closed `SafeDocsProof` carrying only fixed schema/status/count
+    fields -- never a path, row, or raw dbt/child output. Every generated
+    file (the fixture's opaque input copies, the on-disk DuckDB database,
+    the generated profile, and every dbt target/log/package/catalog
+    artifact `docs generate` writes) lives beneath one runner-owned OS
+    temporary root that is removed in `finally` on every exit path --
+    success, dbt failure, preflight failure, or an interrupting exception.
+
+    `_dbt_project_dir_override` is the identical test/integration-only seam
+    `build()` accepts; production callers must never pass it.
+    """
+
+    project_dir = (
+        Path(_dbt_project_dir_override) if _dbt_project_dir_override is not None else _DEFAULT_DBT_PROJECT_DIR
+    )
+
+    temp_root = Path(tempfile.mkdtemp(prefix="calico-dbt-docs-"))
+    try:
+        target_path = temp_root / "target"
+        log_path = temp_root / "logs"
+        for path in (target_path, log_path):
+            path.mkdir(parents=True, exist_ok=True)
+
+        fixture_context = None
+        try:
+            fixture_context, binding = _prepare_environment(
+                mode="fixture", store=None, temp_root=temp_root, fixture_store_factory=None
+            )
+
+            selected_nodes = _ls_selected_nodes(
+                None,
+                project_dir=project_dir,
+                profiles_dir=temp_root,
+                target_path=target_path,
+                log_path=log_path,
+            )
+            if not selected_nodes:
+                return DocsOutcome(status="failed", category="runner.empty_selection", proof=None)
+
+            _run_dbt_build(
+                None,
+                project_dir=project_dir,
+                profiles_dir=temp_root,
+                target_path=target_path,
+                log_path=log_path,
+            )
+
+            model_count, test_count = _run_results_counts(target_path)
+
+            _run_dbt_docs_generate(
+                project_dir=project_dir,
+                profiles_dir=temp_root,
+                target_path=target_path,
+                log_path=log_path,
+            )
+
+            docs_node_count, docs_artifact_count = _docs_safe_counts(target_path)
+
+            proof = SafeDocsProof(
+                proof_schema_version=DOCS_PROOF_SCHEMA_VERSION,
+                command_schema_version=COMMAND_SCHEMA_VERSION,
+                mode="fixture",
+                status="success",
+                dbt_selected_node_count=len(selected_nodes),
+                dbt_model_count=model_count,
+                dbt_test_count=test_count,
+                docs_node_count=docs_node_count,
+                docs_artifact_count=docs_artifact_count,
+            )
+            return DocsOutcome(status="success", category=None, proof=proof)
+        finally:
+            if fixture_context is not None:
+                fixture_context.__exit__(None, None, None)
+    except (pf.PreflightError, cat.CatalogError) as exc:
+        return DocsOutcome(status="failed", category=exc.category, proof=None)
+    except RunnerError as exc:
+        return DocsOutcome(status="failed", category=exc.category, proof=None)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
 def _write_proof_output(proof: SafeBuildProof) -> None:
     destination = Path(__file__).resolve().parent.parent / _PROOF_OUTPUT_RELATIVE_PATH
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -557,6 +775,9 @@ __all__ = [
     "RunnerError",
     "SafeBuildProof",
     "BuildOutcome",
+    "SafeDocsProof",
+    "DocsOutcome",
     "FixtureBuildInspection",
     "build",
+    "docs",
 ]

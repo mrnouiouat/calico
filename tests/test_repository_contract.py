@@ -706,78 +706,85 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
                     f"{path.relative_to(REPO_ROOT)} must not reopen raw CSV or reinterpret its parser contract (D-14)",
                 )
 
-    # -- closed 18-path allowlist: Phase 4 Wave 0 reopens this gate --------
+    # -- closed 41-path allowlist: Plan 06 closes this gate ----------------
 
     def _discovered_production_sql_paths(self) -> set[str]:
         return _discovered_production_sql_paths()
 
-    def test_discovered_production_sql_matches_the_open_cumulative_boundary(self) -> None:
-        # Superseded by Phase 4 Plan 01 (04-01-PLAN.md): the prior exact
-        # Phase-3-only equality this test enforced is reopened to the
-        # cumulative Phase 3 + Phase 4 bootstrap shape --
-        # `Phase4CumulativeGateTests` below owns the detailed group/order
-        # assertions. This method keeps the two invariants that never
-        # relax during the whole Phase 4 bootstrap: the 18 Phase 3 paths
-        # remain complete, and no discovered path may fall outside the
-        # closed Phase 3 + Phase 4 union. Plan 06 is the named owner of
-        # replacing this with one final exact-equality assertion over the
-        # complete 41-path union once every Phase 4 group has landed.
+    def test_discovered_production_sql_exactly_equals_the_closed_phase_3_and_4_union(self) -> None:
+        # Closed by Plan 06 (04-06-PLAN.md Task 1): now that every Phase 4
+        # group (Plans 02-05) has landed, the open cumulative-boundary check
+        # Phase 4 Plan 01 (04-01-PLAN.md) introduced -- "every Phase 3 path
+        # remains complete, no discovered path falls outside the union" --
+        # is replaced by one exact-equality assertion, mirroring exactly how
+        # Phase 3's own Plan 06 closed `PHASE_3_FINAL_PRODUCTION_SQL_PATHS`
+        # once its own Waves 4-5 landed. `Phase4CumulativeGateTests` below
+        # owns the equivalent final closure in more detail.
         discovered = self._discovered_production_sql_paths()
-        missing_phase_3 = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
-        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
         self.assertEqual(
-            (missing_phase_3, unexpected),
-            (set(), set()),
-            "discovered production SQL must retain every Phase 3 path and "
-            "stay inside the closed Phase 3 + Phase 4 shape: "
-            f"missing_phase_3={sorted(missing_phase_3)}, unexpected={sorted(unexpected)}",
+            discovered,
+            PHASE_4_FINAL_PRODUCTION_SQL_PATHS,
+            "discovered production SQL must exactly equal the closed "
+            f"41-path Phase 3 + Phase 4 union: "
+            f"missing={sorted(PHASE_4_FINAL_PRODUCTION_SQL_PATHS - discovered)}, "
+            f"unexpected={sorted(discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS)}",
         )
 
 
 class Phase4CumulativeGateTests(unittest.TestCase):
-    """Phase 4 Plan 01's own cumulative SQL bootstrap gate (D-01/D-22,
-    04-01-PLAN.md Task 1): all 18 Phase 3 paths remain mandatory, no path
-    outside the closed Phase 3 + Phase 4 shape is ever accepted, each named
-    Phase 4 group lands only wholly absent or wholly present, and a group
-    never precedes its declared predecessor group(s).
+    """Phase 4 closure (04-06-PLAN.md Task 1, replacing 04-01-PLAN.md's own
+    bootstrap version of this class): the Phase 4 SQL repository gate is now
+    fully closed. Discovered production SQL must equal, exactly, the
+    complete 41-path union of every Phase 3 path plus every Phase 4 group's
+    path (`PHASE_4_FINAL_PRODUCTION_SQL_PATHS`) -- no group may ever land
+    partially again, and no path may exist outside this closed shape.
+    `PHASE_4_SQL_GROUPS`/`PHASE_4_GROUP_DEPENDENCIES` remain exactly as
+    before, but only as ownership documentation now (D-22); they no longer
+    gate a bootstrap present-or-absent/ordering check because every group is
+    unconditionally required below.
     """
 
     def _discovered(self) -> set[str]:
         return _discovered_production_sql_paths()
 
-    def test_all_phase_3_paths_remain_required(self) -> None:
+    def test_closed_union_is_exactly_41_paths(self) -> None:
+        self.assertEqual(len(PHASE_3_FINAL_PRODUCTION_SQL_PATHS), 18)
+        self.assertEqual(len(PHASE_4_ALL_SQL_PATHS), 23)
+        self.assertEqual(len(PHASE_4_FINAL_PRODUCTION_SQL_PATHS), 41)
+
+    def test_discovered_production_sql_exactly_equals_the_closed_union(self) -> None:
         discovered = self._discovered()
-        missing = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
+        missing = PHASE_4_FINAL_PRODUCTION_SQL_PATHS - discovered
+        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
         self.assertEqual(
-            missing, set(), f"Phase 3 paths must remain complete: missing={sorted(missing)}"
+            (missing, unexpected),
+            (set(), set()),
+            "discovered production SQL must exactly equal the closed 41-path "
+            f"union: missing={sorted(missing)}, unexpected={sorted(unexpected)}",
         )
 
-    def test_unknown_sql_path_outside_the_closed_shape_fails(self) -> None:
-        discovered = self._discovered()
-        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
-        self.assertEqual(unexpected, set(), f"unplanned SQL path(s) discovered: {sorted(unexpected)}")
-
-    def test_each_phase_4_group_is_wholly_absent_or_wholly_present(self) -> None:
+    def test_every_phase_4_group_is_wholly_present(self) -> None:
         discovered = self._discovered()
         for group_name, group_paths in PHASE_4_SQL_GROUPS.items():
-            present = discovered & group_paths
-            self.assertIn(
-                present,
-                (set(), set(group_paths)),
-                f"group {group_name!r} must be wholly absent or wholly present; "
-                f"found partial membership {sorted(present)}",
+            self.assertTrue(
+                group_paths.issubset(discovered),
+                f"group {group_name!r} must be wholly present at Phase 4 closure; "
+                f"missing={sorted(group_paths - discovered)}",
             )
 
-    def test_phase_4_groups_never_precede_their_dependencies(self) -> None:
+    def test_group_dependency_documentation_is_trivially_satisfied_at_closure(self) -> None:
+        # Retained as ownership documentation (D-22): with every group
+        # wholly present, every declared dependency is automatically
+        # satisfied too. This test proves that invariant holds rather than
+        # silently dropping the dependency map.
         discovered = self._discovered()
-        for group_name, group_paths in PHASE_4_SQL_GROUPS.items():
-            if not group_paths.issubset(discovered):
-                continue
-            for dependency_name in PHASE_4_GROUP_DEPENDENCIES[group_name]:
+        for group_name, dependency_names in PHASE_4_GROUP_DEPENDENCIES.items():
+            for dependency_name in dependency_names:
                 dependency_paths = PHASE_4_SQL_GROUPS[dependency_name]
                 self.assertTrue(
                     dependency_paths.issubset(discovered),
-                    f"group {group_name!r} landed before its dependency {dependency_name!r}",
+                    f"group {group_name!r}'s documented dependency {dependency_name!r} "
+                    "must be present at closure",
                 )
 
 

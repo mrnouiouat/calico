@@ -34,6 +34,19 @@ document from the runner's own `SafeBuildProof` -- a category/count/status summa
 path, row, or excluded value. Real mode runs the identical dbt selection and tests fixture mode
 runs; no analytical SQL, model name, or test forks on mode.
 
+## Docs proof (fixture-only)
+
+```
+python -m calico_dbt docs --mode fixture
+```
+
+`docs` always runs in fixture mode -- there is no real-mode docs proof and no `--store` argument.
+It runs the identical fixture-mode `dbt build` this project's `build --mode fixture` runs, then
+pinned dbt 1.10.23 `docs generate`, inside the same kind of runner-owned temporary root. The command
+prints a fixed, safe count-only proof (model/test/node counts, plus generated docs-node/artifact
+counts) and deletes every generated `target`/`catalog`/`log`/database artifact before exiting, on
+success or failure alike -- nothing this command produces is ever committed or left on disk.
+
 ## Honest reproducibility boundary
 
 The real admitted-release store this project's own Gate B proof was built against is intentionally

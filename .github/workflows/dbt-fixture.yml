@@ -35,6 +35,9 @@ jobs:
       - name: Run the complete fixture-mode dbt build
         run: python -m calico_dbt build --mode fixture
 
+      - name: Run the fixture-mode dbt docs proof
+        run: python -m calico_dbt docs --mode fixture
+
       - name: Run repository, disposition-matrix, and CI contract tests
         run: python -m unittest tests.test_repository_contract tests.dbt_foundation.test_disposition_matrix tests.dbt_foundation.test_ci_contract -v
 

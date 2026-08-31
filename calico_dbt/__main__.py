@@ -1,14 +1,16 @@
-"""Stable `python -m calico_dbt build` operator CLI (D-01/D-02/D-04).
+"""Stable `python -m calico_dbt build`/`docs` operator CLI (D-01/D-02/D-04/D-20).
 
-Thin argparse controller over `calico_dbt.runner.build()`
-(`calico_landing.cli`'s controller pattern). Exposes exactly `--mode`,
-`--store`, `--select`, and `--proof-output` -- never a fixture-store
-factory, an inspector, or a dbt-project-directory override, which are
-test/integration-only seams `runner.build()` accepts but this module never
-forwards. Prints one compact, closed, value-free JSON result to stdout and
-one concise fixed-vocabulary status line to stderr; exits `0` on success,
-`1` on any failure -- this module never renders a path, row, excluded
-value, or raw child/exception output (D-15).
+Thin argparse controller over `calico_dbt.runner.build()`/`runner.docs()`
+(`calico_landing.cli`'s controller pattern). `build` exposes exactly
+`--mode`, `--store`, `--select`, and `--proof-output`; `docs` exposes only
+`--mode`, closed to exactly `fixture` -- there is no real-mode docs proof
+and no `--store` for `docs` (T-04-06F). Neither subcommand ever forwards a
+fixture-store factory, an inspector, or a dbt-project-directory override,
+which are test/integration-only seams the runner functions accept but this
+module never exposes. Prints one compact, closed, value-free JSON result to
+stdout and one concise fixed-vocabulary status line to stderr; exits `0` on
+success, `1` on any failure -- this module never renders a path, row,
+excluded value, or raw child/exception output (D-15).
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from calico_dbt.runner import SELECT_ALIASES, build
+from calico_dbt.runner import SELECT_ALIASES, build, docs
 
 _UNEXPECTED_ERROR_STATUS = "failed category=runner.unexpected_error"
 _UNEXPECTED_ERROR_EXIT_CODE = 1
@@ -25,7 +27,7 @@ _UNEXPECTED_ERROR_EXIT_CODE = 1
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="calico_dbt",
-        description="Prepare verified dbt input and run one full pinned dbt build.",
+        description="Prepare verified dbt input and run one full pinned dbt build, or the fixture-only docs proof.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -56,6 +58,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Atomically write the fixed real-mode proof document (real mode only).",
     )
 
+    docs_parser = subparsers.add_parser(
+        "docs",
+        help="Run the closed fixture-only full build plus dbt docs generate proof.",
+    )
+    docs_parser.add_argument(
+        "--mode",
+        choices=("fixture",),
+        default="fixture",
+        help="Always 'fixture' -- the docs proof never runs against a real store.",
+    )
+
     return parser
 
 
@@ -64,12 +77,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        outcome = build(
-            mode=args.mode,
-            store=args.store,
-            select=args.select,
-            proof_output=args.proof_output,
-        )
+        if args.command == "build":
+            outcome = build(
+                mode=args.mode,
+                store=args.store,
+                select=args.select,
+                proof_output=args.proof_output,
+            )
+        elif args.command == "docs":
+            outcome = docs()
+        else:
+            raise AssertionError(f"unreachable: unknown subcommand {args.command!r}")
     except Exception:  # noqa: BLE001 -- fixed safe message only; never the exception object
         print(_UNEXPECTED_ERROR_STATUS, file=sys.stderr)
         return _UNEXPECTED_ERROR_EXIT_CODE
