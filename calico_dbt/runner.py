@@ -23,6 +23,7 @@ string, or raw dbt/child stdout/stderr (D-15).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -105,13 +106,22 @@ SELECT_ALIASES: dict[str, str] = {
     ),
 }
 
-#: The fixed product-relative real-mode proof destination (D-15). Always
-#: this exact path -- never a caller-supplied value.
-_PROOF_OUTPUT_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-build-proof-v1.json"
+#: The immutable Phase 3 real-mode proof destination (D-15, D-22). This
+#: path is read-only from this module's perspective from Phase 4 onward --
+#: `build()` never writes it again. It is referenced only to compute the
+#: explicit `(path, sha256)` supersedes pair Phase 4's additive successor
+#: carries (T-04-06C).
+_PROOF_OUTPUT_V1_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-build-proof-v1.json"
+
+#: The fixed, additive Phase 4 real-mode proof destination (D-22). `build()`
+#: always writes here for `mode="real", proof_output=True` -- never to the
+#: immutable v1 path above.
+_PROOF_OUTPUT_V2_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-build-proof-v2.json"
 
 _DBT_SUBPROCESS_TIMEOUT_SECONDS = 600
 
 PROOF_SCHEMA_VERSION = 1
+PROOF_V2_SCHEMA_VERSION = 2
 COMMAND_SCHEMA_VERSION = 1
 
 _MODES = frozenset({"fixture", "real"})
@@ -653,7 +663,7 @@ def build(
             )
 
             if mode == "real" and proof_output:
-                _write_proof_output(proof)
+                _write_proof_output_v2(proof)
 
             return BuildOutcome(status="success", category=None, proof=proof)
         finally:
@@ -755,15 +765,56 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
-def _write_proof_output(proof: SafeBuildProof) -> None:
-    destination = Path(__file__).resolve().parent.parent / _PROOF_OUTPUT_RELATIVE_PATH
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_proof_output_v2(proof: SafeBuildProof) -> None:
+    """Atomically write the additive Phase 4 real-mode proof successor,
+    `real-build-proof-v2.json` (D-22, T-04-06C).
+
+    Never reads v1 for anything but its already-committed bytes, never
+    writes or deletes v1, and carries an explicit `(path, sha256)`
+    `supersedes` reference to it -- the same safe, fixed, repository-
+    relative path this module has always resolved v1 from, not a caller-
+    supplied or owner-private path. Fails closed with
+    `runner.v1_proof_missing` if the immutable v1 document is absent, since
+    an additive successor cannot supersede a document that does not exist.
+    """
+
+    repo_root = Path(__file__).resolve().parent.parent
+    v1_path = repo_root / _PROOF_OUTPUT_V1_RELATIVE_PATH
+    if not v1_path.is_file():
+        raise RunnerError("runner.v1_proof_missing")
+
+    document = {
+        "proof_schema_version": PROOF_V2_SCHEMA_VERSION,
+        "command_schema_version": proof.command_schema_version,
+        "mode": proof.mode,
+        "status": proof.status,
+        "verified_release_count": proof.verified_release_count,
+        "verified_object_count": proof.verified_object_count,
+        "dbt_selected_node_count": proof.dbt_selected_node_count,
+        "dbt_model_count": proof.dbt_model_count,
+        "dbt_test_count": proof.dbt_test_count,
+        "supersedes": {
+            "path": _PROOF_OUTPUT_V1_RELATIVE_PATH.as_posix(),
+            "sha256": _sha256_file(v1_path),
+        },
+    }
+    payload = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    destination = repo_root / _PROOF_OUTPUT_V2_RELATIVE_PATH
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    fd_dir = destination.parent
     temp_name = destination.name + f".tmp-{os.getpid()}"
-    temp_path = fd_dir / temp_name
+    temp_path = destination.parent / temp_name
     try:
-        temp_path.write_text(proof.to_json(), encoding="utf-8", newline="\n")
+        temp_path.write_text(payload, encoding="utf-8", newline="\n")
         os.replace(temp_path, destination)
     finally:
         temp_path.unlink(missing_ok=True)
@@ -772,6 +823,9 @@ def _write_proof_output(proof: SafeBuildProof) -> None:
 __all__ = [
     "DBT_PROFILE_NAME",
     "SELECT_ALIASES",
+    "PROOF_SCHEMA_VERSION",
+    "PROOF_V2_SCHEMA_VERSION",
+    "COMMAND_SCHEMA_VERSION",
     "RunnerError",
     "SafeBuildProof",
     "BuildOutcome",

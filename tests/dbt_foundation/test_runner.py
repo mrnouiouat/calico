@@ -17,6 +17,7 @@ this module locks does not need to change.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import tempfile
@@ -326,16 +327,76 @@ class RealModeBuildTests(RunnerTestCase):
         self.assertEqual(outcome.category, "runner.invalid_store")
 
     def test_proof_output_ignored_in_fixture_mode(self) -> None:
-        proof_path = (
+        v1_path = (
             Path(__file__).resolve().parents[2] / "docs" / "evidence" / "gate-b" / "real-build-proof-v1.json"
         )
-        existed_before = proof_path.exists()
+        v2_path = (
+            Path(__file__).resolve().parents[2] / "docs" / "evidence" / "gate-b" / "real-build-proof-v2.json"
+        )
+        v1_existed_before = v1_path.exists()
+        v1_bytes_before = v1_path.read_bytes() if v1_existed_before else None
+        v2_existed_before = v2_path.exists()
         outcome = runner.build(
             mode="fixture", proof_output=True, _dbt_project_dir_override=self.project_dir
         )
         self.assertEqual(outcome.status, "success")
-        if not existed_before:
-            self.assertFalse(proof_path.exists())
+        # Fixture mode never honors `proof_output` at all (D-15) -- neither
+        # the immutable v1 document nor the additive v2 successor is ever
+        # touched by a fixture-mode call.
+        if v1_existed_before:
+            self.assertEqual(v1_path.read_bytes(), v1_bytes_before)
+        else:
+            self.assertFalse(v1_path.exists())
+        if not v2_existed_before:
+            self.assertFalse(v2_path.exists())
+
+    def test_real_mode_proof_output_writes_v2_with_supersedes_and_never_touches_v1(
+        self,
+    ) -> None:
+        # This module's own `RunnerTestCase` builds a disposable stub dbt
+        # project, so a full real-mode `dbt build` cannot run here without
+        # an actual owner-controlled admitted store (that is Plan 06 Task
+        # 2's own manual real-build proof, never a unit test). This test
+        # instead exercises the additive-write/supersedes contract directly
+        # against the module's private writer, which is exactly the seam
+        # `build()` itself calls once a real build already succeeded.
+        repo_root = Path(__file__).resolve().parents[2]
+        v1_path = repo_root / "docs" / "evidence" / "gate-b" / "real-build-proof-v1.json"
+        v2_path = repo_root / "docs" / "evidence" / "gate-b" / "real-build-proof-v2.json"
+        self.assertTrue(v1_path.is_file(), "immutable v1 proof must already be committed")
+        v1_bytes_before = v1_path.read_bytes()
+        v2_existed_before = v2_path.exists()
+        v2_bytes_before = v2_path.read_bytes() if v2_existed_before else None
+
+        proof = runner.SafeBuildProof(
+            proof_schema_version=runner.PROOF_SCHEMA_VERSION,
+            command_schema_version=runner.COMMAND_SCHEMA_VERSION,
+            mode="real",
+            status="success",
+            verified_release_count=3,
+            verified_object_count=12,
+            dbt_selected_node_count=99,
+            dbt_model_count=19,
+            dbt_test_count=77,
+        )
+        try:
+            runner._write_proof_output_v2(proof)  # noqa: SLF001 -- exercising the exact seam build() calls
+            self.assertEqual(v1_path.read_bytes(), v1_bytes_before, "v1 must never be modified")
+            document = json.loads(v2_path.read_text(encoding="utf-8"))
+            self.assertEqual(document["proof_schema_version"], runner.PROOF_V2_SCHEMA_VERSION)
+            self.assertEqual(document["dbt_model_count"], 19)
+            supersedes = document["supersedes"]
+            self.assertEqual(set(supersedes), {"path", "sha256"})
+            self.assertEqual(supersedes["path"], "docs/evidence/gate-b/real-build-proof-v1.json")
+            expected_sha256 = hashlib.sha256(v1_bytes_before).hexdigest()
+            self.assertEqual(supersedes["sha256"], expected_sha256)
+        finally:
+            # Restore whatever v2 state existed before this test ran so the
+            # working tree is left exactly as this test found it.
+            if v2_existed_before:
+                v2_path.write_bytes(v2_bytes_before)
+            else:
+                v2_path.unlink(missing_ok=True)
 
 
 class NonEchoDiscplineTests(RunnerTestCase):
