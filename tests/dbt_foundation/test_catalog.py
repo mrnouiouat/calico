@@ -376,8 +376,22 @@ class PreflightVerifyCopyBindTests(unittest.TestCase):
     def test_no_generated_artifact_exists_under_either_repository(self) -> None:
         binding, temp_root = self._run_preflight(self.real_catalog)
         try:
-            calico_build_root = Path(__file__).resolve().parents[3]
+            # `test_catalog.py` lives at `tests/dbt_foundation/test_catalog.py`
+            # (two directories below the repo root), so `calico_root` is
+            # `parents[2]`. `calico-build` is this repository's sibling under
+            # the same parent directory (AGENTS.md repository topology), not
+            # a fixed `.parents[]` index of this file's own path -- an
+            # earlier revision copied the `.parents[3]` idiom from a test
+            # module three directories deeper (e.g.
+            # `tests/tools/privacy_scan/test_seed_manifest.py`) without
+            # adjusting the index, which resolved to this file's own
+            # *grandparent* directory instead of the sibling `calico-build`
+            # repository and made the assertion vacuously true only when the
+            # OS temp directory happens to sit outside the user's home
+            # directory entirely -- it always failed on a default Windows
+            # profile, where `%TEMP%` is `%USERPROFILE%\AppData\Local\Temp`.
             calico_root = Path(__file__).resolve().parents[2]
+            calico_build_root = calico_root.parent / "calico-build"
             self.assertFalse(str(temp_root).startswith(str(calico_root)))
             self.assertFalse(str(temp_root).startswith(str(calico_build_root)))
         finally:
