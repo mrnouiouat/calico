@@ -41,6 +41,13 @@ from calico_dbt.catalog import (
     VerifiedRevisionManifest,
     load_and_verify_revision_manifest,
 )
+from calico_landing.attempts import (
+    AdmissionV1Attempt,
+    AttemptError,
+    StoreV1Attempt,
+    V2Attempt,
+    load_attempt_file,
+)
 from calico_landing.candidate import CandidateError, reject_store_in_git_worktree
 from calico_landing.contracts import LOGICAL_LIST_ORDER, load_csv_contract
 from calico_landing.store import PromotedRevision, StoreError, read_promoted_releases
@@ -71,6 +78,7 @@ _OPAQUE_INPUTS_DIRNAME = "inputs"
 _RELEASES_DIRNAME = "releases"
 _CANONICAL_DIRNAME = "canonical"
 _MANIFEST_FILENAME = "manifest.json"
+_ATTEMPTS_DIRNAME = "attempts"
 
 _HASH_CHUNK_BYTES = 1024 * 1024
 
@@ -103,6 +111,7 @@ class RuntimeInputBinding:
     duckdb_path: Path
     verified_release_count: int
     verified_object_count: int
+    verified_capture_attempt_count: int
 
 
 def _resolve_store_root(store_root: str | Path) -> Path:
@@ -284,6 +293,116 @@ def _validate_pointer_consistency(
     return promotions
 
 
+def _enumerate_attempt_files(store_root: Path) -> list[Path]:
+    """Enumerate exact direct-child attempt JSON files only (T-04-04A,
+    04-04-PLAN.md D-12).
+
+    Rejects a symlinked/reparse `attempts` directory itself and any
+    symlinked/reparse direct child; never recurses into a subdirectory and
+    never globs. Returns `[]` when no `attempts` directory exists at all --
+    a legitimate store state, not a failure, since both fixture and real
+    mode must bind the identical fixed nullable relation shape even when it
+    is empty (D-20).
+    """
+
+    attempts_dir = store_root / _ATTEMPTS_DIRNAME
+    if not attempts_dir.exists():
+        return []
+    if attempts_dir.is_symlink():
+        raise PreflightError("preflight.link_rejected")
+    try:
+        resolved_attempts_dir = attempts_dir.resolve(strict=True)
+    except OSError as exc:
+        raise PreflightError("preflight.capture_attempt_invalid") from exc
+
+    files: list[Path] = []
+    for child in sorted(resolved_attempts_dir.iterdir()):
+        if child.is_symlink():
+            raise PreflightError("preflight.link_rejected")
+        if child.is_dir():
+            continue
+        if child.suffix != ".json":
+            continue
+        files.append(child)
+    return files
+
+
+def _capture_attempt_row(
+    attempt: AdmissionV1Attempt | StoreV1Attempt | V2Attempt,
+) -> tuple[
+    int, str, str, str, str | None, int | None, str | None, int | None, bool | None, str | None, str | None
+]:
+    """Normalize one already-validated attempt dataclass into the fixed
+    eleven-column row shape every `runtime_input.capture_attempts` row
+    shares, regardless of which of the three closed shapes produced it.
+    `attempt_shape` lets dbt SQL apply the exact per-shape closed status
+    vocabulary independently, never guessing the shape back out of which
+    columns happen to be null (D-02: no analytical decision is made here,
+    only a structural relabeling of already-validated fields).
+    """
+
+    if isinstance(attempt, AdmissionV1Attempt):
+        return (
+            1,
+            "admission_v1",
+            attempt.attempt_id,
+            attempt.status,
+            attempt.as_of_date,
+            None,
+            None,
+            attempt.reason_count,
+            None,
+            None,
+            None,
+        )
+    if isinstance(attempt, StoreV1Attempt):
+        return (
+            1,
+            "store_v1",
+            attempt.attempt_id,
+            attempt.status,
+            attempt.as_of_date,
+            attempt.release_revision,
+            attempt.revision_fingerprint,
+            None,
+            attempt.recovered,
+            None,
+            None,
+        )
+    return (
+        2,
+        "v2",
+        attempt.attempt_id,
+        attempt.status,
+        attempt.as_of_date,
+        attempt.release_revision,
+        attempt.revision_fingerprint,
+        attempt.reason_count,
+        None,
+        attempt.started_at_utc,
+        attempt.ended_at_utc,
+    )
+
+
+def _load_capture_attempt_rows(store_root: Path) -> list[tuple]:
+    """Enumerate, validate, and normalize every durable attempt record in
+    `store_root/attempts` into the fixed row shape `prepare_runtime_input`
+    parameter-binds into `runtime_input.capture_attempts`. Any malformed or
+    aliased document fails the whole preflight closed with a fixed
+    category -- an attempt record is untrusted store content crossing a
+    trust boundary (T-04-04A), never silently skipped.
+    """
+
+    rows: list[tuple] = []
+    for attempt_path in _enumerate_attempt_files(store_root):
+        try:
+            attempt = load_attempt_file(attempt_path)
+        except AttemptError as exc:
+            raise PreflightError("preflight.capture_attempt_invalid") from exc
+        rows.append(_capture_attempt_row(attempt))
+    return rows
+
+
 def prepare_runtime_input(
     *,
     store_root: str | Path,
@@ -340,6 +459,7 @@ def prepare_runtime_input(
             opaque_paths[(logical_list, anchor.release_revision, anchor.as_of_date)] = opaque_path
 
     promotions = _validate_pointer_consistency(resolved_store_root, catalog)
+    capture_attempt_rows = _load_capture_attempt_rows(resolved_store_root)
 
     duckdb_path = resolved_temp_root / DUCKDB_FILENAME
     connection = duckdb.connect(str(duckdb_path))
@@ -391,6 +511,26 @@ def prepare_runtime_input(
                 f"INSERT INTO {RUNTIME_SCHEMA}.promotion_catalog VALUES (?, ?, ?)",
                 [as_of_date, promoted.release_revision, promoted.revision_fingerprint],
             )
+
+        # Fixed nullable attempt relation (D-12/D-13/D-20): both fixture and
+        # real mode always create exactly this schema, even when
+        # `capture_attempt_rows` is empty. Every value is bound as a
+        # parameter -- never interpolated into SQL text -- so no attempt
+        # document field can ever become dynamic SQL (T-04-04B).
+        connection.execute(
+            f"CREATE TABLE {RUNTIME_SCHEMA}.capture_attempts ("
+            "schema_version BIGINT, attempt_shape VARCHAR, attempt_id VARCHAR, "
+            "raw_status VARCHAR, as_of_date VARCHAR, release_revision BIGINT, "
+            "revision_fingerprint VARCHAR, reason_count BIGINT, recovered BOOLEAN, "
+            "started_at_utc VARCHAR, ended_at_utc VARCHAR"
+            ")"
+        )
+        for row in capture_attempt_rows:
+            connection.execute(
+                f"INSERT INTO {RUNTIME_SCHEMA}.capture_attempts VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                list(row),
+            )
     except duckdb.Error as exc:
         raise PreflightError("preflight.database_load_failed") from exc
     finally:
@@ -401,6 +541,7 @@ def prepare_runtime_input(
         duckdb_path=duckdb_path,
         verified_release_count=len(catalog.releases),
         verified_object_count=len(opaque_paths),
+        verified_capture_attempt_count=len(capture_attempt_rows),
     )
 
 

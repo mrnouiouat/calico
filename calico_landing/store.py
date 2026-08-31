@@ -554,6 +554,7 @@ def _finish(
     status: str,
     release_revision: int,
     recovered: bool,
+    write_attempt: bool = True,
 ) -> RevisionCommit:
     result = RevisionCommit(
         status=status,
@@ -562,14 +563,15 @@ def _finish(
         revision_fingerprint=revision_fingerprint,
         recovered=recovered,
     )
-    _write_attempt_record(
-        store_root,
-        as_of_date=as_of_date,
-        revision_fingerprint=revision_fingerprint,
-        status=status,
-        release_revision=release_revision,
-        recovered=recovered,
-    )
+    if write_attempt:
+        _write_attempt_record(
+            store_root,
+            as_of_date=as_of_date,
+            revision_fingerprint=revision_fingerprint,
+            status=status,
+            release_revision=release_revision,
+            recovered=recovered,
+        )
     return result
 
 
@@ -581,6 +583,7 @@ def _commit_revision_locked(
     revision_fingerprint: str,
     manifest_metadata: dict[str, object],
     failure_hook: Callable[[str], None],
+    write_attempt: bool = True,
 ) -> RevisionCommit:
     existing = _list_revisions_for_date(store_root, as_of_date)
     promoted = _read_promoted_releases_resolved(store_root)
@@ -608,6 +611,7 @@ def _commit_revision_locked(
                 status="no_new_release",
                 release_revision=match.revision_number,
                 recovered=False,
+                write_attempt=write_attempt,
             )
 
         # A complete, unpromoted revision exists: an earlier process
@@ -629,6 +633,7 @@ def _commit_revision_locked(
             status="accepted",
             release_revision=match.revision_number,
             recovered=True,
+            write_attempt=write_attempt,
         )
 
     # No existing revision for this date carries this fingerprint: allocate
@@ -682,6 +687,7 @@ def _commit_revision_locked(
         status="accepted",
         release_revision=next_revision_number,
         recovered=False,
+        write_attempt=write_attempt,
     )
 
 
@@ -693,6 +699,7 @@ def commit_revision(
     manifest_metadata: dict[str, object] | None = None,
     *,
     failure_hook: Callable[[str], None] | None = None,
+    write_attempt: bool = True,
 ) -> RevisionCommit:
     """Commit or recover one immutable release revision (D-07/D-08/D-09).
 
@@ -723,6 +730,14 @@ def commit_revision(
     solely for deterministic test failure injection; production callers
     must not pass one.
 
+    `write_attempt` defaults to `True`, preserving this module's own
+    historical store-level v1 attempt-trail write exactly as before for
+    every direct caller. `calico_landing.admission.admit()` (04-04-PLAN.md
+    D-13) is the one caller that passes `write_attempt=False`: it now
+    writes its own single v2 attempt record for the whole logical `admit()`
+    call, and disabling this module's write here is what prevents that call
+    from being recorded twice under two incompatible schemas.
+
     Raises `StoreError` on any lock, containment, rename, replacement,
     malformed-document, or permission failure. Never leaves the promotion
     pointer partially written, and never overwrites an existing revision
@@ -751,6 +766,7 @@ def commit_revision(
             revision_fingerprint,
             manifest_metadata,
             hook,
+            write_attempt,
         )
 
 

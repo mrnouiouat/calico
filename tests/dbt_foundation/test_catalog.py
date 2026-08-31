@@ -307,7 +307,7 @@ class PreflightVerifyCopyBindTests(unittest.TestCase):
             shutil.rmtree(temp_root, ignore_errors=True)
             raise
 
-    def test_prepares_all_six_fixed_relations_with_expected_rows(self) -> None:
+    def test_prepares_all_fixed_relations_with_expected_rows(self) -> None:
         binding, temp_root = self._run_preflight(self.real_catalog)
         try:
             self.assertEqual(binding.verified_release_count, len(self.store.admissions))
@@ -325,6 +325,13 @@ class PreflightVerifyCopyBindTests(unittest.TestCase):
                 expected = {name.replace("-", "_") for name in LOGICAL_LIST_ORDER} | {
                     "revision_catalog",
                     "promotion_catalog",
+                    # Added by 04-04-PLAN.md (D-12/D-20): the fixed
+                    # nullable capture-attempt relation both fixture and
+                    # real preflight always create, forward-fixing this
+                    # exact-set assertion the same way this plan already
+                    # forward-fixed test_repository_contract.py's parallel
+                    # six-relation assertion.
+                    "capture_attempts",
                 }
                 self.assertEqual(tables, expected)
 

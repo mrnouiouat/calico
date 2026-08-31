@@ -1,10 +1,11 @@
 version: 2
 
 # Fixed `runtime_input` source contract (D-03, T-03-06). `calico_dbt.preflight`
-# always creates exactly this schema and these six relation names -- four
-# logical-list registry relations plus the revision and promotion catalogs --
-# whether the caller ran fixture or real mode. This file names those already
-# fixed relations; it never contains a path, an environment expression, or a
+# always creates exactly this schema and these seven relation names -- four
+# logical-list registry relations, the revision and promotion catalogs, and
+# the capture-attempt relation (04-04-PLAN.md D-12/D-20) -- whether the
+# caller ran fixture or real mode. This file names those already fixed
+# relations; it never contains a path, an environment expression, or a
 # mode-conditional Jinja block, because mode selection may only change how
 # `runtime_input` is populated, never what dbt sees once it is populated
 # (D-01..D-04).
@@ -30,3 +31,15 @@ sources:
         description: "One row per immutable admitted revision preflight verified for this build: as_of_date, release_revision, revision_fingerprint, parser_contract_version. Every accepted revision is present for audit, not only the promoted one (D-05)."
       - name: promotion_catalog
         description: "One row per as_of_date present in the store's atomic promotion pointer, cross-checked by preflight against revision_catalog before dbt runs (D-06). A date absent here has no validated pointer entry; the pointer-or-highest-revision decision for that date is made in dbt SQL, never in Python."
+      - name: capture_attempts
+        description: >
+          One row per durable attempt JSON file preflight validated under
+          the store's attempts/ directory, across both existing timing-less
+          v1 shapes (admission-level and store-level) and the additive v2
+          shape (04-04-PLAN.md D-12/D-13). Every value is parameter-bound,
+          never interpolated into SQL text. This relation is always
+          present with this fixed nullable schema in both fixture and real
+          mode, including as an empty relation when no attempt files exist
+          (D-20); outcome normalization, timing-state derivation, and
+          duration calculation happen only downstream in dbt SQL, never
+          here or in Python.

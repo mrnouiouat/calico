@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import shutil
 import tempfile
@@ -30,6 +29,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
+from calico_landing.attempts import utc_now_iso, write_v2_attempt
 from calico_landing.candidate import (
     CandidateError,
     reject_store_in_git_worktree,
@@ -69,9 +69,6 @@ _STATUS_CONTRACT_PATH = (
 #: recorded independently by `calico_landing.store` in every manifest.
 _FINGERPRINT_ALGORITHM = "ordered-source-sha256-json-v1"
 
-_ATTEMPT_SCHEMA_VERSION = 1
-_ATTEMPTS_DIRNAME = "attempts"
-
 
 def _exception_code(exc: Exception) -> str:
     code = getattr(exc, "code", None)
@@ -85,38 +82,6 @@ def _reason_from_exception(exc: Exception) -> AdmissionReason:
         safe_line_number=getattr(exc, "safe_line_number", None),
         safe_count=getattr(exc, "safe_count", None),
     )
-
-
-def _write_attempt_record(
-    store_root: Path, *, status: str, as_of_date: str | None, reason_count: int
-) -> None:
-    """Best-effort safe attempt trail for a run this module decided, never
-    an internal `calico_landing.store` outcome (T-02-08). A failure here
-    never masks the already-decided admission outcome.
-    """
-
-    attempts_dir = store_root / _ATTEMPTS_DIRNAME
-    document = {
-        "schema_version": _ATTEMPT_SCHEMA_VERSION,
-        "attempt_id": uuid.uuid4().hex,
-        "status": status,
-        "as_of_date": as_of_date,
-        "reason_count": reason_count,
-    }
-    try:
-        fd, temp_name = tempfile.mkstemp(prefix=".attempt.", suffix=".tmp", dir=attempts_dir)
-    except OSError:
-        return
-    temp_path = Path(temp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(document, handle, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp_path, attempts_dir / f"{document['attempt_id']}.json")
-    except OSError:
-        temp_path.unlink(missing_ok=True)
 
 
 def _cleanup_run_dir(run_dir: Path, staging_root: Path) -> None:
@@ -230,6 +195,35 @@ def admit(
     promoted release for the affected date is left untouched.
     """
 
+    # Captured once, at the very top of this call, per D-13: this is the one
+    # true attempt identity and start boundary for the whole logical
+    # `admit()` transaction, regardless of which stage ultimately decides
+    # the outcome. `ended_at_utc` is captured once more at whichever single
+    # `_record_v2_attempt` call below finalizes that outcome.
+    attempt_id = uuid.uuid4().hex
+    started_at_utc = utc_now_iso()
+
+    def _record_v2_attempt(
+        store_root: Path,
+        *,
+        status: str,
+        as_of_date: str | None,
+        release_revision: int | None = None,
+        revision_fingerprint: str | None = None,
+        reason_count: int | None = None,
+    ) -> None:
+        write_v2_attempt(
+            store_root,
+            attempt_id=attempt_id,
+            started_at_utc=started_at_utc,
+            ended_at_utc=utc_now_iso(),
+            status=status,
+            as_of_date=as_of_date,
+            release_revision=release_revision,
+            revision_fingerprint=revision_fingerprint,
+            reason_count=reason_count,
+        )
+
     try:
         reject_store_in_git_worktree(store)
     except CandidateError:
@@ -265,8 +259,8 @@ def admit(
         reasons.append(_reason_from_exception(exc))
         _cleanup_run_dir(run_dir, layout.staging_root)
         result = AdmissionResult.rejected(sort_reasons(reasons))
-        _write_attempt_record(
-            layout.store_root, status=result.status, as_of_date=None, reason_count=len(reasons)
+        _record_v2_attempt(
+            layout.store_root, status="rejected", as_of_date=None, reason_count=len(reasons)
         )
         return result
 
@@ -285,9 +279,9 @@ def admit(
         best_effort_date = _best_effort_as_of_date(contract, parsed_lists)
         _cleanup_run_dir(run_dir, layout.staging_root)
         result = AdmissionResult.rejected(sort_reasons(reasons), as_of_date=best_effort_date)
-        _write_attempt_record(
+        _record_v2_attempt(
             layout.store_root,
-            status=result.status,
+            status="rejected",
             as_of_date=best_effort_date,
             reason_count=len(reasons),
         )
@@ -299,9 +293,9 @@ def admit(
         best_effort_date = _best_effort_as_of_date(contract, parsed_lists)
         _cleanup_run_dir(run_dir, layout.staging_root)
         result = AdmissionResult.rejected(sort_reasons(reasons), as_of_date=best_effort_date)
-        _write_attempt_record(
+        _record_v2_attempt(
             layout.store_root,
-            status=result.status,
+            status="rejected",
             as_of_date=best_effort_date,
             reason_count=len(reasons),
         )
@@ -336,8 +330,8 @@ def admit(
     if len(parquet_artifacts) != len(LOGICAL_LIST_ORDER):
         _cleanup_run_dir(run_dir, layout.staging_root)
         result = AdmissionResult.rejected(sort_reasons(reasons), as_of_date=as_of_date)
-        _write_attempt_record(
-            layout.store_root, status=result.status, as_of_date=as_of_date, reason_count=len(reasons)
+        _record_v2_attempt(
+            layout.store_root, status="rejected", as_of_date=as_of_date, reason_count=len(reasons)
         )
         return result
 
@@ -374,9 +368,30 @@ def admit(
             as_of_date=as_of_date,
             revision_fingerprint=revision_fingerprint,
             manifest_metadata=manifest_metadata,
+            # This module now records the single v2 attempt for the whole
+            # logical `admit()` call itself (below); disabling the store's
+            # own legacy store-level v1 write here is what prevents this one
+            # call from being recorded twice under two incompatible schemas
+            # (D-13).
+            write_attempt=False,
         )
     except StoreError:
         return AdmissionResult.operational_error(reasons=())
+
+    if commit.status == "no_new_release":
+        v2_status = "no_new_release"
+    elif commit.recovered:
+        v2_status = "recovered"
+    else:
+        v2_status = "accepted"
+
+    _record_v2_attempt(
+        layout.store_root,
+        status=v2_status,
+        as_of_date=commit.as_of_date,
+        release_revision=commit.release_revision,
+        revision_fingerprint=commit.revision_fingerprint,
+    )
 
     if commit.status == "no_new_release":
         return AdmissionResult.no_new_release(

@@ -596,6 +596,12 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
         "charities_may_not_operate",
         "revision_catalog",
         "promotion_catalog",
+        # Added by 04-04-PLAN.md (D-12/D-20): the fixed nullable
+        # capture-attempt relation both fixture and real preflight always
+        # create, forward-fixing this exact-count assertion the same way
+        # Phase 2 Plan 04 forward-fixed this file's own stale SQL-only
+        # assertion when a later plan's required change invalidated it.
+        "capture_attempts",
     )
 
     # -- production project shape -----------------------------------------
@@ -634,7 +640,7 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
 
     # -- sources.yml ---------------------------------------------------------
 
-    def test_sources_yml_declares_exactly_the_six_fixed_runtime_relations(self) -> None:
+    def test_sources_yml_declares_exactly_the_fixed_runtime_relations(self) -> None:
         content = _read(self.SOURCES_YML)
         for table_name in self._EXPECTED_RUNTIME_TABLES:
             self.assertIn(table_name, content)
