@@ -41,6 +41,8 @@ _SOURCES_YML = textwrap.dedent(
           - name: charities_may_not_operate
           - name: revision_catalog
           - name: promotion_catalog
+          - name: capture_attempts
+          - name: public_eligibility_classifications
     """
 )
 
@@ -58,6 +60,28 @@ _MODEL_BODIES: dict[str, str] = {
     "int_registry_record_exclusions": (
         "select * from {{ ref('int_registry_record_dispositions') }}"
     ),
+    # Phase 4 closure (04-06-PLAN.md Task 1): minimal stand-ins for the real
+    # product project's Plan 02-05 models, wired identically to
+    # `runner.SELECT_ALIASES`'s closed Phase 4 aliases so this module's own
+    # subprocess tests can prove every alias resolves without needing the
+    # real product project's actual analytical SQL.
+    "int_keyed_snapshots": "select * from {{ ref('int_registry_record_dispositions') }}",
+    "int_unkeyed_coverage": "select * from {{ ref('int_keyed_snapshots') }}",
+    "int_entity_transitions": "select * from {{ ref('int_adjacent_release_pairs') }}",
+    "int_transition_matrix": "select * from {{ ref('int_entity_transitions') }}",
+    "int_entity_observation_sequence": "select * from {{ ref('int_keyed_snapshots') }}",
+    "int_delinquency_spells": "select * from {{ ref('int_entity_observation_sequence') }}",
+    "stg_capture_attempts": "select * from {{ source('runtime_input', 'capture_attempts') }}",
+    "int_capture_runs": "select * from {{ ref('stg_capture_attempts') }}",
+    "int_release_flags": "select * from {{ ref('int_capture_runs') }}",
+    "int_public_organization_eligibility": (
+        "select * from {{ source('runtime_input', 'public_eligibility_classifications') }}"
+    ),
+    "mart_registry_population_coverage": (
+        "select * from {{ ref('int_registry_record_dispositions') }}"
+    ),
+    "dim_public_organizations": "select * from {{ ref('int_public_organization_eligibility') }}",
+    "fct_public_status_observations": "select * from {{ ref('int_public_organization_eligibility') }}",
 }
 
 _DBT_PROJECT_YML = textwrap.dedent(
@@ -142,6 +166,10 @@ class ModeAndArgumentValidationTests(RunnerTestCase):
                 "adjacency",
                 "promotion-adjacency",
                 "dispositions",
+                "longitudinal-transitions",
+                "longitudinal-facts",
+                "capture-facts",
+                "public-models",
             },
         )
 
