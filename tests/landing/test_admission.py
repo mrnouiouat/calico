@@ -28,7 +28,7 @@ from pathlib import Path
 from unittest import mock
 
 import calico_landing.admission as admission_module
-from calico_landing.admission import admit
+from calico_landing.admission import admit, load_default_status_contract
 from calico_landing.candidate import CandidateError, resolve_and_stage_candidate
 from calico_landing.contracts import LOGICAL_LIST_ORDER, CsvContract
 from calico_landing.parquet import CanonicalSerializationError
@@ -552,6 +552,94 @@ class FailureInjectionTests(unittest.TestCase):
                 self.assertEqual(result.reasons, ())
                 self.assertFalse((store_root / "promoted-releases.json").exists())
                 self.assertEqual(list((store_root / "releases").iterdir()), [])
+
+
+class StatusVocabularyEnforcementTests(unittest.TestCase):
+    """`admit()`'s optional `status_contract` parameter (04-01-PLAN.md
+    D-02/D-22): omitted by default so every existing caller (this
+    baseline fixture included) keeps its exact prior behavior; when a
+    caller opts in, an unknown nonblank `Registry Status` rejects the
+    whole candidate set through the same non-echoing reason path as every
+    other structural rule, while blank status remains admitted.
+
+    The committed baseline fixture (`tests/fixtures/landing/valid/*.csv`)
+    predates the closed 33-value vocabulary and legitimately carries
+    non-compliant placeholder values ("Active", "Reporting Incomplete") --
+    exactly the "unreviewed nonblank status" case this contract exists to
+    catch. `test_admit_without_status_contract_keeps_prior_behavior` and
+    `test_admit_with_status_contract_rejects_the_unreviewed_placeholder_values`
+    both rely on this rather than mutating the fixture.
+    """
+
+    def test_admit_without_status_contract_keeps_prior_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as store_dir:
+            result = admit(BASELINE_CANDIDATE_ROOT, Path(store_dir))
+            self.assertEqual(result.status, "accepted")
+            self.assertEqual(result.reasons, ())
+
+    def test_admit_with_status_contract_rejects_the_unreviewed_placeholder_values(self) -> None:
+        contract = load_default_status_contract()
+        with tempfile.TemporaryDirectory() as store_dir:
+            result = admit(BASELINE_CANDIDATE_ROOT, Path(store_dir), status_contract=contract)
+
+            self.assertEqual(result.status, "rejected")
+            self.assertEqual(_reason_codes(result), ["set.unknown_registry_status"] * len(result.reasons))
+            self.assertGreater(len(result.reasons), 0)
+            for reason in result.reasons:
+                self.assertIn(reason.logical_list, LOGICAL_LIST_ORDER)
+                self.assertIsNotNone(reason.safe_count)
+                self.assertGreater(reason.safe_count, 0)
+                self.assertIsNone(reason.safe_line_number)
+            self.assertFalse((Path(store_dir) / "releases").exists() and any((Path(store_dir) / "releases").iterdir()))
+
+    def test_admit_with_status_contract_accepts_a_fully_compliant_candidate(self) -> None:
+        with fb.mutated_candidate() as candidate:
+            candidate.replace_field("charities-may-operate", 0, 0, "Current")
+            candidate.replace_field("charities-may-operate", 1, 0, "Current")
+            candidate.replace_field("charities-may-operate", 2, 0, "Current")
+            candidate.replace_field("charities-undetermined-status", 0, 0, "Not Registered")
+            candidate.replace_field("charities-undetermined-status", 1, 0, "Not Registered")
+            _recompute_content_length(candidate.root)
+
+            contract = load_default_status_contract()
+            with tempfile.TemporaryDirectory() as store_dir:
+                result = admit(candidate.root, Path(store_dir), status_contract=contract)
+
+                self.assertEqual(result.status, "accepted")
+                self.assertEqual(result.reasons, ())
+
+    def test_admit_with_status_contract_still_admits_blank_status_row(self) -> None:
+        # The committed baseline's "Unregistered Outreach Group" row has a
+        # blank registration key but a nonblank "Active" status; swap it to
+        # blank status instead so this test isolates the blank-status
+        # exemption specifically, independent of the unrelated placeholder
+        # rejections proven above.
+        with fb.mutated_candidate() as candidate:
+            candidate.replace_field("charities-may-operate", 0, 0, "Current")
+            candidate.replace_field("charities-may-operate", 1, 0, "Current")
+            candidate.replace_field("charities-may-operate", 2, 0, "")
+            candidate.replace_field("charities-undetermined-status", 0, 0, "Not Registered")
+            candidate.replace_field("charities-undetermined-status", 1, 0, "Not Registered")
+            _recompute_content_length(candidate.root)
+
+            contract = load_default_status_contract()
+            with tempfile.TemporaryDirectory() as store_dir:
+                result = admit(candidate.root, Path(store_dir), status_contract=contract)
+
+                self.assertEqual(result.status, "accepted")
+                self.assertEqual(result.reasons, ())
+
+    def test_status_contract_rejection_never_echoes_the_unknown_value(self) -> None:
+        contract = load_default_status_contract()
+        with tempfile.TemporaryDirectory() as store_dir:
+            result = admit(BASELINE_CANDIDATE_ROOT, Path(store_dir), status_contract=contract)
+
+            combined = result.to_json() + result.render_status()
+            for reason in result.reasons:
+                combined += json.dumps(reason.to_dict())
+
+            self.assertNotIn("Active", combined)
+            self.assertNotIn("Reporting Incomplete", combined)
 
 
 class NonEchoTests(unittest.TestCase):

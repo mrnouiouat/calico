@@ -85,6 +85,108 @@ PHASE_3_FINAL_PRODUCTION_SQL_PATHS = frozenset(
 )
 
 
+#: Named, ordered Phase 4 SQL path groups (04-01-PLAN.md interfaces block).
+#: Each group is one later Phase 4 plan's exact closed `.sql` path set
+#: (Plans 02-05; Plan 06 lands no new production SQL and instead replaces
+#: this whole bootstrap gate with one final exact-equality assertion over
+#: the complete 41-path union). A group may land only wholly absent or
+#: wholly present, and only after every group named in
+#: `PHASE_4_GROUP_DEPENDENCIES` for it is itself wholly present -- this
+#: mirrors the Wave 3/4/5 bootstrap shape Phase 3 used before its own
+#: Plan 06 closed it to exact equality (see `Wave3DbtFoundationContractTests`
+#: above).
+PHASE_4_PLAN_02_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/int_keyed_snapshots.sql",
+        "dbt/models/intermediate/int_unkeyed_coverage.sql",
+        "dbt/models/intermediate/int_entity_transitions.sql",
+        "dbt/models/intermediate/int_transition_matrix.sql",
+        "dbt/tests/assert_keyed_snapshot_reconciliation.sql",
+        "dbt/tests/assert_transition_endpoint_union.sql",
+        "dbt/tests/assert_transition_pair_membership.sql",
+        "dbt/tests/assert_transition_classification.sql",
+    }
+)
+
+PHASE_4_PLAN_03_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/int_entity_observation_sequence.sql",
+        "dbt/models/intermediate/int_delinquency_spells.sql",
+        "dbt/tests/assert_delinquency_spell_invariants.sql",
+    }
+)
+
+PHASE_4_PLAN_04_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/stg_capture_attempts.sql",
+        "dbt/models/intermediate/int_capture_runs.sql",
+        "dbt/models/intermediate/int_release_flags.sql",
+        "dbt/tests/assert_capture_run_normalization.sql",
+        "dbt/tests/assert_release_flag_grain.sql",
+    }
+)
+
+PHASE_4_PLAN_05_SQL_PATHS = frozenset(
+    {
+        "dbt/models/intermediate/int_public_organization_eligibility.sql",
+        "dbt/models/marts/mart_registry_population_coverage.sql",
+        "dbt/models/marts/dim_public_organizations.sql",
+        "dbt/models/marts/fct_public_status_observations.sql",
+        "dbt/tests/assert_population_coverage_reconciliation.sql",
+        "dbt/tests/assert_public_organization_eligibility.sql",
+        "dbt/tests/assert_public_status_observation_reconciliation.sql",
+    }
+)
+
+#: Group name -> exact path set, for iteration. Plan 06 (closure) lands no
+#: new production SQL of its own, so it owns no group here.
+PHASE_4_SQL_GROUPS: dict[str, frozenset] = {
+    "plan_02_transitions": PHASE_4_PLAN_02_SQL_PATHS,
+    "plan_03_spells": PHASE_4_PLAN_03_SQL_PATHS,
+    "plan_04_capture": PHASE_4_PLAN_04_SQL_PATHS,
+    "plan_05_public": PHASE_4_PLAN_05_SQL_PATHS,
+}
+
+#: Group name -> the set of predecessor group names that must be wholly
+#: present before this group may land ("no later group may precede its
+#: dependencies", 04-01-PLAN.md). `plan_02_transitions` and
+#: `plan_04_capture` are both Wave 2: each depends only on the Phase 3
+#: final set (already unconditionally required above) and may land in
+#: either order relative to each other. `plan_03_spells` (Wave 3) depends
+#: on `plan_02_transitions`'s keyed snapshots. `plan_05_public` (Wave 3)
+#: depends on both `plan_02_transitions` (keyed snapshots) and
+#: `plan_04_capture` (nothing capture-specific, but Plan 05's own
+#: `depends_on` frontmatter names both 04-02 and 04-04).
+PHASE_4_GROUP_DEPENDENCIES: dict[str, frozenset] = {
+    "plan_02_transitions": frozenset(),
+    "plan_03_spells": frozenset({"plan_02_transitions"}),
+    "plan_04_capture": frozenset(),
+    "plan_05_public": frozenset({"plan_02_transitions", "plan_04_capture"}),
+}
+
+#: The complete closed Phase 4 SQL shape: every path any Phase 4 group will
+#: ever contain, whether or not that group has landed yet. Together with
+#: `PHASE_3_FINAL_PRODUCTION_SQL_PATHS` this is the total closed
+#: cumulative repository SQL boundary Wave 0 opens ("the allowed
+#: cumulative set is immutable in shape", 04-01-PLAN.md) -- 23 Phase 4
+#: paths plus the 18 delivered Phase 3 paths, for an eventual exact 41.
+#: Plan 06 is the named owner of replacing this bootstrap union with one
+#: final exact-equality assertion once every group has landed.
+PHASE_4_ALL_SQL_PATHS = frozenset().union(*PHASE_4_SQL_GROUPS.values())
+
+PHASE_4_FINAL_PRODUCTION_SQL_PATHS = frozenset(
+    PHASE_3_FINAL_PRODUCTION_SQL_PATHS | PHASE_4_ALL_SQL_PATHS
+)
+
+
+def _discovered_production_sql_paths() -> set[str]:
+    return {
+        str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+        for path in (REPO_ROOT / "dbt").rglob("*.sql")
+        if "target" not in path.parts and "dbt_packages" not in path.parts and "logs" not in path.parts
+    }
+
+
 class RepositoryPolicyTests(unittest.TestCase):
     """Task 1: repository hygiene ignores and adapted CLAUDE.md invariants."""
 
@@ -433,9 +535,11 @@ class ToolchainFixtureContractTests(unittest.TestCase):
     def test_only_known_sql_files_exist_in_repository(self) -> None:
         # The disposable adapter-smoke model and the one named non-dbt SQL
         # exception remain exactly as before; every discovered production
-        # `dbt/` path must additionally be a member of the closed Phase 3
-        # allowlist (`Wave3DbtFoundationContractTests` enforces the
-        # subset/group shape of that production membership in detail).
+        # `dbt/` path must additionally be a member of the closed
+        # cumulative Phase 3 + Phase 4 shape (`Wave3DbtFoundationContractTests`
+        # and `Phase4CumulativeGateTests` enforce the subset/group shape of
+        # that production membership in detail; Phase 4's own groups may
+        # be absent, but never widen beyond this closed union).
         sql_files = sorted(
             path
             for path in REPO_ROOT.rglob("*.sql")
@@ -452,8 +556,8 @@ class ToolchainFixtureContractTests(unittest.TestCase):
             )
             self.assertIn(
                 path,
-                PHASE_3_FINAL_PRODUCTION_SQL_PATHS,
-                f"production SQL path not in the closed Phase 3 allowlist: {path}",
+                PHASE_4_FINAL_PRODUCTION_SQL_PATHS,
+                f"production SQL path not in the closed Phase 3 + Phase 4 allowlist: {path}",
             )
 
     def test_exactly_the_fixture_and_production_dbt_projects_exist(self) -> None:
@@ -590,29 +694,79 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
                     f"{path.relative_to(REPO_ROOT)} must not reopen raw CSV or reinterpret its parser contract (D-14)",
                 )
 
-    # -- closed 18-path allowlist: final exact-equality handoff (Plan 06) ---
+    # -- closed 18-path allowlist: Phase 4 Wave 0 reopens this gate --------
 
     def _discovered_production_sql_paths(self) -> set[str]:
-        return {
-            str(path.relative_to(REPO_ROOT)).replace("\\", "/")
-            for path in (REPO_ROOT / "dbt").rglob("*.sql")
-            if "target" not in path.parts and "dbt_packages" not in path.parts and "logs" not in path.parts
-        }
+        return _discovered_production_sql_paths()
 
-    def test_discovered_production_sql_exactly_equals_the_closed_final_allowlist(self) -> None:
-        # Plan 06's own handoff: Waves 3-5 have all landed, so discovery must
-        # now equal -- not merely be a subset of -- the complete 18-path
-        # allowlist. Both a missing planned path and an unplanned extra path
-        # fail this test.
+    def test_discovered_production_sql_matches_the_open_cumulative_boundary(self) -> None:
+        # Superseded by Phase 4 Plan 01 (04-01-PLAN.md): the prior exact
+        # Phase-3-only equality this test enforced is reopened to the
+        # cumulative Phase 3 + Phase 4 bootstrap shape --
+        # `Phase4CumulativeGateTests` below owns the detailed group/order
+        # assertions. This method keeps the two invariants that never
+        # relax during the whole Phase 4 bootstrap: the 18 Phase 3 paths
+        # remain complete, and no discovered path may fall outside the
+        # closed Phase 3 + Phase 4 union. Plan 06 is the named owner of
+        # replacing this with one final exact-equality assertion over the
+        # complete 41-path union once every Phase 4 group has landed.
         discovered = self._discovered_production_sql_paths()
-        missing = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
-        unexpected = discovered - PHASE_3_FINAL_PRODUCTION_SQL_PATHS
+        missing_phase_3 = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
+        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
         self.assertEqual(
-            (missing, unexpected),
+            (missing_phase_3, unexpected),
             (set(), set()),
-            "discovered production SQL must exactly equal the closed 18-path "
-            f"allowlist: missing={sorted(missing)}, unexpected={sorted(unexpected)}",
+            "discovered production SQL must retain every Phase 3 path and "
+            "stay inside the closed Phase 3 + Phase 4 shape: "
+            f"missing_phase_3={sorted(missing_phase_3)}, unexpected={sorted(unexpected)}",
         )
+
+
+class Phase4CumulativeGateTests(unittest.TestCase):
+    """Phase 4 Plan 01's own cumulative SQL bootstrap gate (D-01/D-22,
+    04-01-PLAN.md Task 1): all 18 Phase 3 paths remain mandatory, no path
+    outside the closed Phase 3 + Phase 4 shape is ever accepted, each named
+    Phase 4 group lands only wholly absent or wholly present, and a group
+    never precedes its declared predecessor group(s).
+    """
+
+    def _discovered(self) -> set[str]:
+        return _discovered_production_sql_paths()
+
+    def test_all_phase_3_paths_remain_required(self) -> None:
+        discovered = self._discovered()
+        missing = PHASE_3_FINAL_PRODUCTION_SQL_PATHS - discovered
+        self.assertEqual(
+            missing, set(), f"Phase 3 paths must remain complete: missing={sorted(missing)}"
+        )
+
+    def test_unknown_sql_path_outside_the_closed_shape_fails(self) -> None:
+        discovered = self._discovered()
+        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
+        self.assertEqual(unexpected, set(), f"unplanned SQL path(s) discovered: {sorted(unexpected)}")
+
+    def test_each_phase_4_group_is_wholly_absent_or_wholly_present(self) -> None:
+        discovered = self._discovered()
+        for group_name, group_paths in PHASE_4_SQL_GROUPS.items():
+            present = discovered & group_paths
+            self.assertIn(
+                present,
+                (set(), set(group_paths)),
+                f"group {group_name!r} must be wholly absent or wholly present; "
+                f"found partial membership {sorted(present)}",
+            )
+
+    def test_phase_4_groups_never_precede_their_dependencies(self) -> None:
+        discovered = self._discovered()
+        for group_name, group_paths in PHASE_4_SQL_GROUPS.items():
+            if not group_paths.issubset(discovered):
+                continue
+            for dependency_name in PHASE_4_GROUP_DEPENDENCIES[group_name]:
+                dependency_paths = PHASE_4_SQL_GROUPS[dependency_name]
+                self.assertTrue(
+                    dependency_paths.issubset(discovered),
+                    f"group {group_name!r} landed before its dependency {dependency_name!r}",
+                )
 
 
 if __name__ == "__main__":

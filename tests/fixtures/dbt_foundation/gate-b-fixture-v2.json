@@ -1,0 +1,501 @@
+{
+  "fixture_version": 2,
+  "max_rows_per_logical_list": 6,
+  "max_declared_bytes_per_object": 4096,
+  "as_of_dates": ["2032-01-05", "2032-02-16", "2032-03-30", "2032-05-11", "2032-06-22"],
+  "revisions": [
+    {
+      "revision_label": "d0-rev1",
+      "as_of_date": "2032-01-05",
+      "pointer_variant": null,
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210001",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Alpha",
+            "City": "Fixture City Alpha",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-01-05"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "CT910010",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Beta",
+            "City": "Fixture City Beta",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-01-05"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "9210090",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Gamma",
+            "City": "Fixture City Gamma",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-01-05"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": " Suspended ",
+            "State Charity Reg#": " EX910091 ",
+            "FEIN": "  ",
+            "SOS/FTB#": "  ",
+            "Name": " Gate B Longitudinal Org Delta ",
+            "City": " Fixture City Delta ",
+            "State": " CA ",
+            "Issue Date": "  ",
+            "Last Renewal": "  ",
+            "Date Status Set": "  ",
+            "As-of Date": " 2032-01-05 "
+          }
+        ]
+      }
+    },
+    {
+      "revision_label": "d1-rev1",
+      "as_of_date": "2032-02-16",
+      "pointer_variant": null,
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210092",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Epsilon",
+            "City": "Fixture City Epsilon",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "9210001",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Zeta",
+            "City": "Fixture City Zeta",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          },
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "9210002",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Eta",
+            "City": "Fixture City Eta",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          },
+          {
+            "Registry Status": "Delinquent - Late Fees Due",
+            "State Charity Reg#": "CT910020",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Theta",
+            "City": "Fixture City Theta",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "9210093",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Iota",
+            "City": "Fixture City Iota",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": "Suspended",
+            "State Charity Reg#": "EX910094",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "O\"Malley Fixture Trust",
+            "City": "Fixture City Kappa",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-02-16"
+          }
+        ]
+      }
+    },
+    {
+      "revision_label": "d2-rev-a",
+      "as_of_date": "2032-03-30",
+      "pointer_variant": "d2-rev-a",
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210095",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Discarded Lambda",
+            "City": "Fixture City Lambda",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "CT910096",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Discarded Mu",
+            "City": "Fixture City Mu",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "9210097",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Discarded Nu",
+            "City": "Fixture City Nu",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": "Suspended",
+            "State Charity Reg#": "EX910098",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Discarded Xi",
+            "City": "Fixture City Xi",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ]
+      }
+    },
+    {
+      "revision_label": "d2-rev-b",
+      "as_of_date": "2032-03-30",
+      "pointer_variant": "d2-rev-b",
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210099",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Omicron",
+            "City": "Fixture City Omicron",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "9210002",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Pi",
+            "City": "Fixture City Pi",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          },
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "9210003",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Rho",
+            "City": "Fixture City Rho",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          },
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "CT910030",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Sigma",
+            "City": "Fixture City Sigma",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "9210100",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Tau",
+            "City": "Fixture City Tau",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": "Suspended",
+            "State Charity Reg#": "EX910101",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Upsilon",
+            "City": "Fixture City Upsilon",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-03-30"
+          }
+        ]
+      }
+    },
+    {
+      "revision_label": "d3-rev1",
+      "as_of_date": "2032-05-11",
+      "pointer_variant": null,
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210003",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Phi",
+            "City": "Fixture City Phi",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          },
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "CT910030",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Chi",
+            "City": "Fixture City Chi",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "9210004",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Psi",
+            "City": "Fixture City Psi",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          },
+          {
+            "Registry Status": "Delinquent - Late Fees Due",
+            "State Charity Reg#": "CT910020",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org Omega",
+            "City": "Fixture City Omega",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org AlphaTwo",
+            "City": "Fixture City AlphaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": "Suspended",
+            "State Charity Reg#": "EX910102",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org BetaTwo",
+            "City": "Fixture City BetaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-05-11"
+          }
+        ]
+      }
+    },
+    {
+      "revision_label": "d4-rev1",
+      "as_of_date": "2032-06-22",
+      "pointer_variant": null,
+      "records": {
+        "charities-may-operate": [
+          {
+            "Registry Status": "Active",
+            "State Charity Reg#": "9210103",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org GammaTwo",
+            "City": "Fixture City GammaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-06-22"
+          }
+        ],
+        "charities-not-operating": [
+          {
+            "Registry Status": "Delinquent",
+            "State Charity Reg#": "CT910030",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org DeltaTwo",
+            "City": "Fixture City DeltaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-06-22"
+          },
+          {
+            "Registry Status": "",
+            "State Charity Reg#": "CT910104",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org EpsilonTwo",
+            "City": "Fixture City EpsilonTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-06-22"
+          }
+        ],
+        "charities-undetermined-status": [
+          {
+            "Registry Status": "Not Registered",
+            "State Charity Reg#": "9210105",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org ZetaTwo",
+            "City": "Fixture City ZetaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-06-22"
+          }
+        ],
+        "charities-may-not-operate": [
+          {
+            "Registry Status": "Suspended",
+            "State Charity Reg#": "EX910106",
+            "FEIN": "",
+            "SOS/FTB#": "",
+            "Name": "Gate B Longitudinal Org EtaTwo",
+            "City": "Fixture City EtaTwo",
+            "State": "CA",
+            "Issue Date": "",
+            "Last Renewal": "",
+            "Date Status Set": "",
+            "As-of Date": "2032-06-22"
+          }
+        ]
+      }
+    }
+  ]
+}

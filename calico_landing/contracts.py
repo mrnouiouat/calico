@@ -71,6 +71,23 @@ _XLSX_KNOWN_WORKSHEET_KEYS = frozenset(
     {"header_row", "blank_status_row_count", "required_quality_flag"}
 )
 
+#: Locked closed source-status vocabulary contract (04-01-PLAN.md D-02,
+#: D-22). Authored fresh from the deduplicated union of the four baseline
+#: `status_vocabulary` arrays -- never the archived paths, counts, or
+#: excluded source columns those arrays also carried.
+_SUPPORTED_STATUS_CONTRACT_VERSION = 1
+_REQUIRED_NONBLANK_STATUS_COUNT = 33
+_REQUIRED_DELINQUENT_STATUS_COUNT = 2
+
+_STATUS_TOP_LEVEL_KEYS = frozenset(
+    {
+        "contract_version",
+        "logical_lists",
+        "nonblank_status_vocabulary",
+        "delinquent_statuses",
+    }
+)
+
 
 class ContractError(Exception):
     """Raised when a contract document is missing, malformed, or fails closed.
@@ -106,6 +123,24 @@ class XlsxKnownWorksheet:
     header_row: int
     blank_status_row_count: int
     required_quality_flag: str
+
+
+@dataclass(frozen=True)
+class StatusContract:
+    """The closed, versioned source-status vocabulary contract (D-02/D-22).
+
+    `nonblank_status_vocabulary` is the exact closed 33-value deduplicated
+    union of the four baseline `status_vocabulary` arrays; blank status is
+    deliberately not a member -- it remains reachable through the existing
+    typed-path exclusion behavior and is validated separately. Exactly the
+    two locked delinquent statuses appear in `delinquent_statuses`, both of
+    which are also members of `nonblank_status_vocabulary`.
+    """
+
+    contract_version: int
+    logical_lists: tuple[str, ...]
+    nonblank_status_vocabulary: frozenset[str]
+    delinquent_statuses: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -233,6 +268,69 @@ def load_csv_contract(path: str | Path) -> CsvContract:
         max_compressed_payload_bytes=max_compressed_payload_bytes,
         max_decompressed_payload_bytes=max_decompressed_payload_bytes,
         max_physical_line_bytes=max_physical_line_bytes,
+    )
+
+
+def load_status_contract(path: str | Path) -> StatusContract:
+    """Load and strictly validate the closed source-status vocabulary contract.
+
+    Fails closed on any missing/unknown field, unsupported version, wrong
+    logical-list order, non-unique or non-33-count nonblank vocabulary, or
+    a `delinquent_statuses` set that is not exactly the two locked values
+    and a subset of the nonblank vocabulary. Never reflects the offending
+    input in the raised `ContractError` (D-05/D-10 non-echo discipline
+    mirrored from `load_csv_contract`).
+    """
+
+    document = _read_document(path)
+
+    if set(document.keys()) != _STATUS_TOP_LEVEL_KEYS:
+        raise ContractError("invalid_status_contract_schema")
+
+    contract_version = _require_int(
+        document, "contract_version", category="invalid_status_contract_version"
+    )
+    if contract_version != _SUPPORTED_STATUS_CONTRACT_VERSION:
+        raise ContractError("unsupported_status_contract_version")
+
+    raw_logical_lists = document["logical_lists"]
+    if not isinstance(raw_logical_lists, list) or not all(
+        isinstance(item, str) for item in raw_logical_lists
+    ):
+        raise ContractError("invalid_status_logical_lists")
+    if tuple(raw_logical_lists) != LOGICAL_LIST_ORDER:
+        raise ContractError("invalid_status_logical_lists")
+
+    raw_vocabulary = document["nonblank_status_vocabulary"]
+    if not isinstance(raw_vocabulary, list) or not all(
+        isinstance(item, str) and item for item in raw_vocabulary
+    ):
+        raise ContractError("invalid_status_vocabulary")
+    if (
+        len(raw_vocabulary) != _REQUIRED_NONBLANK_STATUS_COUNT
+        or len(set(raw_vocabulary)) != _REQUIRED_NONBLANK_STATUS_COUNT
+    ):
+        raise ContractError("invalid_status_vocabulary")
+    nonblank_status_vocabulary = frozenset(raw_vocabulary)
+
+    raw_delinquent = document["delinquent_statuses"]
+    if not isinstance(raw_delinquent, list) or not all(
+        isinstance(item, str) and item for item in raw_delinquent
+    ):
+        raise ContractError("invalid_delinquent_statuses")
+    if (
+        len(raw_delinquent) != _REQUIRED_DELINQUENT_STATUS_COUNT
+        or len(set(raw_delinquent)) != _REQUIRED_DELINQUENT_STATUS_COUNT
+    ):
+        raise ContractError("invalid_delinquent_statuses")
+    if not set(raw_delinquent).issubset(nonblank_status_vocabulary):
+        raise ContractError("invalid_delinquent_statuses")
+
+    return StatusContract(
+        contract_version=contract_version,
+        logical_lists=tuple(raw_logical_lists),
+        nonblank_status_vocabulary=nonblank_status_vocabulary,
+        delinquent_statuses=tuple(raw_delinquent),
     )
 
 

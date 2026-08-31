@@ -29,6 +29,7 @@ REASON_RANK: dict[str, int] = {
     "date.mismatch": 100,
     "registration.unknown_format": 110,
     "registration.duplicate": 120,
+    "set.unknown_registry_status": 125,
     "canonical.serialization_failed": 130,
     "revision.invalid_same_date": 140,
     "store.busy": 150,

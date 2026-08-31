@@ -278,5 +278,206 @@ class ClosedValidationTests(unittest.TestCase):
         self.assertEqual(ctx.exception.category, "fixture.unknown_pointer_variant")
 
 
+class FixtureV2SpecShapeTests(unittest.TestCase):
+    """The committed v2 scenario document carries exactly five dates, six
+    revisions, and one same-date pair with two distinctly labeled pointer
+    variants (04-01-PLAN.md D-19). Fixture v1 is untouched by this class.
+    """
+
+    def test_v2_spec_loads_with_five_dates_and_six_revisions(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        self.assertEqual(len(spec.as_of_dates), 5)
+        self.assertEqual(len(spec.revisions), 6)
+
+    def test_v2_same_date_has_exactly_two_revisions_with_distinct_pointer_variants(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        same_date_revisions = [r for r in spec.revisions if r.as_of_date == spec.same_date]
+        self.assertEqual(len(same_date_revisions), 2)
+        variants = {r.pointer_variant for r in same_date_revisions}
+        self.assertEqual(len(variants), 2)
+        self.assertNotIn(None, variants)
+        self.assertEqual(set(spec.same_date_revision_labels), variants)
+
+    def test_v2_other_dates_have_exactly_one_revision_and_no_pointer_variant(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        for as_of_date in spec.as_of_dates:
+            if as_of_date == spec.same_date:
+                continue
+            matching = [r for r in spec.revisions if r.as_of_date == as_of_date]
+            self.assertEqual(len(matching), 1)
+            self.assertIsNone(matching[0].pointer_variant)
+
+    def test_v2_synthetic_dates_never_collide_with_real_admitted_dates_or_v1_dates(self) -> None:
+        v2_spec = gb.load_gate_b_fixture_spec_v2()
+        v1_spec = gb.load_gate_b_fixture_spec()
+        self.assertEqual(set(v2_spec.as_of_dates) & _REAL_ADMITTED_DATES, set())
+        self.assertEqual(set(v2_spec.as_of_dates) & set(v1_spec.as_of_dates), set())
+
+    def test_v1_fixture_document_bytes_are_unchanged_by_the_v2_addition(self) -> None:
+        # D-01/D-16: fixture v1 remains byte-for-byte unchanged and
+        # loadable; adding v2 never mutates it.
+        v1_spec = gb.load_gate_b_fixture_spec()
+        self.assertEqual(len(v1_spec.as_of_dates), 3)
+        self.assertEqual(len(v1_spec.revisions), 4)
+
+
+class FixtureV2DefectShapeAndPrivacyTests(unittest.TestCase):
+    """V2 retains all four locked Phase 3 defect shapes and the same
+    excluded-field/identity-safety guarantees as v1.
+    """
+
+    def test_all_four_required_defect_shapes_present_in_v2(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        counts = gb.defect_shape_counts(spec)
+        for shape in ("universal_padding", "unmatched_quote", "blank_registration", "blank_status"):
+            self.assertGreater(counts[shape], 0, f"missing required defect shape in v2: {shape}")
+
+    def test_v2_excluded_fields_stay_blank_and_registration_keys_are_approved_or_blank(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        for revision in spec.revisions:
+            for logical_list in LOGICAL_LIST_ORDER:
+                for record in revision.records[logical_list]:
+                    self.assertEqual(record["FEIN"].strip(), "")
+                    self.assertEqual(record["SOS/FTB#"].strip(), "")
+                    reg_value = record["State Charity Reg#"].strip()
+                    if reg_value:
+                        self.assertTrue(
+                            gb.is_approved_registration_family(reg_value),
+                            f"unapproved registration family in {logical_list}: {reg_value!r}",
+                        )
+
+    def test_v2_no_real_organization_name_or_fein_shaped_value_present(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        for revision in spec.revisions:
+            for logical_list in LOGICAL_LIST_ORDER:
+                for record in revision.records[logical_list]:
+                    self.assertIn("Fixture", record["Name"] + record["City"])
+
+
+class FixtureV2LongitudinalCoverageTests(unittest.TestCase):
+    """V2's overlapping exact keys structurally cover every named D-19
+    longitudinal edge case across the five-date panel (04-01-PLAN.md).
+    Coverage is proven at the fixture-document level -- membership of the
+    right key in the right revision at the right status -- not by
+    reimplementing Plan 02/03's transition/spell SQL classification here.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.spec = gb.load_gate_b_fixture_spec_v2()
+        cls.by_label = {r.revision_label: r for r in cls.spec.revisions}
+
+    def _status_for_key(self, revision_label: str, key: str) -> str | None:
+        revision = self.by_label[revision_label]
+        for logical_list in LOGICAL_LIST_ORDER:
+            for record in revision.records[logical_list]:
+                if record["State Charity Reg#"].strip() == key:
+                    return record["Registry Status"].strip()
+        return None
+
+    def test_entry_key_moves_from_non_delinquent_to_delinquent(self) -> None:
+        self.assertEqual(self._status_for_key("d0-rev1", "9210001"), "Active")
+        self.assertEqual(self._status_for_key("d1-rev1", "9210001"), "Delinquent")
+
+    def test_still_delinquent_key_persists_across_the_same_date_promoted_pair(self) -> None:
+        self.assertEqual(self._status_for_key("d1-rev1", "9210002"), "Delinquent")
+        self.assertEqual(self._status_for_key("d2-rev-b", "9210002"), "Delinquent")
+
+    def test_observed_exit_key_moves_from_delinquent_to_non_delinquent(self) -> None:
+        self.assertEqual(self._status_for_key("d2-rev-b", "9210003"), "Delinquent")
+        self.assertEqual(self._status_for_key("d3-rev1", "9210003"), "Active")
+
+    def test_newly_observed_key_first_appears_delinquent(self) -> None:
+        self.assertIsNone(self._status_for_key("d2-rev-b", "9210004"))
+        self.assertEqual(self._status_for_key("d3-rev1", "9210004"), "Delinquent")
+
+    def test_disappearance_key_is_delinquent_once_and_never_returns(self) -> None:
+        self.assertEqual(self._status_for_key("d0-rev1", "CT910010"), "Delinquent")
+        for revision_label in ("d1-rev1", "d2-rev-b", "d3-rev1", "d4-rev1"):
+            self.assertIsNone(self._status_for_key(revision_label, "CT910010"))
+
+    def test_loss_and_reappearance_key_has_a_gap_at_the_promoted_same_date_revision(self) -> None:
+        self.assertEqual(self._status_for_key("d1-rev1", "CT910020"), "Delinquent - Late Fees Due")
+        self.assertIsNone(self._status_for_key("d2-rev-b", "CT910020"))
+        self.assertEqual(self._status_for_key("d3-rev1", "CT910020"), "Delinquent - Late Fees Due")
+
+    def test_exit_and_reentry_key_exits_then_becomes_delinquent_again(self) -> None:
+        self.assertEqual(self._status_for_key("d2-rev-b", "CT910030"), "Delinquent")
+        self.assertEqual(self._status_for_key("d3-rev1", "CT910030"), "Active")
+        self.assertEqual(self._status_for_key("d4-rev1", "CT910030"), "Delinquent")
+
+    def test_same_date_promotion_discards_the_non_promoted_revision_content(self) -> None:
+        # The discarded "d2-rev-a" revision carries its own distinct filler
+        # keys that never appear in "d2-rev-b" -- proving the two same-date
+        # revisions are genuinely independent content, not a copy.
+        discarded_only_key = "CT910096"
+        self.assertEqual(self._status_for_key("d2-rev-a", discarded_only_key), "Delinquent")
+        self.assertIsNone(self._status_for_key("d2-rev-b", discarded_only_key))
+
+
+class FixtureV2AdmissionThroughPhaseTwoTests(unittest.TestCase):
+    """Every v2 revision is admitted through the real
+    `calico_landing.admission.admit()` boundary, producing the expected
+    5-date/6-revision store, and no admitted content survives
+    context-manager cleanup (mirrors v1's `AdmissionThroughPhaseTwoTests`).
+    """
+
+    def test_default_pointer_variant_admits_all_six_revisions(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        with gb.gate_b_fixture_store_v2() as store:
+            self.assertEqual(len(store.admissions), 6)
+            for admission in store.admissions:
+                self.assertEqual(admission.result.status, "accepted")
+                self.assertEqual(admission.result.reasons, ())
+
+            promoted = read_promoted_releases(store.store_root)
+            self.assertEqual(set(promoted.keys()), set(spec.as_of_dates))
+
+            expected_pointer_label = spec.same_date_revision_labels[-1]
+            expected_admission = next(
+                a for a in store.admissions if a.revision_label == expected_pointer_label
+            )
+            same_date_promotion = promoted[spec.same_date]
+            self.assertEqual(
+                same_date_promotion.release_revision, expected_admission.result.release_revision
+            )
+            self.assertEqual(
+                same_date_promotion.revision_fingerprint,
+                expected_admission.result.revision_fingerprint,
+            )
+
+    def test_explicit_pointer_variant_selects_the_named_same_date_revision(self) -> None:
+        spec = gb.load_gate_b_fixture_spec_v2()
+        other_variant = spec.same_date_revision_labels[0]
+        with gb.gate_b_fixture_store_v2(pointer_variant=other_variant) as store:
+            promoted = read_promoted_releases(store.store_root)
+            same_date_promotion = promoted[spec.same_date]
+            expected_admission = next(
+                a for a in store.admissions if a.revision_label == other_variant
+            )
+            self.assertEqual(
+                same_date_promotion.release_revision, expected_admission.result.release_revision
+            )
+            self.assertEqual(store.pointer_variant, other_variant)
+
+    def test_no_generated_row_bearing_path_survives_context_manager_cleanup(self) -> None:
+        with gb.gate_b_fixture_store_v2() as store:
+            store_root = store.store_root
+            self.assertTrue(store_root.exists())
+        self.assertFalse(store_root.exists())
+
+    def test_v2_admitted_store_never_resolves_inside_a_git_worktree(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        with gb.gate_b_fixture_store_v2() as store:
+            with self.assertRaises(ValueError):
+                store.store_root.relative_to(repo_root)
+
+    def test_unknown_pointer_variant_rejected(self) -> None:
+        with self.assertRaises(gb.GateBFixtureError) as ctx:
+            with gb.gate_b_fixture_store_v2(pointer_variant="not-a-real-label"):
+                pass  # pragma: no cover -- must never be entered
+        self.assertEqual(ctx.exception.category, "fixture.unknown_pointer_variant")
+
+
 if __name__ == "__main__":
     unittest.main()

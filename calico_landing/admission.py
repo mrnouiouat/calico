@@ -35,7 +35,13 @@ from calico_landing.candidate import (
     reject_store_in_git_worktree,
     resolve_and_stage_candidate,
 )
-from calico_landing.contracts import LOGICAL_LIST_ORDER, CsvContract, load_csv_contract
+from calico_landing.contracts import (
+    LOGICAL_LIST_ORDER,
+    CsvContract,
+    StatusContract,
+    load_csv_contract,
+    load_status_contract,
+)
 from calico_landing.parquet import CanonicalSerializationError, write_parquet
 from calico_landing.parser import ParsedList, StructuralReject, parse_payload
 from calico_landing.result import AdmissionReason, AdmissionResult, sort_reasons
@@ -47,6 +53,16 @@ from calico_landing.validation import validate_set
 #: location, never the process working directory.
 _CSV_CONTRACT_PATH = (
     Path(__file__).resolve().parent.parent / "contracts" / "ag-registry-csv-v1.json"
+)
+
+#: The closed source-status vocabulary contract (04-01-PLAN.md D-02/D-22).
+#: Resolved relative to the package's own location, mirroring
+#: `_CSV_CONTRACT_PATH`. Loading is exposed via `load_default_status_contract()`
+#: below; `admit()` itself only enforces it when a caller explicitly opts in
+#: through the `status_contract` parameter (see that function's docstring
+#: for why this is additive-only rather than an unconditional default).
+_STATUS_CONTRACT_PATH = (
+    Path(__file__).resolve().parent.parent / "contracts" / "ag-registry-status-v1.json"
 )
 
 #: Locked D-08 fingerprint algorithm identifier -- must match the constant
@@ -166,7 +182,23 @@ def _revision_fingerprint(raw_sha256_by_list: dict[str, str]) -> str:
     return hashlib.sha256(framed).hexdigest()
 
 
-def admit(candidate_input: str | Path, store: str | Path) -> AdmissionResult:
+def load_default_status_contract() -> StatusContract:
+    """Load the committed closed source-status vocabulary contract from its
+    fixed package-relative path. Provided so a caller can opt an `admit()`
+    call into status-vocabulary enforcement without hardcoding the
+    contract path itself; raises `calico_landing.contracts.ContractError`
+    on any malformed or missing contract document.
+    """
+
+    return load_status_contract(_STATUS_CONTRACT_PATH)
+
+
+def admit(
+    candidate_input: str | Path,
+    store: str | Path,
+    *,
+    status_contract: StatusContract | None = None,
+) -> AdmissionResult:
     """Admit one candidate release into `store` as a single atomic transaction.
 
     Copies and hashes all four candidate objects into isolated same-store
@@ -175,6 +207,22 @@ def admit(candidate_input: str | Path, store: str | Path) -> AdmissionResult:
     only if every check passes -- serializes four canonical Parquet objects
     plus one closed release manifest and commits/recovers one immutable
     store revision.
+
+    `status_contract` is optional and additive (04-01-PLAN.md D-02/D-22):
+    when supplied (for example via `load_default_status_contract()`), the
+    complete four-list set's nonblank `Registry Status` values are also
+    validated against the contract's closed 33-value vocabulary before
+    admission commits anything; an unknown nonblank value rejects the
+    whole candidate set through the same non-echoing `AdmissionReason`
+    path as every other structural rule. When omitted (the default), no
+    status-vocabulary check runs at all -- callers that do not yet supply
+    a contract keep their exact existing behavior. This module's own CLI
+    boundary (`calico_landing.cli`) and the still-immutable Phase 3
+    `gate-b-fixture-v1.json` fixture both intentionally continue to omit
+    it, since both predate the closed 33-value vocabulary and are not
+    this plan's to rewrite; a later plan should migrate any remaining
+    non-compliant placeholder status values before making this the
+    unconditional default.
 
     Any failure at any stage returns a `rejected` (or `operational_error`)
     `AdmissionResult`: no partial canonical output is ever exposed, the
@@ -245,7 +293,7 @@ def admit(candidate_input: str | Path, store: str | Path) -> AdmissionResult:
         )
         return result
 
-    reasons.extend(validate_set(parsed_lists))
+    reasons.extend(validate_set(parsed_lists, status_contract=status_contract))
 
     if reasons:
         best_effort_date = _best_effort_as_of_date(contract, parsed_lists)
@@ -339,4 +387,4 @@ def admit(candidate_input: str | Path, store: str | Path) -> AdmissionResult:
     )
 
 
-__all__ = ["admit"]
+__all__ = ["admit", "load_default_status_contract"]

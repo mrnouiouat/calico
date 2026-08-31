@@ -531,16 +531,268 @@ def gate_b_fixture_store(pointer_variant: str | None = None) -> Iterator[GateBFi
         )
 
 
+#: The committed closed fixture-scenario document for the Phase 4 v2
+#: successor (04-01-PLAN.md D-19). Additive: `gate-b-fixture-v1.json` is
+#: never mutated and `gate_b_fixture_store` (v1) above is completely
+#: unchanged -- every already-delivered Phase 3 test and the default
+#: `calico_dbt.runner.build(mode="fixture")` factory keep using v1
+#: exactly as before. This is a parallel document/loader/store-builder
+#: pair Phase 4's own longitudinal integration tests import directly (or
+#: pass as `runner.build`'s explicit `fixture_store_factory=` seam).
+FIXTURE_SPEC_PATH_V2 = Path(__file__).resolve().parent / "gate-b-fixture-v2.json"
+
+_SUPPORTED_FIXTURE_VERSION_V2 = 2
+_REQUIRED_DISTINCT_DATES_V2 = 5
+_REQUIRED_REVISION_COUNT_V2 = 6
+_REQUIRED_SAME_DATE_REVISIONS_V2 = 2
+
+
+@dataclass(frozen=True)
+class GateBFixtureSpecV2:
+    """The complete, closed, validated Gate B fixture v2 scenario (D-19).
+
+    Reuses the identical per-revision/per-record shape as v1
+    (`_parse_revision`/`_parse_record` are version-agnostic and are reused
+    unchanged), but requires a wider five-date/six-revision panel -- one
+    date carrying exactly two distinctly labeled pointer-variant revisions
+    (proving same-date promotion), the other four carrying exactly one
+    revision each -- engineered with overlapping invented registration
+    keys to exercise every named D-19 longitudinal edge case: entry, still
+    delinquent, observed exit, newly observed, disappearance,
+    loss/reappearance, and exit/re-entry. All four locked Phase 3 defect
+    shapes are retained (D-01).
+    """
+
+    fixture_version: int
+    as_of_dates: tuple[str, ...]
+    revisions: tuple[RevisionSpec, ...]
+    max_rows_per_logical_list: int
+    max_declared_bytes_per_object: int
+    same_date: str
+    same_date_revision_labels: tuple[str, ...]
+
+
+def load_gate_b_fixture_spec_v2(path: str | Path = FIXTURE_SPEC_PATH_V2) -> GateBFixtureSpecV2:
+    """Load and strictly validate the closed Gate B fixture v2 scenario.
+
+    Mirrors `load_gate_b_fixture_spec`'s fail-closed discipline exactly
+    (same top-level/revision/record key sets, same excluded-field,
+    registration-family, byte-cap, and defect-shape rules), but requires
+    the wider five-date/six-revision v2 distribution instead of v1's
+    three-date/four-revision shape. Never reads or mutates
+    `gate-b-fixture-v1.json`.
+    """
+
+    spec_path = Path(path)
+    try:
+        raw_bytes = spec_path.read_bytes()
+    except OSError as exc:
+        raise GateBFixtureError("fixture.spec_not_found") from exc
+
+    try:
+        document = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GateBFixtureError("fixture.invalid_spec_json") from exc
+
+    if not isinstance(document, dict) or set(document.keys()) != _TOP_LEVEL_KEYS:
+        raise GateBFixtureError("fixture.invalid_spec_schema")
+
+    fixture_version = document.get("fixture_version")
+    if not isinstance(fixture_version, int) or isinstance(fixture_version, bool):
+        raise GateBFixtureError("fixture.invalid_spec_schema")
+    if fixture_version != _SUPPORTED_FIXTURE_VERSION_V2:
+        raise GateBFixtureError("fixture.unsupported_version")
+
+    max_rows = document.get("max_rows_per_logical_list")
+    if (
+        not isinstance(max_rows, int)
+        or isinstance(max_rows, bool)
+        or not (1 <= max_rows <= _MAX_ROWS_PER_LIST_CAP)
+    ):
+        raise GateBFixtureError("fixture.invalid_row_cap")
+
+    max_declared_bytes = document.get("max_declared_bytes_per_object")
+    if (
+        not isinstance(max_declared_bytes, int)
+        or isinstance(max_declared_bytes, bool)
+        or not (1 <= max_declared_bytes <= _MAX_DECLARED_BYTES_CAP)
+    ):
+        raise GateBFixtureError("fixture.invalid_byte_cap")
+
+    raw_dates = document.get("as_of_dates")
+    if not isinstance(raw_dates, list) or not all(isinstance(item, str) for item in raw_dates):
+        raise GateBFixtureError("fixture.invalid_date_set")
+    if (
+        len(raw_dates) != _REQUIRED_DISTINCT_DATES_V2
+        or len(set(raw_dates)) != _REQUIRED_DISTINCT_DATES_V2
+    ):
+        raise GateBFixtureError("fixture.invalid_date_set")
+    for value in raw_dates:
+        try:
+            date.fromisoformat(value)
+        except ValueError as exc:
+            raise GateBFixtureError("fixture.invalid_date_set") from exc
+    as_of_dates = tuple(raw_dates)
+
+    raw_revisions = document.get("revisions")
+    if not isinstance(raw_revisions, list) or len(raw_revisions) != _REQUIRED_REVISION_COUNT_V2:
+        raise GateBFixtureError("fixture.invalid_revision_count")
+
+    seen_labels: set[str] = set()
+    revisions = tuple(
+        _parse_revision(
+            raw_revision,
+            as_of_dates=as_of_dates,
+            max_rows=max_rows,
+            max_declared_bytes=max_declared_bytes,
+            seen_labels=seen_labels,
+        )
+        for raw_revision in raw_revisions
+    )
+
+    counts_by_date: dict[str, int] = {}
+    for revision in revisions:
+        counts_by_date[revision.as_of_date] = counts_by_date.get(revision.as_of_date, 0) + 1
+    if set(counts_by_date.keys()) != set(as_of_dates):
+        raise GateBFixtureError("fixture.invalid_revision_distribution")
+
+    same_date_dates = [
+        value for value, count in counts_by_date.items() if count == _REQUIRED_SAME_DATE_REVISIONS_V2
+    ]
+    single_dates = [value for value, count in counts_by_date.items() if count == 1]
+    if len(same_date_dates) != 1 or len(single_dates) != _REQUIRED_DISTINCT_DATES_V2 - 1:
+        raise GateBFixtureError("fixture.invalid_revision_distribution")
+    same_date = same_date_dates[0]
+
+    same_date_revisions = [r for r in revisions if r.as_of_date == same_date]
+    other_revisions = [r for r in revisions if r.as_of_date != same_date]
+
+    same_date_variants = [r.pointer_variant for r in same_date_revisions]
+    if any(variant is None for variant in same_date_variants) or len(
+        set(same_date_variants)
+    ) != _REQUIRED_SAME_DATE_REVISIONS_V2:
+        raise GateBFixtureError("fixture.invalid_pointer_variant_assignment")
+    if any(r.pointer_variant is not None for r in other_revisions):
+        raise GateBFixtureError("fixture.invalid_pointer_variant_assignment")
+
+    counts = _defect_shape_counts(revisions)
+    for shape in _REQUIRED_DEFECT_SHAPES:
+        if counts[shape] <= 0:
+            raise GateBFixtureError("fixture.missing_required_defect_shape")
+
+    return GateBFixtureSpecV2(
+        fixture_version=fixture_version,
+        as_of_dates=as_of_dates,
+        revisions=revisions,
+        max_rows_per_logical_list=max_rows,
+        max_declared_bytes_per_object=max_declared_bytes,
+        same_date=same_date,
+        same_date_revision_labels=tuple(r.revision_label for r in same_date_revisions),
+    )
+
+
+@dataclass(frozen=True)
+class GateBFixtureStoreV2:
+    """The complete admitted Gate B fixture v2 store: every revision's
+    admission outcome plus the resolved pointer variant admitted last for
+    the shared same-date pair. Additive successor to `GateBFixtureStore`;
+    v1's store builder is untouched.
+    """
+
+    store_root: Path
+    admissions: tuple[GateBFixtureAdmission, ...]
+    pointer_variant: str
+
+
+def _ordered_revisions_v2(
+    spec: GateBFixtureSpecV2, pointer_variant: str | None
+) -> tuple[tuple[RevisionSpec, ...], str]:
+    resolved_variant = (
+        pointer_variant if pointer_variant is not None else spec.same_date_revision_labels[-1]
+    )
+    if resolved_variant not in spec.same_date_revision_labels:
+        raise GateBFixtureError("fixture.unknown_pointer_variant")
+
+    non_same_date = [
+        r for r in spec.revisions if r.revision_label not in spec.same_date_revision_labels
+    ]
+    same_date_by_label = {
+        r.revision_label: r for r in spec.revisions if r.revision_label in spec.same_date_revision_labels
+    }
+    ordered_same_date = [
+        same_date_by_label[label]
+        for label in spec.same_date_revision_labels
+        if label != resolved_variant
+    ]
+    ordered_same_date.append(same_date_by_label[resolved_variant])
+
+    return tuple(non_same_date + ordered_same_date), resolved_variant
+
+
+@contextmanager
+def gate_b_fixture_store_v2(pointer_variant: str | None = None) -> Iterator[GateBFixtureStoreV2]:
+    """Admit the complete closed Gate B fixture v2 scenario through the real
+    Phase 2 `calico_landing.admission.admit()` boundary and yield the
+    resulting `GateBFixtureStoreV2`.
+
+    This is a parallel, additive entry point (D-01/D-16): `gate_b_fixture_store`
+    (v1) above is completely unchanged and remains the default fixture
+    factory every already-delivered Phase 3 test and
+    `calico_dbt.runner.build(mode="fixture")`'s own default
+    `fixture_store_factory` use. Phase 4's own longitudinal integration
+    tests call this function directly, or pass it explicitly as
+    `runner.build`'s `fixture_store_factory=` seam, when they need the
+    richer v2 panel; nothing in Phase 3 is affected by this function's
+    existence. Every revision this call admits is materialized only
+    inside its own owned `TemporaryDirectory`; the returned store lives
+    inside a second owned `TemporaryDirectory` fully removed on exit
+    (mirrors v1's identical cleanup discipline).
+    """
+
+    spec = load_gate_b_fixture_spec_v2(FIXTURE_SPEC_PATH_V2)
+    ordered_revisions, resolved_variant = _ordered_revisions_v2(spec, pointer_variant)
+
+    with tempfile.TemporaryDirectory(prefix="calico-gate-b-fixture-v2-store-") as store_dir:
+        store_root = Path(store_dir).resolve()
+        admissions: list[GateBFixtureAdmission] = []
+
+        for revision in ordered_revisions:
+            with _materialize_candidate(revision) as candidate_root:
+                result = admit(candidate_root, store_root)
+
+            if result.status != "accepted":
+                raise GateBFixtureError("fixture.admission_rejected")
+
+            admissions.append(
+                GateBFixtureAdmission(
+                    revision_label=revision.revision_label,
+                    as_of_date=revision.as_of_date,
+                    result=result,
+                )
+            )
+
+        yield GateBFixtureStoreV2(
+            store_root=store_root,
+            admissions=tuple(admissions),
+            pointer_variant=resolved_variant,
+        )
+
+
 __all__ = [
     "FIXTURE_SPEC_PATH",
+    "FIXTURE_SPEC_PATH_V2",
     "MANIFEST_FILENAME",
     "GateBFixtureError",
     "RevisionSpec",
     "GateBFixtureSpec",
+    "GateBFixtureSpecV2",
     "GateBFixtureAdmission",
     "GateBFixtureStore",
+    "GateBFixtureStoreV2",
     "is_approved_registration_family",
     "load_gate_b_fixture_spec",
+    "load_gate_b_fixture_spec_v2",
     "defect_shape_counts",
     "gate_b_fixture_store",
+    "gate_b_fixture_store_v2",
 ]

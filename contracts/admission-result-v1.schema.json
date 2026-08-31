@@ -55,6 +55,7 @@
             "date.mismatch",
             "registration.unknown_format",
             "registration.duplicate",
+            "set.unknown_registry_status",
             "canonical.serialization_failed",
             "revision.invalid_same_date",
             "store.busy"

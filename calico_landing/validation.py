@@ -22,12 +22,13 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from calico_landing.contracts import LOGICAL_LIST_ORDER
+from calico_landing.contracts import LOGICAL_LIST_ORDER, StatusContract
 from calico_landing.parser import ParsedList
 from calico_landing.result import AdmissionReason
 
 _AS_OF_DATE_HEADER = "As-of Date"
 _REG_NUMBER_HEADER = "State Charity Reg#"
+_REGISTRY_STATUS_HEADER = "Registry Status"
 
 #: The three locked approved nonblank registration-key families
 #: (02-RESEARCH.md "Three classified families"): anchored bare digits,
@@ -79,8 +80,11 @@ def _shared_date(nonblank_dates: list[str]) -> str | None:
     return tied[0]
 
 
-def validate_set(parsed_lists: dict[str, ParsedList]) -> tuple[AdmissionReason, ...]:
-    """Validate the complete four-list set's date and registration-key rules.
+def validate_set(
+    parsed_lists: dict[str, ParsedList], *, status_contract: StatusContract | None = None
+) -> tuple[AdmissionReason, ...]:
+    """Validate the complete four-list set's date, registration-key, and
+    (when `status_contract` is supplied) source-status vocabulary rules.
 
     `parsed_lists` must map every one of `LOGICAL_LIST_ORDER` to a
     successfully parsed `ParsedList` (candidate resolution, transfer,
@@ -89,19 +93,42 @@ def validate_set(parsed_lists: dict[str, ParsedList]) -> tuple[AdmissionReason, 
     violation found, in arbitrary order -- the caller applies
     `calico_landing.result.sort_reasons` for the locked deterministic
     ordering.
+
+    `status_contract` is optional and additive (04-01-PLAN.md D-02/D-22):
+    when supplied, every nonblank `Registry Status` value in every logical
+    list must be a member of the contract's closed 33-value vocabulary;
+    blank status is always exempt (the existing typed-path exclusion
+    behavior). An unknown nonblank value produces one `set.unknown_registry_status`
+    reason per logical list carrying only a safe count -- never the
+    offending value -- so the whole candidate set fails closed without
+    echo. When `status_contract` is omitted, no status-vocabulary check
+    runs at all, preserving every existing caller's behavior exactly.
     """
 
     reasons: list[AdmissionReason] = []
     nonblank_dates: list[str] = []
     date_by_record: list[tuple[str, int, str]] = []
     key_occurrences: dict[str, list[tuple[str, int]]] = {}
+    unknown_status_count_by_list: dict[str, int] = {}
 
     for logical_list in LOGICAL_LIST_ORDER:
         parsed = parsed_lists[logical_list]
         date_index = _column_index(parsed.headers, _AS_OF_DATE_HEADER)
         reg_index = _column_index(parsed.headers, _REG_NUMBER_HEADER)
+        status_index = (
+            _column_index(parsed.headers, _REGISTRY_STATUS_HEADER)
+            if status_contract is not None
+            else None
+        )
 
         for record in parsed.records:
+            if status_index is not None:
+                status_value = record.fields[status_index].strip()
+                if status_value and status_value not in status_contract.nonblank_status_vocabulary:
+                    unknown_status_count_by_list[logical_list] = (
+                        unknown_status_count_by_list.get(logical_list, 0) + 1
+                    )
+
             date_value = record.fields[date_index].strip()
             if not date_value:
                 reasons.append(
@@ -153,6 +180,15 @@ def validate_set(parsed_lists: dict[str, ParsedList]) -> tuple[AdmissionReason, 
                     safe_line_number=line_no,
                 )
             )
+
+    for logical_list, count in unknown_status_count_by_list.items():
+        reasons.append(
+            AdmissionReason(
+                code="set.unknown_registry_status",
+                logical_list=logical_list,
+                safe_count=count,
+            )
+        )
 
     return tuple(reasons)
 

@@ -27,8 +27,10 @@ from calico_landing.contracts import (
     UNSUPPORTED_XLSX_REASON,
     ContractError,
     CsvContract,
+    StatusContract,
     XlsxContract,
     load_csv_contract,
+    load_status_contract,
     load_xlsx_contract,
 )
 from calico_landing.result import (
@@ -43,7 +45,51 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS_DIR = REPO_ROOT / "contracts"
 CSV_CONTRACT_PATH = CONTRACTS_DIR / "ag-registry-csv-v1.json"
 XLSX_CONTRACT_PATH = CONTRACTS_DIR / "ag-registry-xlsx-2019-deferred-v1.json"
+STATUS_CONTRACT_PATH = CONTRACTS_DIR / "ag-registry-status-v1.json"
 RESULT_SCHEMA_PATH = CONTRACTS_DIR / "admission-result-v1.schema.json"
+
+#: The exact deduplicated 33-value union of the four baseline
+#: `status_vocabulary` arrays (`.planning/research/ag-schema-baseline.json`,
+#: 2026-08-05 snapshot) -- independently recomputed here so this test
+#: proves the committed contract against the source baseline, not merely
+#: against itself.
+EXPECTED_NONBLANK_STATUS_VOCABULARY = frozenset(
+    {
+        "Closed - Registration Not Required",
+        "Current",
+        "Current - Awaiting Reporting",
+        "Current - In Process",
+        "Current - Probationary Registration",
+        "Current - Reporting Incomplete",
+        "Delinquent",
+        "Delinquent - Late Fees Due",
+        "Dissolution Pending",
+        "Dissolution Waiver Issued",
+        "Dissolved",
+        "Enforcement Action Pending",
+        "Exempt",
+        "Exempt - Dissolution Pending",
+        "Exempt - Dissolution Waiver Issued",
+        "Exempt - Dissolved",
+        "Exempt - Facility Financing",
+        "Exempt - Form 990-PF Required",
+        "Exempt - Religious",
+        "Exempt - Withdrawn",
+        "Mutual Benefit",
+        "Never Registered - Diss. Waiver Issued",
+        "Never Registered - Dissolution Pending",
+        "Never Registered - Dissolved",
+        "Never Registered - Withdrawn",
+        "Not Registered",
+        "Not Registered - Cease and Desist Order",
+        "Registered - Corporate Trustee",
+        "Revoked",
+        "Subject to Cease and Desist Order",
+        "Suspended",
+        "Trust Closed",
+        "Withdrawn",
+    }
+)
 
 EXPECTED_HEADERS = (
     "Registry Status",
@@ -234,6 +280,184 @@ class NoXlsxReaderDependencyTests(unittest.TestCase):
         self.assertTrue(decision_doc.is_file())
         text = decision_doc.read_text(encoding="utf-8")
         self.assertIn("synthetic", text.lower())
+
+
+class StatusContractDocumentTests(unittest.TestCase):
+    """The committed status contract document encodes D-02/D-22 exactly:
+    one supported version, an exact four-key top-level schema, and the
+    deduplicated 33-value nonblank vocabulary from the baseline.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.document = _load_json(STATUS_CONTRACT_PATH)
+        cls.contract = load_status_contract(STATUS_CONTRACT_PATH)
+
+    def test_document_exists(self) -> None:
+        self.assertTrue(STATUS_CONTRACT_PATH.is_file())
+
+    def test_document_key_set_is_exact_and_closed(self) -> None:
+        self.assertEqual(
+            set(self.document.keys()),
+            {
+                "contract_version",
+                "logical_lists",
+                "nonblank_status_vocabulary",
+                "delinquent_statuses",
+            },
+        )
+
+    def test_contract_version_is_one(self) -> None:
+        self.assertEqual(self.document["contract_version"], 1)
+
+    def test_logical_lists_exact_order_and_count(self) -> None:
+        self.assertEqual(tuple(self.document["logical_lists"]), LOGICAL_LIST_ORDER)
+        self.assertEqual(len(self.document["logical_lists"]), 4)
+
+    def test_nonblank_vocabulary_is_exactly_the_deduplicated_33_value_baseline_union(self) -> None:
+        vocabulary = self.document["nonblank_status_vocabulary"]
+        self.assertEqual(len(vocabulary), 33)
+        self.assertEqual(len(set(vocabulary)), 33)
+        self.assertEqual(set(vocabulary), EXPECTED_NONBLANK_STATUS_VOCABULARY)
+
+    def test_both_locked_delinquent_statuses_are_present(self) -> None:
+        self.assertEqual(
+            set(self.document["delinquent_statuses"]),
+            {"Delinquent", "Delinquent - Late Fees Due"},
+        )
+        self.assertTrue(
+            set(self.document["delinquent_statuses"]).issubset(
+                set(self.document["nonblank_status_vocabulary"])
+            )
+        )
+
+    def test_blank_status_is_not_a_vocabulary_member(self) -> None:
+        self.assertNotIn("", self.document["nonblank_status_vocabulary"])
+
+    def test_contract_does_not_carry_archived_paths_counts_or_excluded_columns(self) -> None:
+        # D-22: archived paths, row counts, and excluded source columns
+        # from the workshop baseline must never cross into this product
+        # contract.
+        for forbidden_key in ("archived_path", "as_of_date", "columns", "reg_shapes", "row_count"):
+            self.assertNotIn(forbidden_key, self.document)
+
+    def test_loader_returns_frozen_contract_with_matching_fields(self) -> None:
+        self.assertIsInstance(self.contract, StatusContract)
+        self.assertEqual(self.contract.logical_lists, LOGICAL_LIST_ORDER)
+        self.assertEqual(self.contract.nonblank_status_vocabulary, EXPECTED_NONBLANK_STATUS_VOCABULARY)
+        self.assertEqual(
+            set(self.contract.delinquent_statuses), {"Delinquent", "Delinquent - Late Fees Due"}
+        )
+
+    def test_loader_result_is_immutable(self) -> None:
+        with self.assertRaises(AttributeError):
+            self.contract.contract_version = 2  # type: ignore[misc]
+
+
+class MalformedStatusContractTests(unittest.TestCase):
+    """Malformed/extra-field status contract documents fail closed by fixed
+    category, mirroring `MalformedCsvContractTests`.
+    """
+
+    def _write(self, tmp_dir: Path, document: dict) -> Path:
+        path = tmp_dir / "malformed-status.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return path
+
+    def _valid_document(self) -> dict:
+        return json.loads(STATUS_CONTRACT_PATH.read_text(encoding="utf-8"))
+
+    def test_missing_file_raises_contract_not_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "does-not-exist.json"
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(missing)
+            self.assertEqual(ctx.exception.category, "contract_not_found")
+
+    def test_missing_key_raises_invalid_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            del document["delinquent_statuses"]
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_status_contract_schema")
+
+    def test_extra_key_raises_invalid_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["unexpected_field"] = "synthetic-value"
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_status_contract_schema")
+
+    def test_unsupported_version_raises_unsupported_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["contract_version"] = 2
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "unsupported_status_contract_version")
+
+    def test_wrong_logical_list_order_raises_invalid_status_logical_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["logical_lists"] = list(reversed(document["logical_lists"]))
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_status_logical_lists")
+
+    def test_non_33_count_vocabulary_raises_invalid_status_vocabulary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["nonblank_status_vocabulary"] = document["nonblank_status_vocabulary"][:-1]
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_status_vocabulary")
+
+    def test_duplicate_vocabulary_entry_raises_invalid_status_vocabulary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            vocabulary = document["nonblank_status_vocabulary"][:-1]
+            vocabulary.append(vocabulary[0])
+            document["nonblank_status_vocabulary"] = vocabulary
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_status_vocabulary")
+
+    def test_delinquent_statuses_not_a_subset_raises_invalid_delinquent_statuses(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["delinquent_statuses"] = ["Delinquent", "Not A Real Status"]
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_delinquent_statuses")
+
+    def test_wrong_delinquent_status_count_raises_invalid_delinquent_statuses(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["delinquent_statuses"] = ["Delinquent"]
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            self.assertEqual(ctx.exception.category, "invalid_delinquent_statuses")
+
+    def test_error_never_echoes_sentinel_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            document = self._valid_document()
+            document["unexpected_field"] = _SENTINEL_PATH_LIKE
+            path = self._write(Path(tmp), document)
+            with self.assertRaises(ContractError) as ctx:
+                load_status_contract(path)
+            rendered = f"{ctx.exception.category}:{ctx.exception}"
+            self.assertNotIn(_SENTINEL_PATH_LIKE, rendered)
+            self.assertNotIn(str(path), rendered)
 
 
 class ResultSchemaDocumentTests(unittest.TestCase):
