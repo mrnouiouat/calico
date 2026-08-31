@@ -602,6 +602,12 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
         # Phase 2 Plan 04 forward-fixed this file's own stale SQL-only
         # assertion when a later plan's required change invalidated it.
         "capture_attempts",
+        # Added by 04-05-PLAN.md (D-16/D-18/D-20): the fixed nullable
+        # private eligibility-classification relation both fixture and
+        # real preflight always create, forward-fixing this exact-set
+        # assertion the same way 04-04-PLAN.md already forward-fixed it
+        # for capture_attempts above.
+        "public_eligibility_classifications",
     )
 
     # -- production project shape -----------------------------------------

@@ -1,11 +1,12 @@
 version: 2
 
 # Fixed `runtime_input` source contract (D-03, T-03-06). `calico_dbt.preflight`
-# always creates exactly this schema and these seven relation names -- four
-# logical-list registry relations, the revision and promotion catalogs, and
-# the capture-attempt relation (04-04-PLAN.md D-12/D-20) -- whether the
-# caller ran fixture or real mode. This file names those already fixed
-# relations; it never contains a path, an environment expression, or a
+# always creates exactly this schema and these eight relation names -- four
+# logical-list registry relations, the revision and promotion catalogs, the
+# capture-attempt relation (04-04-PLAN.md D-12/D-20), and the private
+# eligibility-classification relation (04-05-PLAN.md D-16/D-18/D-20) --
+# whether the caller ran fixture or real mode. This file names those already
+# fixed relations; it never contains a path, an environment expression, or a
 # mode-conditional Jinja block, because mode selection may only change how
 # `runtime_input` is populated, never what dbt sees once it is populated
 # (D-01..D-04).
@@ -43,3 +44,15 @@ sources:
           (D-20); outcome normalization, timing-state derivation, and
           duration calculation happen only downstream in dbt SQL, never
           here or in Python.
+      - name: public_eligibility_classifications
+        description: >
+          One row per closed classification entry preflight validated from
+          the store's one fixed optional direct-child private eligibility
+          sidecar file (04-05-PLAN.md D-16/D-18). Every value is
+          parameter-bound, never interpolated into SQL text. This relation
+          is always present with this fixed nullable schema in both
+          fixture and real mode, including as an empty relation when no
+          sidecar file exists (D-20) -- a missing real classification input
+          is a valid state, and downstream dbt SQL normalizes every
+          unmatched exact key to 'unclassified' rather than failing the
+          build or admitting an unreviewed key.

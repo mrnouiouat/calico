@@ -41,6 +41,7 @@ from calico_dbt.catalog import (
     VerifiedRevisionManifest,
     load_and_verify_revision_manifest,
 )
+from calico_dbt.eligibility import EligibilityError, load_eligibility_classifications
 from calico_landing.attempts import (
     AdmissionV1Attempt,
     AttemptError,
@@ -112,6 +113,7 @@ class RuntimeInputBinding:
     verified_release_count: int
     verified_object_count: int
     verified_capture_attempt_count: int
+    verified_eligibility_classification_count: int
 
 
 def _resolve_store_root(store_root: str | Path) -> Path:
@@ -403,6 +405,29 @@ def _load_capture_attempt_rows(store_root: Path) -> list[tuple]:
     return rows
 
 
+def _load_eligibility_rows(store_root: Path) -> list[tuple[str, str, str]]:
+    """Load, validate, and shape every private eligibility classification
+    into the fixed three-column row `prepare_runtime_input` parameter-binds
+    into `runtime_input.public_eligibility_classifications` (D-16/D-18).
+
+    An absent sidecar is a valid empty result, never a failure (T-04-05B):
+    the fixed relation is still created, just with zero rows, in both
+    fixture and real mode (D-20). Any malformed or aliased document fails
+    the whole preflight closed with a fixed category -- untrusted store
+    content crossing a trust boundary, never silently skipped (T-04-05A).
+    """
+
+    try:
+        classifications = load_eligibility_classifications(store_root)
+    except EligibilityError as exc:
+        raise PreflightError("preflight.public_eligibility_invalid") from exc
+
+    return [
+        (entry.registration_number, entry.classification, entry.classification_version)
+        for entry in classifications
+    ]
+
+
 def prepare_runtime_input(
     *,
     store_root: str | Path,
@@ -460,6 +485,7 @@ def prepare_runtime_input(
 
     promotions = _validate_pointer_consistency(resolved_store_root, catalog)
     capture_attempt_rows = _load_capture_attempt_rows(resolved_store_root)
+    eligibility_rows = _load_eligibility_rows(resolved_store_root)
 
     duckdb_path = resolved_temp_root / DUCKDB_FILENAME
     connection = duckdb.connect(str(duckdb_path))
@@ -531,6 +557,25 @@ def prepare_runtime_input(
                 "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 list(row),
             )
+
+        # Fixed nullable eligibility relation (D-16/D-18/D-20): both fixture
+        # and real mode always create exactly this schema, even when
+        # `eligibility_rows` is empty (an absent sidecar in real mode).
+        # Every value is bound as a parameter -- never interpolated into
+        # SQL text -- so no sidecar field can ever become dynamic SQL
+        # (T-04-05A).
+        connection.execute(
+            f"CREATE TABLE {RUNTIME_SCHEMA}.public_eligibility_classifications ("
+            "registration_number VARCHAR, classification VARCHAR, "
+            "classification_version VARCHAR"
+            ")"
+        )
+        for row in eligibility_rows:
+            connection.execute(
+                f"INSERT INTO {RUNTIME_SCHEMA}.public_eligibility_classifications VALUES "
+                "(?, ?, ?)",
+                list(row),
+            )
     except duckdb.Error as exc:
         raise PreflightError("preflight.database_load_failed") from exc
     finally:
@@ -542,6 +587,7 @@ def prepare_runtime_input(
         verified_release_count=len(catalog.releases),
         verified_object_count=len(opaque_paths),
         verified_capture_attempt_count=len(capture_attempt_rows),
+        verified_eligibility_classification_count=len(eligibility_rows),
     )
 
 

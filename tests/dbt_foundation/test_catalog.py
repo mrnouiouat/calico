@@ -332,6 +332,10 @@ class PreflightVerifyCopyBindTests(unittest.TestCase):
                     # forward-fixed test_repository_contract.py's parallel
                     # six-relation assertion.
                     "capture_attempts",
+                    # Added by 04-05-PLAN.md (D-16/D-18/D-20): the fixed
+                    # nullable private eligibility-classification relation
+                    # both fixture and real preflight always create.
+                    "public_eligibility_classifications",
                 }
                 self.assertEqual(tables, expected)
 

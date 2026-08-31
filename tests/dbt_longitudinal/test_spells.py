@@ -47,16 +47,18 @@ _DELINQUENCY_SPELLS_SQL = _INTERMEDIATE_DIR / "int_delinquency_spells.sql"
 _SPELLS_YML = _INTERMEDIATE_DIR / "intermediate_spells.yml"
 
 #: The exact total dbt model count now that this plan's two models
-#: (int_entity_observation_sequence, int_delinquency_spells) exist
-#: alongside the seventeen already-delivered Phase 3/Plan 02/Plan 04
-#: models. An unselected `runner.build` always builds the whole project
-#: regardless of which plan's test is driving it, so this constant tracks
-#: total project model count, not only this file's own plan's models --
-#: forward-fixed the same way 04-04-PLAN.md forward-fixed this file's own
-#: stale count when its three models landed. A mismatch here means either
-#: a model failed to build or an unexpected extra/missing model exists in
-#: the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 19
+#: (int_entity_observation_sequence, int_delinquency_spells) and
+#: 04-05-PLAN.md's four models (int_public_organization_eligibility,
+#: mart_registry_population_coverage, dim_public_organizations,
+#: fct_public_status_observations) exist alongside the seventeen already-
+#: delivered Phase 3/Plan 02/Plan 04 models. An unselected `runner.build`
+#: always builds the whole project regardless of which plan's test is
+#: driving it, so this constant tracks total project model count, not only
+#: this file's own plan's models -- forward-fixed the same way 04-04-
+#: PLAN.md forward-fixed this file's own stale count when its three models
+#: landed. A mismatch here means either a model failed to build or an
+#: unexpected extra/missing model exists in the project.
+_EXPECTED_TOTAL_MODEL_COUNT = 23
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

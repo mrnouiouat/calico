@@ -63,15 +63,18 @@ _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "vali
 
 #: The exact total dbt model count now that Plan 03's two models
 #: (04-03-PLAN.md: int_entity_observation_sequence, int_delinquency_spells)
-#: also exist alongside this plan's own three models and the fourteen
-#: already-delivered Phase 3 + Plan 02 models. An unselected `runner.build`
-#: always builds the whole project regardless of which plan's test is
-#: driving it, so this constant tracks total project model count, not only
-#: this file's own plan's models -- forward-fixed the same way this file's
-#: own constant was forward-fixed from 14 to 17 when this plan's own three
-#: models first landed. A mismatch here means either a new model failed to
-#: build or an unexpected extra/missing model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 19
+#: and Plan 05's four models (04-05-PLAN.md: int_public_organization_
+#: eligibility, mart_registry_population_coverage, dim_public_organizations,
+#: fct_public_status_observations) also exist alongside this plan's own
+#: three models and the fourteen already-delivered Phase 3 + Plan 02
+#: models. An unselected `runner.build` always builds the whole project
+#: regardless of which plan's test is driving it, so this constant tracks
+#: total project model count, not only this file's own plan's models --
+#: forward-fixed the same way this file's own constant was forward-fixed
+#: from 14 to 17 to 19 to 23 as each later plan landed. A mismatch here
+#: means either a new model failed to build or an unexpected extra/missing
+#: model exists in the project.
+_EXPECTED_TOTAL_MODEL_COUNT = 23
 
 _FABRICATED_RECOVERED_FINGERPRINT = "b" * 64
 

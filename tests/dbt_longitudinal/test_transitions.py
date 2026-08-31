@@ -45,18 +45,21 @@ _TRANSITION_MATRIX_SQL = _INTERMEDIATE_DIR / "int_transition_matrix.sql"
 
 #: The exact total dbt model count now that Plan 02's four models,
 #: Plan 04's three models (04-04-PLAN.md: stg_capture_attempts,
-#: int_capture_runs, int_release_flags), and Plan 03's two models
-#: (04-03-PLAN.md: int_entity_observation_sequence, int_delinquency_spells)
-#: all exist alongside the ten already-delivered Phase 3 models (Wave 3-5).
-#: An unselected `runner.build` always builds the whole project regardless
-#: of which plan's test is driving it, so this constant tracks total
-#: project model count, not only this file's own Plan 02 models --
-#: forward-fixed the same way Plan 04 forward-fixed test_catalog.py's and
-#: test_repository_contract.py's own stale exact-count assertions, and the
-#: same way this file's own constant was forward-fixed from 14 to 17 when
-#: Plan 04 landed. A mismatch here means either a model failed to build or
-#: an unexpected extra/missing model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 19
+#: int_capture_runs, int_release_flags), Plan 03's two models
+#: (04-03-PLAN.md: int_entity_observation_sequence, int_delinquency_spells),
+#: and Plan 05's four models (04-05-PLAN.md: int_public_organization_
+#: eligibility, mart_registry_population_coverage, dim_public_organizations,
+#: fct_public_status_observations) all exist alongside the ten already-
+#: delivered Phase 3 models (Wave 3-5). An unselected `runner.build` always
+#: builds the whole project regardless of which plan's test is driving it,
+#: so this constant tracks total project model count, not only this file's
+#: own Plan 02 models -- forward-fixed the same way Plan 04 forward-fixed
+#: test_catalog.py's and test_repository_contract.py's own stale exact-count
+#: assertions, and the same way this file's own constant was forward-fixed
+#: from 14 to 17 to 19 to 23 as each later plan landed. A mismatch here
+#: means either a model failed to build or an unexpected extra/missing
+#: model exists in the project.
+_EXPECTED_TOTAL_MODEL_COUNT = 23
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

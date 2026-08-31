@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: mart_registry_population_coverage
+    description: >
+      Grain: one row per accepted release identity, source list,
+      source-reported status, and keyed-versus-unkeyed coverage class
+      (D-15). The one bounded low-cardinality baseline aggregate Phase 4
+      owns -- contains no organization key, name, city, or drillthrough
+      field. Grouped directly from int_registry_record_dispositions so its
+      own sum(record_count) reconciles to the total promoted row count by
+      construction. Independently reconciled by
+      assert_population_coverage_reconciliation.sql. Materialized as an
+      explicit view.
+    columns:
+      - name: as_of_date
+        description: "The accepted release's source-reported as-of date."
+        tests:
+          - not_null
+      - name: release_revision
+        description: "The accepted release's revision number."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "The accepted release's ordered-source-hash fingerprint."
+        tests:
+          - not_null
+      - name: source_list
+        description: "The published logical source list this aggregated row belongs to."
+        tests:
+          - not_null
+      - name: source_reported_registry_status
+        description: "The source-reported status category, or null for the one blank-status typed-path exclusion disposition."
+      - name: coverage_class
+        description: "'keyed' for the eligible_for_keyed_path disposition; 'unkeyed' for every other closed disposition value (blank registration or blank status)."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - keyed
+                - unkeyed
+      - name: record_count
+        description: "The count of promoted records in this exact release/list/status/coverage_class group."
+        tests:
+          - not_null
+
+  - name: dim_public_organizations
+    description: >
+      Grain: one row per explicit eligible exact registration key (D-16,
+      D-21 representative model). Deterministically selects the one latest
+      observed full-release row per eligible key, ordered by accepted
+      as-of date, release revision, and revision fingerprint descending --
+      never backfills an individual null display attribute from an older
+      release. Positive column list only: organization name, exact
+      registration number, city/state, latest observed status/release
+      identity, and a fixed official verification instruction (D-007/D-17).
+      Independently reconciled by assert_public_organization_eligibility.sql.
+      Materialized as an explicit view.
+    columns:
+      - name: state_charity_registration_number
+        description: "The exact full nonblank longitudinal key. Unique within this relation (one row per eligible key)."
+        tests:
+          - not_null
+          - unique
+      - name: organization_name
+        description: "The source-reported organization name from the latest observed release (D-007 deliberately allowed identity field)."
+      - name: city
+        description: "The source-reported city from the latest observed release, retained for disambiguation only (D-007)."
+      - name: state
+        description: "The source-reported state from the latest observed release."
+      - name: latest_source_reported_status
+        description: "The source-reported registry status category from the latest observed release."
+      - name: latest_is_delinquent
+        description: "Whether the latest observed release's status was one of the two closed delinquent statuses."
+        tests:
+          - not_null
+      - name: latest_observed_as_of_date
+        description: "The accepted as-of date of the latest observed release for this key."
+        tests:
+          - not_null
+      - name: latest_observed_release_revision
+        description: "The release revision of the latest observed release for this key."
+        tests:
+          - not_null
+      - name: latest_observed_revision_fingerprint
+        description: "The revision fingerprint of the latest observed release for this key."
+        tests:
+          - not_null
+      - name: official_verification_instructions
+        description: "Fixed, non-dynamic instructions pointing a reader to the official California Registry Search Tool for the current status of this exact registration number (D-019 substring-hazard/staleness context)."
+        tests:
+          - not_null
+
+  - name: fct_public_status_observations
+    description: >
+      Grain: one row per explicit eligible exact registration key and
+      promoted accepted release identity -- at most one row per key/release
+      (D-16, D-21 representative model). Built from eligible keys cross
+      joined to every promoted release, left joined to int_keyed_snapshots,
+      so a key genuinely absent from a given release is an explicit
+      'not_observed' state rather than a silently omitted row. Positive
+      column list only, mirroring dim_public_organizations's allowed-field
+      boundary. Independently reconciled by
+      assert_public_status_observation_reconciliation.sql. Materialized as
+      an immediate full-refresh table (the reused heavy public observation
+      fact).
+    columns:
+      - name: state_charity_registration_number
+        description: "The exact full nonblank longitudinal key."
+        tests:
+          - not_null
+      - name: as_of_date
+        description: "The promoted release's accepted as-of date."
+        tests:
+          - not_null
+      - name: release_revision
+        description: "The promoted release's revision number."
+        tests:
+          - not_null
+      - name: revision_fingerprint
+        description: "The promoted release's ordered-source-hash fingerprint."
+        tests:
+          - not_null
+      - name: observation_state
+        description: "'observed' when this eligible key has a keyed snapshot row for this exact release; 'not_observed' otherwise (D-16: missing-from-release stays explicit, never coalesced into a status)."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - observed
+                - not_observed
+      - name: organization_name
+        description: "The source-reported organization name observed at this exact release, or null when observation_state = 'not_observed'."
+      - name: city
+        description: "The source-reported city observed at this exact release, or null when observation_state = 'not_observed'."
+      - name: state
+        description: "The source-reported state observed at this exact release, or null when observation_state = 'not_observed'."
+      - name: source_reported_status
+        description: "The source-reported registry status observed at this exact release, or null when observation_state = 'not_observed'."
+      - name: is_delinquent
+        description: "Whether the observed status was one of the two closed delinquent statuses, or null when observation_state = 'not_observed'."
