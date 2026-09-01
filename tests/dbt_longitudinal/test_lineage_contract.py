@@ -107,6 +107,30 @@ SAFE_OUTPUT_MODELS: frozenset[str] = frozenset(
     {"mart_registry_population_coverage", "dim_public_organizations", "fct_public_status_observations"}
 )
 
+#: Phase 5's own metric/diagnostic/claim marts (05-01..05-05-PLAN.md). These
+#: fill none of Phase 4's ten grain slots and are not Phase 4 helpers -- they
+#: are exactly the "fully owned by Phase 5" relations `docs/model-grains.md`'s
+#: own "Phase 5 integration points and non-ownership" section already names
+#: by responsibility (starting-cohort persistence, the three `Last Renewal`
+#: measures, headline reconciliation, interval proportions, the approved
+#: claim). Kept as a separate set from `HELPER_MODEL_NAMES` on purpose: that
+#: set's own completeness test additionally requires every member to be
+#: labeled a *Phase 4 helper* in `docs/model-grains.md`, which would
+#: misrepresent these as Phase 4-owned rather than the Phase 5 boundary the
+#: doc already, correctly, states.
+PHASE_5_METRIC_MODEL_NAMES: frozenset[str] = frozenset(
+    {
+        "mart_release_snapshot_metrics",
+        "mart_adjacent_pair_metrics",
+        "mart_starting_cohort_persistence",
+        "mart_source_reported_status_age",
+        "mart_spell_censoring_summary",
+        "mart_release_quality",
+        "mart_last_renewal_diagnostic",
+        "mart_claim_support",
+    }
+)
+
 #: Every discovered lineage edge required for a reviewer to follow the
 #: complete Phase 3 -> Phase 4 -> safe-output path (D-01/D-20). Expressed as
 #: (upstream_model, downstream_model) pairs; each must appear as a
@@ -284,10 +308,12 @@ class GrainMapCompletenessTests(unittest.TestCase):
             self.assertIn(owner, all_names, f"grain {grain!r}'s owner {owner!r} does not exist as a model file")
 
     def test_helper_set_plus_owner_set_is_the_complete_model_universe(self) -> None:
-        # Proves no undocumented thirteenth-or-more helper or eleventh owner
-        # silently exists anywhere under dbt/models/.
+        # Proves no undocumented thirteenth-or-more Phase 4 helper, eleventh
+        # Phase 4 owner, or ninth Phase 5 metric mart silently exists anywhere
+        # under dbt/models/ (forward-fixed at Phase 5 closure, 05-05-PLAN.md
+        # Task 3, to also close over Phase 5's own eight new marts).
         self.assertEqual(
-            HELPER_MODEL_NAMES | set(REQUIRED_GRAIN_OWNERS.values()),
+            HELPER_MODEL_NAMES | set(REQUIRED_GRAIN_OWNERS.values()) | PHASE_5_METRIC_MODEL_NAMES,
             _all_model_names(),
         )
 

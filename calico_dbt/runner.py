@@ -546,8 +546,15 @@ def _gate_a_reconciliation_mismatched(target_path: Path) -> bool:
 def _run_dbt_docs_generate(
     *, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path
 ) -> None:
+    # `docs()` is always fixture mode (D-20) -- the same fixed var
+    # `_run_dbt_build`/`_ls_selected_nodes` already pass. Without it, dbt
+    # cannot even *compile* `assert_gate_a_reconciliation.sql`: its
+    # `var('calico_verified_mode')` call (no default) raises at parse time
+    # regardless of which side of the `{% if %}` ultimately runs, so any
+    # dbt command over this project that omits `--vars` fails closed before
+    # docs generation ever starts (D-11/D-15).
     cmd = _dbt_command(
-        ["docs", "generate"],
+        ["docs", "generate", *_verified_mode_vars("fixture")],
         project_dir=project_dir,
         profiles_dir=profiles_dir,
         target_path=target_path,

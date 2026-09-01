@@ -86,9 +86,12 @@ class RealProjectDocsProofTests(unittest.TestCase):
         self.assertIsNotNone(proof)
         self.assertEqual(proof.mode, "fixture")
         self.assertEqual(proof.status, "success")
-        # Exactly the complete closed Phase 3 + Phase 4 model set (D-01/D-22):
-        # every dbt/models/**/*.sql file becomes exactly one "model." node.
-        self.assertEqual(proof.dbt_model_count, 23)
+        # Exactly the complete closed Phase 3 + Phase 4 + Phase 5 model set
+        # (D-01/D-22): every dbt/models/**/*.sql file becomes exactly one
+        # "model." node. 23 -> 31 at Phase 5 closure (05-05-PLAN.md Task 3),
+        # the same forward-fix applied to test_transitions.py, test_spells.py,
+        # test_capture_runs.py, and test_public_models.py.
+        self.assertEqual(proof.dbt_model_count, 31)
         self.assertGreaterEqual(proof.dbt_test_count, 18)
         self.assertGreater(proof.dbt_selected_node_count, 0)
         self.assertGreater(proof.docs_node_count, 0)

@@ -58,7 +58,14 @@ _SPELLS_YML = _INTERMEDIATE_DIR / "intermediate_spells.yml"
 #: PLAN.md forward-fixed this file's own stale count when its three models
 #: landed. A mismatch here means either a model failed to build or an
 #: unexpected extra/missing model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 23
+#:
+#: Forward-fixed again at Phase 5 closure (05-05-PLAN.md Task 3): Plans
+#: 01-04 cumulatively added eight new marts (mart_release_snapshot_metrics,
+#: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
+#: mart_source_reported_status_age, mart_spell_censoring_summary,
+#: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support),
+#: bringing the total from 23 to 31.
+_EXPECTED_TOTAL_MODEL_COUNT = 31
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

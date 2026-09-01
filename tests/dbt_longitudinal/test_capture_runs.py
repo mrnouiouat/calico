@@ -71,10 +71,16 @@ _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "vali
 #: regardless of which plan's test is driving it, so this constant tracks
 #: total project model count, not only this file's own plan's models --
 #: forward-fixed the same way this file's own constant was forward-fixed
-#: from 14 to 17 to 19 to 23 as each later plan landed. A mismatch here
-#: means either a new model failed to build or an unexpected extra/missing
-#: model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 23
+#: from 14 to 17 to 19 to 23 to 31 as each later plan landed. A mismatch
+#: here means either a new model failed to build or an unexpected
+#: extra/missing model exists in the project.
+#:
+#: 23 -> 31 at Phase 5 closure (05-05-PLAN.md Task 3): Plans 01-04
+#: cumulatively added eight new marts (mart_release_snapshot_metrics,
+#: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
+#: mart_source_reported_status_age, mart_spell_censoring_summary,
+#: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support).
+_EXPECTED_TOTAL_MODEL_COUNT = 31
 
 _FABRICATED_RECOVERED_FINGERPRINT = "b" * 64
 

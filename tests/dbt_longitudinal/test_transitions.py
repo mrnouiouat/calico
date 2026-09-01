@@ -56,10 +56,16 @@ _TRANSITION_MATRIX_SQL = _INTERMEDIATE_DIR / "int_transition_matrix.sql"
 #: own Plan 02 models -- forward-fixed the same way Plan 04 forward-fixed
 #: test_catalog.py's and test_repository_contract.py's own stale exact-count
 #: assertions, and the same way this file's own constant was forward-fixed
-#: from 14 to 17 to 19 to 23 as each later plan landed. A mismatch here
-#: means either a model failed to build or an unexpected extra/missing
+#: from 14 to 17 to 19 to 23 to 31 as each later plan landed. A mismatch
+#: here means either a model failed to build or an unexpected extra/missing
 #: model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 23
+#:
+#: 23 -> 31 at Phase 5 closure (05-05-PLAN.md Task 3): Plans 01-04
+#: cumulatively added eight new marts (mart_release_snapshot_metrics,
+#: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
+#: mart_source_reported_status_age, mart_spell_censoring_summary,
+#: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support).
+_EXPECTED_TOTAL_MODEL_COUNT = 31
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

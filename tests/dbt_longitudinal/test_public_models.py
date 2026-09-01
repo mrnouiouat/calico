@@ -77,7 +77,13 @@ _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "vali
 #: test_transitions.py, test_spells.py, and test_capture_runs.py. A
 #: mismatch here means either a model failed to build or an unexpected
 #: extra/missing model exists in the project.
-_EXPECTED_TOTAL_MODEL_COUNT = 23
+#:
+#: 23 -> 31 at Phase 5 closure (05-05-PLAN.md Task 3): Plans 01-04
+#: cumulatively added eight new marts (mart_release_snapshot_metrics,
+#: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
+#: mart_source_reported_status_age, mart_spell_censoring_summary,
+#: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support).
+_EXPECTED_TOTAL_MODEL_COUNT = 31
 
 #: Synthetic fixture v2 keys used to prove all three closed eligibility
 #: states plus the missing-match default (D-18). Chosen from the real
