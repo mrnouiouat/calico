@@ -82,5 +82,74 @@ class ClaimSupportSqlContractTests(unittest.TestCase):
         self.assertNotIn("state_charity_registration_number", text)
         self.assertIsNone(re.search(r"\bfein\b|\bein\b", text, re.IGNORECASE))
 
+
+class ClaimLanguageContractTests(unittest.TestCase):
+    def test_contract_is_canonical_closed_and_linked_to_the_relation(self) -> None:
+        raw = CONTRACT.read_bytes()
+        document = json.loads(raw)
+        canonical = (
+            json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+            + "\n"
+        ).encode()
+        self.assertEqual(raw, canonical)
+        self.assertEqual(set(document), {
+            "approved_wording", "claim_contract_version", "governed_surfaces",
+            "numeric_support", "prohibited_claims", "required_vocabulary",
+        })
+        self.assertEqual(document["claim_contract_version"], 1)
+        support = document["numeric_support"]
+        self.assertEqual(support["relation"], "mart_claim_support")
+        self.assertEqual(support["relation_version"], "claim_support_status_movement_v1")
+        self.assertEqual(set(support["denominator_ids"]), {
+            "matched_observed_entry_population_v1",
+            "all_entrant_population_v1",
+            "claim_support_status_movement_v1",
+        })
+        model = MODEL.read_text(encoding="utf-8")
+        for denominator_id in support["denominator_ids"]:
+            self.assertIn(denominator_id, model)
+
+    def test_contract_carries_exact_approved_wording_and_closed_vocabulary(self) -> None:
+        document = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        self.assertEqual(document["required_vocabulary"], [
+            "published delinquent population", "observed exit", "not observed",
+            "source-reported", "release-quality diagnostic",
+        ])
+        wording = document["approved_wording"]
+        self.assertIn("7,737 matched organizations were observed moving", wording)
+        self.assertIn("source-reported July 17 status date", wording)
+        self.assertIn("total delinquency entries fell from 7,750 to 2", wording)
+        self.assertIn("descriptive claim", wording)
+        self.assertIn(
+            "do not establish internal cause, exact processing time, or workflow",
+            wording,
+        )
+        prohibited = document["prohibited_claims"]
+        self.assertEqual(len(prohibited), 10)
+        self.assertEqual(len({item["id"] for item in prohibited}), len(prohibited))
+        self.assertTrue(all(set(item) == {"id", "fragments"} for item in prohibited))
+
+    def test_governed_metadata_and_docs_use_required_terms_without_prohibited_phrases(self) -> None:
+        document = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        governed = "\n".join(
+            (ROOT / relative).read_text(encoding="utf-8")
+            for relative in document["governed_surfaces"]
+        ).lower()
+        for term in document["required_vocabulary"]:
+            self.assertIn(term.lower(), governed)
+        for category in document["prohibited_claims"]:
+            for fragment in category["fragments"]:
+                self.assertNotIn(fragment.lower(), governed)
+
+    def test_contract_does_not_create_publication_machinery(self) -> None:
+        document = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        serialized = json.dumps(document).lower()
+        for forbidden_key in (
+            "export_allowlist", "publication_allowlist", "public_fields",
+            "api_schema", "orm_model", "power_bi_export",
+        ):
+            self.assertNotIn(forbidden_key, serialized)
+
+
 if __name__ == "__main__":
     unittest.main()
