@@ -1,6 +1,34 @@
 version: 2
 
 models:
+  - name: mart_last_renewal_diagnostic
+    description: >
+      Grain: one row per exact adjacent accepted-release pair and one of exactly
+      three Last Renewal release-quality diagnostic measures. This relation does
+      not define events, thresholds, scores, spells, or organization history.
+    columns:
+      - name: diagnostic_role
+        tests:
+          - not_null
+          - accepted_values:
+              values: [release_quality_diagnostic]
+      - name: measure_name
+        tests:
+          - not_null
+          - accepted_values:
+              values: [conditional_precision, eligible_exit_sensitivity, all_exit_sensitivity]
+      - name: denominator_definition_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: [starting_delinquent_diagnostic_clears_v1, observed_exits_with_populated_start_v1, all_observed_exits_v1]
+      - name: diagnostic_eligible_count
+        tests: [not_null]
+      - name: numerator_count
+        tests: [not_null]
+      - name: denominator_count
+        tests: [not_null]
+
   - name: mart_release_snapshot_metrics
     description: >
       Grain: one row per accepted release identity and locked published delinquent

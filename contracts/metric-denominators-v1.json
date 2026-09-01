@@ -1,0 +1,23 @@
+{
+  "contract_version": 1,
+  "denominator_definitions": [
+    {
+      "id": "all_observed_exits_v1",
+      "definition": "All exact-key records classified by the authoritative transition relation as delinquency_exit_observed for the accepted-release pair."
+    },
+    {
+      "id": "observed_exits_with_populated_start_v1",
+      "definition": "Observed exits whose source-reported Last Renewal value is populated at the start, including nonblank values that are unparseable as dates."
+    },
+    {
+      "id": "starting_delinquent_diagnostic_clears_v1",
+      "definition": "Starting published delinquent population records observed at both endpoints with a populated source-reported Last Renewal value at start and a blank value at end."
+    }
+  ],
+  "diagnostic_role": "release_quality_diagnostic",
+  "measure_ids": [
+    "conditional_precision",
+    "eligible_exit_sensitivity",
+    "all_exit_sensitivity"
+  ]
+}
