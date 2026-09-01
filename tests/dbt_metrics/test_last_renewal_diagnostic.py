@@ -21,7 +21,7 @@ class LastRenewalDiagnosticTests(unittest.TestCase):
         outcome = runner.build(mode="fixture", fixture_store_factory=gate_b_fixture_store_v2)
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 30)
+        self.assertEqual(outcome.proof.dbt_model_count, 31)
 
     def test_exact_three_closed_measures_and_role(self) -> None:
         text = MODEL.read_text(encoding="utf-8")

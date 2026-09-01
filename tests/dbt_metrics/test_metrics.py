@@ -28,7 +28,7 @@ class AdjacentPairMetricDbtTests(unittest.TestCase):
         )
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 30)
+        self.assertEqual(outcome.proof.dbt_model_count, 31)
 
 
 class AdjacentPairMetricContractTests(unittest.TestCase):

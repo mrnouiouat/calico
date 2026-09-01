@@ -16,7 +16,7 @@ class MetricFamilyTests(unittest.TestCase):
         outcome = runner.build(mode="fixture", fixture_store_factory=gate_b_fixture_store_v2)
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 30)
+        self.assertEqual(outcome.proof.dbt_model_count, 31)
 
     def test_snapshot_keeps_locked_categories_and_denominators(self) -> None:
         text = (MARTS / "mart_release_snapshot_metrics.sql").read_text(encoding="utf-8")
