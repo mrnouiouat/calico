@@ -178,6 +178,21 @@ PHASE_4_FINAL_PRODUCTION_SQL_PATHS = frozenset(
     PHASE_3_FINAL_PRODUCTION_SQL_PATHS | PHASE_4_ALL_SQL_PATHS
 )
 
+# Phase 5 Plan 01 tracer paths. The cumulative gate remains exact while the
+# first production metric slice lands; later Phase 5 plans extend this closed
+# set deliberately rather than weakening discovery to a broad directory rule.
+PHASE_5_PLAN_01_SQL_PATHS = frozenset(
+    {
+        "dbt/macros/wilson_interval.sql",
+        "dbt/models/marts/mart_adjacent_pair_metrics.sql",
+        "dbt/tests/assert_metric_arithmetic.sql",
+    }
+)
+
+PHASE_5_CURRENT_PRODUCTION_SQL_PATHS = frozenset(
+    PHASE_4_FINAL_PRODUCTION_SQL_PATHS | PHASE_5_PLAN_01_SQL_PATHS
+)
+
 
 def _discovered_production_sql_paths() -> set[str]:
     return {
@@ -556,8 +571,8 @@ class ToolchainFixtureContractTests(unittest.TestCase):
             )
             self.assertIn(
                 path,
-                PHASE_4_FINAL_PRODUCTION_SQL_PATHS,
-                f"production SQL path not in the closed Phase 3 + Phase 4 allowlist: {path}",
+                    PHASE_5_CURRENT_PRODUCTION_SQL_PATHS,
+                    f"production SQL path not in the closed cumulative allowlist: {path}",
             )
 
     def test_exactly_the_fixture_and_production_dbt_projects_exist(self) -> None:
@@ -723,11 +738,11 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
         discovered = self._discovered_production_sql_paths()
         self.assertEqual(
             discovered,
-            PHASE_4_FINAL_PRODUCTION_SQL_PATHS,
+            PHASE_5_CURRENT_PRODUCTION_SQL_PATHS,
             "discovered production SQL must exactly equal the closed "
             f"41-path Phase 3 + Phase 4 union: "
-            f"missing={sorted(PHASE_4_FINAL_PRODUCTION_SQL_PATHS - discovered)}, "
-            f"unexpected={sorted(discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS)}",
+            f"missing={sorted(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS - discovered)}, "
+            f"unexpected={sorted(discovered - PHASE_5_CURRENT_PRODUCTION_SQL_PATHS)}",
         )
 
 
@@ -750,12 +765,12 @@ class Phase4CumulativeGateTests(unittest.TestCase):
     def test_closed_union_is_exactly_41_paths(self) -> None:
         self.assertEqual(len(PHASE_3_FINAL_PRODUCTION_SQL_PATHS), 18)
         self.assertEqual(len(PHASE_4_ALL_SQL_PATHS), 23)
-        self.assertEqual(len(PHASE_4_FINAL_PRODUCTION_SQL_PATHS), 41)
+        self.assertEqual(len(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS), 44)
 
     def test_discovered_production_sql_exactly_equals_the_closed_union(self) -> None:
         discovered = self._discovered()
-        missing = PHASE_4_FINAL_PRODUCTION_SQL_PATHS - discovered
-        unexpected = discovered - PHASE_4_FINAL_PRODUCTION_SQL_PATHS
+        missing = PHASE_5_CURRENT_PRODUCTION_SQL_PATHS - discovered
+        unexpected = discovered - PHASE_5_CURRENT_PRODUCTION_SQL_PATHS
         self.assertEqual(
             (missing, unexpected),
             (set(), set()),

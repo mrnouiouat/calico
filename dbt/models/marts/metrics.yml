@@ -1,0 +1,79 @@
+version: 2
+
+models:
+  - name: mart_adjacent_pair_metrics
+    description: >
+      Grain: one row per exact adjacent accepted-release pair identity.
+      Reports identity-free counts for the published delinquent population,
+      observed exits, still delinquent observations, not-observed keys,
+      matched observed entries, newly observed delinquent keys, all entrants,
+      signed net movement, and one descriptive largest matched status-to-status
+      transition. It is not an organization-level relation. Nullable statuses
+      use __NULL_STATUS__ only as a deterministic lexical sort token; projected
+      status values retain null.
+    columns:
+      - name: from_as_of_date
+        tests: [not_null]
+      - name: from_release_revision
+        tests: [not_null]
+      - name: from_revision_fingerprint
+        tests: [not_null]
+      - name: to_as_of_date
+        tests: [not_null]
+      - name: to_release_revision
+        tests: [not_null]
+      - name: to_revision_fingerprint
+        tests: [not_null]
+      - name: gap_days
+        tests: [not_null]
+      - name: starting_delinquent_count
+        description: Full starting published delinquent population; includes keys not observed at the endpoint.
+        tests: [not_null]
+      - name: ending_published_delinquent_count
+        tests: [not_null]
+      - name: observed_exit_count
+        description: Starting published delinquent keys observed at the endpoint outside the closed delinquent statuses.
+        tests: [not_null]
+      - name: still_delinquent_count
+        tests: [not_null]
+      - name: not_observed_count
+        description: Starting published delinquent keys absent at the endpoint; not an observed exit.
+        tests: [not_null]
+      - name: matched_observed_entry_count
+        description: Keys observed at both endpoints that enter the published delinquent population.
+        tests: [not_null]
+      - name: newly_observed_delinquent_count
+        tests: [not_null]
+      - name: total_entrant_count
+        description: Matched observed entries plus newly observed delinquent keys.
+        tests: [not_null]
+      - name: net_delinquent_movement
+        description: Ending minus starting published delinquent population at this exact pair grain.
+        tests: [not_null]
+      - name: observed_exit_denominator_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: [starting_published_delinquent_cohort_v1]
+      - name: observed_exit_proportion
+        description: Observed exits divided by the full starting published delinquent population; null when its visible denominator is zero.
+      - name: observed_exit_wilson_95_lower
+        description: SQL-computed 95 percent Wilson lower bound; null when the denominator is zero.
+      - name: observed_exit_wilson_95_upper
+        description: SQL-computed 95 percent Wilson upper bound; null when the denominator is zero.
+      - name: largest_transition_from_status
+        description: Source-reported start status for the deterministic largest matched status-to-status transition.
+      - name: largest_transition_to_status
+        description: Source-reported end status for the deterministic largest matched status-to-status transition.
+      - name: largest_transition_count
+        description: Count for the descriptive status-pair maximum; never an organization ranking.
+      - name: matched_entry_denominator_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: [matched_observed_entry_population_v1]
+      - name: total_entrant_denominator_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: [all_entrant_population_v1]
