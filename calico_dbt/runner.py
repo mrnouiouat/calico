@@ -30,8 +30,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -118,10 +120,69 @@ _PROOF_OUTPUT_V1_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-bu
 #: immutable v1 path above.
 _PROOF_OUTPUT_V2_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-build-proof-v2.json"
 
+#: The fixed, additive Phase 5 Gate B exit proof destination (D-11..D-15,
+#: D-22). `build()` always writes here for `mode="real", proof_output=True`
+#: -- immediately after the v2 write above, and only after every dbt node
+#: (including the real-gated `assert_gate_a_reconciliation` singular test)
+#: has already succeeded in full.
+_PROOF_OUTPUT_V3_RELATIVE_PATH = Path("docs") / "evidence" / "gate-b" / "real-build-proof-v3.json"
+
+#: The canonical, already-committed artifacts a v3 proof binds itself to by
+#: recorded SHA-256 (T-05-05A/B/C). Every path is repository-relative
+#: except the oracle, which is the immutable Gate A benchmark one directory
+#: above this repository in the private `calico-build` planning workspace
+#: -- it is never inside this repository and never published; only its
+#: hash ever crosses into a safe field.
+_METRIC_DENOMINATORS_CONTRACT_RELATIVE_PATH = Path("contracts") / "metric-denominators-v1.json"
+_LAST_RENEWAL_DIAGNOSTIC_CONTRACT_RELATIVE_PATH = (
+    Path("docs") / "evidence" / "gate-b" / "last-renewal-diagnostic-v1.json"
+)
+_CLAIM_SUPPORT_CONTRACT_RELATIVE_PATH = Path("contracts") / "claim-support-v1.json"
+_GATE_A_RECONCILIATION_SQL_RELATIVE_PATH = Path("dbt") / "tests" / "assert_gate_a_reconciliation.sql"
+_GATE_A_ORACLE_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "calico-build" / "GATE-A-EVIDENCE.md"
+)
+
+#: Safe `run_results.json` `unique_id` substrings (D-15): every lookup
+#: below reads only the fixed `status`/`failures` fields off the one
+#: matching node -- never `message`, `compiled_code`, or any other field
+#: that could carry row-level or path content.
+_GATE_A_RECONCILIATION_TEST_NAME_FRAGMENT = "assert_gate_a_reconciliation"
+_LAST_RENEWAL_DIAGNOSTIC_MODEL_NAME_FRAGMENT = "mart_last_renewal_diagnostic"
+_LAST_RENEWAL_DIAGNOSTIC_TEST_NAME_FRAGMENT = "assert_last_renewal_diagnostic"
+_CLAIM_SUPPORT_MODEL_NAME_FRAGMENT = "mart_claim_support"
+_CLAIM_SUPPORT_TEST_NAME_FRAGMENT = "assert_claim_support"
+
+#: The closed, governed three-measure vocabulary D-08/D-09 lock for the
+#: `Last Renewal` diagnostic. `_write_proof_output_v3` derives the written
+#: `diagnostics.measures` value from the live `metric-denominators-v1.json`
+#: contract (single source of truth for generation); `verify_proof`
+#: compares against this fixed constant (single source of truth for
+#: governance) so the two can never silently drift apart unnoticed.
+_LAST_RENEWAL_DIAGNOSTIC_MEASURES = (
+    "conditional_precision",
+    "eligible_exit_sensitivity",
+    "all_exit_sensitivity",
+)
+
+#: A v3 proof older than this relative to `verify_proof`'s own invocation
+#: time is treated as stale/possibly-copied rather than the product of the
+#: build that just ran (D-15, T-05-05C) -- generous enough that a normal
+#: build-then-verify sequence always passes, bounded enough to reject a
+#: proof reused from an old session.
+_CURRENT_RUN_MAX_AGE_SECONDS = 24 * 60 * 60
+
+#: Path-shaped substrings a closed proof document must never contain
+#: (D-15). Split/concatenated so the committed source text itself never
+#: contains a contiguous absolute-path shape, matching this repository's
+#: own privacy scanner discipline and its existing test-suite convention.
+_PATH_LIKE_MARKERS = (":" + "\\", "/" + "Users" + "/", "/" + "home" + "/", "\\\\")
+
 _DBT_SUBPROCESS_TIMEOUT_SECONDS = 600
 
 PROOF_SCHEMA_VERSION = 1
 PROOF_V2_SCHEMA_VERSION = 2
+PROOF_V3_SCHEMA_VERSION = 3
 COMMAND_SCHEMA_VERSION = 1
 
 _MODES = frozenset({"fixture", "real"})
@@ -428,6 +489,60 @@ def _run_results_counts(target_path: Path) -> tuple[int, int]:
     return (model_count, test_count)
 
 
+def _find_run_result(target_path: Path, name_fragment: str) -> dict | None:
+    """Return the first `run_results.json` result entry whose `unique_id`
+    contains `name_fragment`, or `None` if the file is unreadable/malformed
+    or no such entry exists. Callers read only the fixed `status`/
+    `failures` fields off the returned entry -- never `message`,
+    `compiled_code`, or any other field (D-15).
+    """
+
+    run_results_path = target_path / "run_results.json"
+    try:
+        document = json.loads(run_results_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    results = document.get("results")
+    if not isinstance(results, list):
+        return None
+
+    for entry in results:
+        if not isinstance(entry, dict):
+            continue
+        unique_id = entry.get("unique_id")
+        if isinstance(unique_id, str) and name_fragment in unique_id:
+            return entry
+    return None
+
+
+def _safe_node_status(target_path: Path, name_fragment: str) -> str | None:
+    entry = _find_run_result(target_path, name_fragment)
+    if entry is None:
+        return None
+    status = entry.get("status")
+    return status if isinstance(status, str) else None
+
+
+def _safe_node_failures(target_path: Path, name_fragment: str) -> int | None:
+    entry = _find_run_result(target_path, name_fragment)
+    if entry is None:
+        return None
+    failures = entry.get("failures")
+    return failures if isinstance(failures, int) else None
+
+
+def _gate_a_reconciliation_mismatched(target_path: Path) -> bool:
+    """`True` only when the real-gated `assert_gate_a_reconciliation`
+    singular test ran and did not pass -- never `True` for an unrelated
+    build failure, and never `True` in fixture mode (the fixture branch of
+    that test always returns zero rows by construction, D-12).
+    """
+
+    status = _safe_node_status(target_path, _GATE_A_RECONCILIATION_TEST_NAME_FRAGMENT)
+    return status is not None and status != "pass"
+
+
 def _run_dbt_docs_generate(
     *, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path
 ) -> None:
@@ -638,14 +753,30 @@ def build(
             if not selected_nodes:
                 return BuildOutcome(status="failed", category="runner.empty_selection", proof=None)
 
-            _run_dbt_build(
-                selection,
-                mode=mode,
-                project_dir=project_dir,
-                profiles_dir=temp_root,
-                target_path=target_path,
-                log_path=log_path,
-            )
+            try:
+                _run_dbt_build(
+                    selection,
+                    mode=mode,
+                    project_dir=project_dir,
+                    profiles_dir=temp_root,
+                    target_path=target_path,
+                    log_path=log_path,
+                )
+            except RunnerError as exc:
+                # D-13/D-14, T-05-05A: distinguish "the immutable Gate A
+                # benchmark itself did not reproduce" from every other dbt
+                # build failure, without ever reading a mismatched row --
+                # only the already-safe closed-vocabulary `status` field
+                # for this one named test.
+                if (
+                    mode == "real"
+                    and exc.category == "runner.dbt_build_failed"
+                    and _gate_a_reconciliation_mismatched(target_path)
+                ):
+                    return BuildOutcome(
+                        status="failed", category="runner.gate_a_reconciliation_mismatch", proof=None
+                    )
+                raise
 
             model_count, test_count = _run_results_counts(target_path)
 
@@ -671,6 +802,12 @@ def build(
 
             if mode == "real" and proof_output:
                 _write_proof_output_v2(proof)
+                store_fingerprint = hashlib.sha256(
+                    _resolve_real_store(store).as_posix().encode("utf-8")
+                ).hexdigest()
+                _write_proof_output_v3(
+                    proof, target_path=target_path, store_fingerprint=store_fingerprint
+                )
 
             return BuildOutcome(status="success", category=None, proof=proof)
         finally:
@@ -829,11 +966,347 @@ def _write_proof_output_v2(proof: SafeBuildProof) -> None:
         temp_path.unlink(missing_ok=True)
 
 
+def _write_proof_output_v3(
+    proof: SafeBuildProof,
+    *,
+    target_path: Path,
+    store_fingerprint: str,
+) -> None:
+    """Atomically write the additive Phase 5 Gate B exit proof,
+    `real-build-proof-v3.json` (D-11..D-15, D-22, T-05-05A/B/C).
+
+    Only ever called after a real-mode `dbt build` has already succeeded in
+    full -- which by construction means the real-gated
+    `assert_gate_a_reconciliation` singular test already passed with zero
+    mismatch rows (a failing test would already have short-circuited
+    `build()` with `runner.gate_a_reconciliation_mismatch` before this
+    function is ever reached). Reads only the fixed, closed-vocabulary
+    `status`/`failures` fields off the still-open `run_results.json` inside
+    `target_path` -- never `message`, `compiled_code`, or raw child
+    stdout/stderr. Fails closed with a fixed category if the v2
+    predecessor, the immutable oracle, any canonical contract, or the
+    reconciliation SQL itself is absent or malformed, since an additive
+    successor cannot be safely bound to evidence that does not exist.
+    """
+
+    repo_root = Path(__file__).resolve().parent.parent
+
+    v2_path = repo_root / _PROOF_OUTPUT_V2_RELATIVE_PATH
+    if not v2_path.is_file():
+        raise RunnerError("runner.v2_proof_missing")
+    if not _GATE_A_ORACLE_PATH.is_file():
+        raise RunnerError("runner.oracle_evidence_missing")
+
+    metric_contract_path = repo_root / _METRIC_DENOMINATORS_CONTRACT_RELATIVE_PATH
+    diagnostic_contract_path = repo_root / _LAST_RENEWAL_DIAGNOSTIC_CONTRACT_RELATIVE_PATH
+    claim_contract_path = repo_root / _CLAIM_SUPPORT_CONTRACT_RELATIVE_PATH
+    reconciliation_sql_path = repo_root / _GATE_A_RECONCILIATION_SQL_RELATIVE_PATH
+    for required_path, category in (
+        (metric_contract_path, "runner.metric_contract_missing"),
+        (diagnostic_contract_path, "runner.diagnostic_contract_missing"),
+        (claim_contract_path, "runner.claim_contract_missing"),
+        (reconciliation_sql_path, "runner.reconciliation_sql_missing"),
+    ):
+        if not required_path.is_file():
+            raise RunnerError(category)
+
+    try:
+        metric_contract_document = json.loads(metric_contract_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RunnerError("runner.metric_contract_invalid") from exc
+    measure_ids = metric_contract_document.get("measure_ids")
+    if (
+        not isinstance(measure_ids, list)
+        or not measure_ids
+        or not all(isinstance(measure_id, str) and measure_id for measure_id in measure_ids)
+    ):
+        raise RunnerError("runner.metric_contract_invalid")
+
+    try:
+        claim_contract_document = json.loads(claim_contract_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RunnerError("runner.claim_contract_invalid") from exc
+    numeric_support = claim_contract_document.get("numeric_support")
+    if not isinstance(numeric_support, dict):
+        raise RunnerError("runner.claim_contract_invalid")
+    claim_relation = numeric_support.get("relation")
+    claim_relation_version = numeric_support.get("relation_version")
+    if (
+        not isinstance(claim_relation, str)
+        or not claim_relation
+        or not isinstance(claim_relation_version, str)
+        or not claim_relation_version
+    ):
+        raise RunnerError("runner.claim_contract_invalid")
+
+    reconciliation_status = _safe_node_status(target_path, _GATE_A_RECONCILIATION_TEST_NAME_FRAGMENT)
+    reconciliation_failures = _safe_node_failures(target_path, _GATE_A_RECONCILIATION_TEST_NAME_FRAGMENT)
+    if reconciliation_status != "pass":
+        # build() only reaches this writer after a fully successful real
+        # dbt build; an absent/non-pass status here means the assertion
+        # node could not be found in run_results.json at all -- never
+        # silently claim reconciliation when the evidence for it is
+        # missing (D-14).
+        raise RunnerError("runner.reconciliation_status_unavailable")
+
+    diagnostic_model_status = _safe_node_status(target_path, _LAST_RENEWAL_DIAGNOSTIC_MODEL_NAME_FRAGMENT)
+    diagnostic_test_status = _safe_node_status(target_path, _LAST_RENEWAL_DIAGNOSTIC_TEST_NAME_FRAGMENT)
+    if diagnostic_model_status != "success" or diagnostic_test_status != "pass":
+        raise RunnerError("runner.diagnostic_status_unavailable")
+
+    claim_model_status = _safe_node_status(target_path, _CLAIM_SUPPORT_MODEL_NAME_FRAGMENT)
+    claim_test_status = _safe_node_status(target_path, _CLAIM_SUPPORT_TEST_NAME_FRAGMENT)
+    if claim_model_status != "success" or claim_test_status != "pass":
+        raise RunnerError("runner.claim_support_status_unavailable")
+
+    document: dict = {
+        "proof_schema_version": PROOF_V3_SCHEMA_VERSION,
+        "command_schema_version": proof.command_schema_version,
+        "mode": proof.mode,
+        "status": proof.status,
+        "run_id": uuid.uuid4().hex,
+        "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "verified_input_binding": True,
+        "store_fingerprint_sha256": store_fingerprint,
+        "verified_release_count": proof.verified_release_count,
+        "verified_object_count": proof.verified_object_count,
+        "dbt_selected_node_count": proof.dbt_selected_node_count,
+        "dbt_model_count": proof.dbt_model_count,
+        "dbt_test_count": proof.dbt_test_count,
+        "reconciliation": {
+            "assertion_name": "assert_gate_a_reconciliation",
+            "status": "reconciled",
+            "mismatch_row_count": reconciliation_failures if reconciliation_failures is not None else 0,
+        },
+        "diagnostics": {
+            "status": "complete",
+            "measures": list(measure_ids),
+            "model_status": diagnostic_model_status,
+            "test_status": diagnostic_test_status,
+        },
+        "claim_support": {
+            "status": "supported",
+            "relation": claim_relation,
+            "relation_version": claim_relation_version,
+            "model_status": claim_model_status,
+            "test_status": claim_test_status,
+        },
+        "hashes": {
+            "oracle_sha256": _sha256_file(_GATE_A_ORACLE_PATH),
+            "predecessor_v2_sha256": _sha256_file(v2_path),
+            "metric_denominators_contract_sha256": _sha256_file(metric_contract_path),
+            "last_renewal_diagnostic_contract_sha256": _sha256_file(diagnostic_contract_path),
+            "claim_support_contract_sha256": _sha256_file(claim_contract_path),
+            "reconciliation_sql_sha256": _sha256_file(reconciliation_sql_path),
+        },
+        "supersedes": {
+            "path": _PROOF_OUTPUT_V2_RELATIVE_PATH.as_posix(),
+            "sha256": _sha256_file(v2_path),
+        },
+    }
+    payload_for_hash = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    document["hashes"]["generated_proof_payload_sha256"] = hashlib.sha256(
+        payload_for_hash.encode("utf-8")
+    ).hexdigest()
+
+    payload = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    destination = repo_root / _PROOF_OUTPUT_V3_RELATIVE_PATH
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_name = destination.name + f".tmp-{os.getpid()}"
+    temp_path = destination.parent / temp_name
+    try:
+        temp_path.write_text(payload, encoding="utf-8", newline="\n")
+        os.replace(temp_path, destination)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+@dataclass(frozen=True)
+class VerifyProofOutcome:
+    """The safe, non-echo result of one `verify_proof()` call (D-15)."""
+
+    status: str
+    category: str | None
+
+    @property
+    def verified(self) -> bool:
+        return self.status == "verified"
+
+
+def _contains_path_like_value(value: object) -> bool:
+    if isinstance(value, str):
+        return any(marker in value for marker in _PATH_LIKE_MARKERS)
+    if isinstance(value, dict):
+        return any(_contains_path_like_value(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_path_like_value(item) for item in value)
+    return False
+
+
+def verify_proof(
+    *,
+    proof_path: str | Path,
+    require_mode: str | None = None,
+    require_current_run: bool = False,
+    require_verified_binding: bool = False,
+    require_exact_reconciliation: bool = False,
+    require_diagnostics: bool = False,
+    require_claim_support: bool = False,
+    verify_hashes: bool = False,
+    repo_root: str | Path | None = None,
+    now: "datetime | None" = None,
+) -> VerifyProofOutcome:
+    """Closed, fail-closed verification over one v3 Gate B proof document
+    (D-11..D-15, T-05-05A/B/C).
+
+    Every guarantee is additive and independently gated by its own flag.
+    `verify_hashes` recomputes every recorded external-file hash from
+    current on-disk state, plus the proof's own self-hash from its
+    remaining content, and rejects on any mismatch. `now` is a test-only
+    seam (never a CLI option) `require_current_run` uses instead of the
+    real wall clock; production callers must never pass it.
+    """
+
+    resolved_repo_root = (
+        Path(repo_root) if repo_root is not None else Path(__file__).resolve().parent.parent
+    )
+    path = Path(proof_path)
+    if not path.is_file():
+        return VerifyProofOutcome(status="failed", category="verify_proof.file_not_found")
+
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return VerifyProofOutcome(status="failed", category="verify_proof.invalid_json")
+    if not isinstance(document, dict):
+        return VerifyProofOutcome(status="failed", category="verify_proof.invalid_json")
+
+    if _contains_path_like_value(document):
+        return VerifyProofOutcome(status="failed", category="verify_proof.path_like_value_detected")
+
+    if document.get("proof_schema_version") != PROOF_V3_SCHEMA_VERSION:
+        return VerifyProofOutcome(status="failed", category="verify_proof.unsupported_schema_version")
+    if document.get("status") != "success":
+        return VerifyProofOutcome(status="failed", category="verify_proof.build_not_successful")
+    if require_mode is not None and document.get("mode") != require_mode:
+        return VerifyProofOutcome(status="failed", category="verify_proof.mode_mismatch")
+    if require_verified_binding and document.get("verified_input_binding") is not True:
+        return VerifyProofOutcome(status="failed", category="verify_proof.binding_not_verified")
+
+    if require_current_run:
+        run_id = document.get("run_id")
+        generated_at = document.get("generated_at_utc")
+        if not isinstance(run_id, str) or len(run_id) != 32:
+            return VerifyProofOutcome(status="failed", category="verify_proof.stale_run")
+        if not isinstance(generated_at, str):
+            return VerifyProofOutcome(status="failed", category="verify_proof.stale_run")
+        try:
+            generated_at_dt = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            return VerifyProofOutcome(status="failed", category="verify_proof.stale_run")
+        current_time = now if now is not None else datetime.now(timezone.utc)
+        age_seconds = (current_time - generated_at_dt).total_seconds()
+        if age_seconds < 0 or age_seconds > _CURRENT_RUN_MAX_AGE_SECONDS:
+            return VerifyProofOutcome(status="failed", category="verify_proof.stale_run")
+
+    if require_exact_reconciliation:
+        reconciliation = document.get("reconciliation")
+        if (
+            not isinstance(reconciliation, dict)
+            or reconciliation.get("status") != "reconciled"
+            or reconciliation.get("mismatch_row_count") != 0
+        ):
+            return VerifyProofOutcome(status="failed", category="verify_proof.reconciliation_not_exact")
+
+    if require_diagnostics:
+        diagnostics = document.get("diagnostics")
+        measures = diagnostics.get("measures") if isinstance(diagnostics, dict) else None
+        if (
+            not isinstance(diagnostics, dict)
+            or diagnostics.get("status") != "complete"
+            or not isinstance(measures, list)
+            or sorted(measures) != sorted(_LAST_RENEWAL_DIAGNOSTIC_MEASURES)
+            or diagnostics.get("model_status") != "success"
+            or diagnostics.get("test_status") != "pass"
+        ):
+            return VerifyProofOutcome(status="failed", category="verify_proof.diagnostics_incomplete")
+
+    if require_claim_support:
+        claim_support = document.get("claim_support")
+        if (
+            not isinstance(claim_support, dict)
+            or claim_support.get("status") != "supported"
+            or not claim_support.get("relation")
+            or not claim_support.get("relation_version")
+            or claim_support.get("model_status") != "success"
+            or claim_support.get("test_status") != "pass"
+        ):
+            return VerifyProofOutcome(status="failed", category="verify_proof.claim_not_supported")
+
+    if verify_hashes:
+        hashes = document.get("hashes")
+        supersedes = document.get("supersedes")
+        if not isinstance(hashes, dict) or not isinstance(supersedes, dict):
+            return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+
+        file_checks = (
+            (_GATE_A_ORACLE_PATH, hashes.get("oracle_sha256")),
+            (resolved_repo_root / _PROOF_OUTPUT_V2_RELATIVE_PATH, hashes.get("predecessor_v2_sha256")),
+            (
+                resolved_repo_root / _METRIC_DENOMINATORS_CONTRACT_RELATIVE_PATH,
+                hashes.get("metric_denominators_contract_sha256"),
+            ),
+            (
+                resolved_repo_root / _LAST_RENEWAL_DIAGNOSTIC_CONTRACT_RELATIVE_PATH,
+                hashes.get("last_renewal_diagnostic_contract_sha256"),
+            ),
+            (
+                resolved_repo_root / _CLAIM_SUPPORT_CONTRACT_RELATIVE_PATH,
+                hashes.get("claim_support_contract_sha256"),
+            ),
+            (
+                resolved_repo_root / _GATE_A_RECONCILIATION_SQL_RELATIVE_PATH,
+                hashes.get("reconciliation_sql_sha256"),
+            ),
+        )
+        for file_path, expected_hash in file_checks:
+            if not isinstance(expected_hash, str) or not file_path.is_file():
+                return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+            if _sha256_file(file_path) != expected_hash:
+                return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+
+        if supersedes.get("path") != _PROOF_OUTPUT_V2_RELATIVE_PATH.as_posix() or supersedes.get(
+            "sha256"
+        ) != hashes.get("predecessor_v2_sha256"):
+            return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+
+        recorded_payload_hash = hashes.get("generated_proof_payload_sha256")
+        if not isinstance(recorded_payload_hash, str):
+            return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+        reconstructed = json.loads(json.dumps(document))
+        reconstructed["hashes"] = {
+            key: value for key, value in hashes.items() if key != "generated_proof_payload_sha256"
+        }
+        recomputed_payload = json.dumps(
+            reconstructed, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        )
+        recomputed_hash = hashlib.sha256(recomputed_payload.encode("utf-8")).hexdigest()
+        if recomputed_hash != recorded_payload_hash:
+            return VerifyProofOutcome(status="failed", category="verify_proof.hash_mismatch")
+
+    return VerifyProofOutcome(status="verified", category=None)
+
+
 __all__ = [
     "DBT_PROFILE_NAME",
     "SELECT_ALIASES",
     "PROOF_SCHEMA_VERSION",
     "PROOF_V2_SCHEMA_VERSION",
+    "PROOF_V3_SCHEMA_VERSION",
     "COMMAND_SCHEMA_VERSION",
     "RunnerError",
     "SafeBuildProof",
@@ -841,6 +1314,8 @@ __all__ = [
     "SafeDocsProof",
     "DocsOutcome",
     "FixtureBuildInspection",
+    "VerifyProofOutcome",
     "build",
     "docs",
+    "verify_proof",
 ]
