@@ -357,8 +357,13 @@ def _write_profile(profiles_dir: Path, duckdb_path: Path) -> None:
     (profiles_dir / "profiles.yml").write_text(content, encoding="utf-8")
 
 
-def _ls_selected_nodes(selection: str | None, *, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path) -> list[str]:
-    sub = ["--quiet", "ls", "--output", "name"]
+def _verified_mode_vars(mode: str) -> list[str]:
+    """Return the sole runner-owned dbt variable; callers cannot widen it."""
+    return ["--vars", json.dumps({"calico_verified_mode": mode}, separators=(",", ":"))]
+
+
+def _ls_selected_nodes(selection: str | None, *, mode: str, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path) -> list[str]:
+    sub = ["--quiet", "ls", "--output", "name", *_verified_mode_vars(mode)]
     if selection is not None:
         sub += ["--select", *selection.split()]
     cmd = _dbt_command(
@@ -374,8 +379,8 @@ def _ls_selected_nodes(selection: str | None, *, project_dir: Path, profiles_dir
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def _run_dbt_build(selection: str | None, *, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path) -> None:
-    sub = ["build"]
+def _run_dbt_build(selection: str | None, *, mode: str, project_dir: Path, profiles_dir: Path, target_path: Path, log_path: Path) -> None:
+    sub = ["build", *_verified_mode_vars(mode)]
     if selection is not None:
         sub += ["--select", *selection.split()]
         # `cautious`, not the `eager` default: a partial-selection verify
@@ -624,6 +629,7 @@ def build(
 
             selected_nodes = _ls_selected_nodes(
                 selection,
+                mode=mode,
                 project_dir=project_dir,
                 profiles_dir=temp_root,
                 target_path=target_path,
@@ -634,6 +640,7 @@ def build(
 
             _run_dbt_build(
                 selection,
+                mode=mode,
                 project_dir=project_dir,
                 profiles_dir=temp_root,
                 target_path=target_path,
@@ -715,6 +722,7 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
 
             selected_nodes = _ls_selected_nodes(
                 None,
+                mode="fixture",
                 project_dir=project_dir,
                 profiles_dir=temp_root,
                 target_path=target_path,
@@ -725,6 +733,7 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
 
             _run_dbt_build(
                 None,
+                mode="fixture",
                 project_dir=project_dir,
                 profiles_dir=temp_root,
                 target_path=target_path,
