@@ -189,8 +189,20 @@ PHASE_5_PLAN_01_SQL_PATHS = frozenset(
     }
 )
 
+PHASE_5_PLAN_02_SQL_PATHS = frozenset(
+    {
+        "dbt/models/marts/mart_release_snapshot_metrics.sql",
+        "dbt/models/marts/mart_starting_cohort_persistence.sql",
+        "dbt/models/marts/mart_source_reported_status_age.sql",
+        "dbt/models/marts/mart_spell_censoring_summary.sql",
+        "dbt/models/marts/mart_release_quality.sql",
+    }
+)
+
 PHASE_5_CURRENT_PRODUCTION_SQL_PATHS = frozenset(
-    PHASE_4_FINAL_PRODUCTION_SQL_PATHS | PHASE_5_PLAN_01_SQL_PATHS
+    PHASE_4_FINAL_PRODUCTION_SQL_PATHS
+    | PHASE_5_PLAN_01_SQL_PATHS
+    | PHASE_5_PLAN_02_SQL_PATHS
 )
 
 
@@ -765,7 +777,7 @@ class Phase4CumulativeGateTests(unittest.TestCase):
     def test_closed_union_is_exactly_41_paths(self) -> None:
         self.assertEqual(len(PHASE_3_FINAL_PRODUCTION_SQL_PATHS), 18)
         self.assertEqual(len(PHASE_4_ALL_SQL_PATHS), 23)
-        self.assertEqual(len(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS), 44)
+        self.assertEqual(len(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS), 49)
 
     def test_discovered_production_sql_exactly_equals_the_closed_union(self) -> None:
         discovered = self._discovered()

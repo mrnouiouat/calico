@@ -1,6 +1,89 @@
 version: 2
 
 models:
+  - name: mart_release_snapshot_metrics
+    description: >
+      Grain: one row per accepted release identity and locked published delinquent
+      category. Keyed and unkeyed coverage share the visible all-record denominator.
+    columns:
+      - name: as_of_date
+        tests: [not_null]
+      - name: published_delinquent_category
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Delinquent', 'Delinquent - Late Fees Due']
+      - name: published_delinquent_category_count
+        tests: [not_null]
+      - name: raw_total_record_count
+        tests: [not_null]
+      - name: keyed_coverage_denominator_id
+        tests:
+          - accepted_values:
+              values: [all_promoted_release_records_v1]
+      - name: unkeyed_coverage_denominator_id
+        tests:
+          - accepted_values:
+              values: [all_promoted_release_records_v1]
+
+  - name: mart_starting_cohort_persistence
+    description: >
+      Grain: one row per actual accepted-release endpoint pair. A not-observed
+      endpoint remains distinct and no missing horizon is bridged.
+    columns:
+      - name: from_as_of_date
+        tests: [not_null]
+      - name: to_as_of_date
+        tests: [not_null]
+      - name: gap_days
+        tests: [not_null]
+      - name: persistence_denominator_id
+        tests:
+          - accepted_values:
+              values: [starting_published_delinquent_cohort_v1]
+
+  - name: mart_source_reported_status_age
+    description: >
+      Grain: one row per accepted release and source-reported prevalent-snapshot
+      age bucket. This is source-reported status age, not event duration.
+    columns:
+      - name: source_reported_status_age_state
+        tests:
+          - not_null
+          - accepted_values:
+              values: [valid_reported_date, future_reported_date, missing, invalid_nonblank]
+      - name: record_count
+        tests: [not_null]
+
+  - name: mart_spell_censoring_summary
+    description: 'Grain: one row per authoritative closed spell terminal state.'
+    columns:
+      - name: terminal_state
+        tests:
+          - not_null
+          - accepted_values:
+              values: [observed_exit, right_censored, lost_to_observation]
+      - name: spell_count
+        tests: [not_null]
+
+  - name: mart_release_quality
+    description: >
+      Grain: one row per accepted release identity. Descriptive release-health,
+      schema-contract, parser-contract, rule, and capture outcome counts only.
+    columns:
+      - name: as_of_date
+        tests: [not_null]
+      - name: release_health_state
+        tests:
+          - accepted_values:
+              values: [accepted_healthy, accepted_review]
+      - name: schema_contract_version
+        tests:
+          - accepted_values:
+              values: [registry-csv-contract-v1]
+      - name: parser_contract_version
+        tests: [not_null]
+
   - name: mart_adjacent_pair_metrics
     description: >
       Grain: one row per exact adjacent accepted-release pair identity.
