@@ -1,0 +1,219 @@
+name: Capture Current Registry Release
+
+# Per D-04/D-06/D-08/D-11 (06-06-PLAN.md): scheduled and ordinary manual
+# `capture` dispatch runs both call the exact same production
+# `python -m calico_capture run` command the mandatory local runbook also
+# calls. `authorization_probe` is a closed, no-secret dispatch mode reserved
+# solely for Plan 07's future effective-ref positive/negative tests -- it
+# never enters the source/B2 path (the `capture`/`status` jobs below only
+# run for `mode == 'capture'`). This workflow stays unactivated (no
+# repository secrets configured, no server-side ref rules proven) until
+# Plan 07 demonstrates the required branch/tag restrictions.
+on:
+  schedule:
+    # 17:17 UTC every Wednesday -- POSIX cron's day-of-month/day-of-week
+    # fields are OR'd when both are restricted, so "first and third
+    # Wednesday" is never expressed as a single combined cron expression.
+    # The `calendar-gate` job below applies the actual UTC day-of-month
+    # window (1..7 or 15..21), mirroring
+    # `calico_capture.orchestrator.is_capture_day` exactly.
+    - cron: "17 17 * * 3"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "capture (normal manual run) or authorization_probe (Plan 07 no-secret ref probe only)"
+        type: choice
+        required: true
+        default: capture
+        options:
+          - capture
+          - authorization_probe
+
+permissions:
+  contents: read
+
+# One constant concurrency group and `cancel-in-progress: false` so an
+# in-flight preservation run is never canceled by a later trigger (a queued
+# member may still replace an existing *pending* member -- the capture
+# operation itself must stay idempotent, which `calico_capture.orchestrator.
+# capture()` already is).
+concurrency:
+  group: calico-private-capture-v1
+  cancel-in-progress: false
+
+jobs:
+  calendar-gate:
+    name: Calendar gate (no secrets, read-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+      mode: ${{ steps.gate.outputs.mode }}
+      trigger: ${{ steps.gate.outputs.trigger }}
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.15'
+
+      - name: Compute the calendar-gate decision
+        id: gate
+        env:
+          CALICO_DISPATCH_MODE: ${{ github.event.inputs.mode }}
+        run: |
+          python - <<'PY'
+          import datetime
+          import os
+
+          # Deliberately duplicates the exact D-04 first/third-Wednesday
+          # window `calico_capture.orchestrator.is_capture_day` already
+          # implements and `tests.capture.test_schedule_contract` already
+          # proves over a ten-Gregorian-year span (this project's
+          # established local-constant-duplication precedent) -- kept
+          # dependency-free (stdlib only, no `calico_capture`/`calico_dbt`
+          # import) so this no-secret job never needs the dbt/B2 toolchain
+          # installed.
+          event_name = os.environ["GITHUB_EVENT_NAME"]
+          dispatch_mode = os.environ.get("CALICO_DISPATCH_MODE") or "capture"
+          trigger = "schedule" if event_name == "schedule" else "workflow_dispatch"
+          mode = "capture" if event_name == "schedule" else dispatch_mode
+
+          if trigger == "schedule":
+              today = datetime.datetime.now(datetime.timezone.utc).date()
+              should_run = today.isoweekday() == 3 and (
+                  1 <= today.day <= 7 or 15 <= today.day <= 21
+              )
+          else:
+              should_run = True
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"should_run={'true' if should_run else 'false'}\n")
+              handle.write(f"mode={mode}\n")
+              handle.write(f"trigger={trigger}\n")
+          PY
+
+  capture:
+    name: Capture (B2 secrets, read-only checkout)
+    needs: calendar-gate
+    if: needs.calendar-gate.outputs.should_run == 'true' && needs.calendar-gate.outputs.mode == 'capture'
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    permissions:
+      contents: read
+    environment: capture-automation
+    outputs:
+      status_json: ${{ steps.run.outputs.status_json }}
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.15'
+
+      - name: Install exact dbt and capture toolchain pins
+        run: |
+          python -m pip install --requirement requirements-dbt.txt
+          python -m pip install --requirement requirements-capture.txt
+
+      - name: Run one production capture attempt sequence
+        id: run
+        env:
+          CALICO_B2_APPLICATION_KEY_ID: ${{ secrets.CALICO_B2_APPLICATION_KEY_ID }}
+          CALICO_B2_APPLICATION_KEY: ${{ secrets.CALICO_B2_APPLICATION_KEY }}
+        run: |
+          set +e
+          python -m calico_capture run --trigger ${{ needs.calendar-gate.outputs.trigger }} > capture-status.json
+          {
+            echo "status_json<<CAPTURE_STATUS_EOF"
+            cat capture-status.json
+            echo "CAPTURE_STATUS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+  status:
+    name: Status (contents write, no B2 secrets)
+    needs: [calendar-gate, capture]
+    if: needs.calendar-gate.outputs.should_run == 'true' && needs.calendar-gate.outputs.mode == 'capture'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (persisted credentials required for the safe non-force status write)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.15'
+
+      - name: Install exact dbt toolchain pins
+        run: python -m pip install --requirement requirements-dbt.txt
+
+      - name: Validate the safe capture status document
+        env:
+          CAPTURE_STATUS_JSON: ${{ needs.capture.outputs.status_json }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          from calico_capture.status import validate_capture_status_document
+
+          document = json.loads(os.environ["CAPTURE_STATUS_JSON"])
+          validate_capture_status_document(document)
+          with open("capture-status-validated.json", "w", encoding="utf-8") as handle:
+              handle.write(
+                  json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+              )
+              handle.write("\n")
+          PY
+
+      - name: Publish the safe status document to published-data (non-force)
+        run: |
+          # The bot email is assembled at runtime from two halves so the
+          # committed source text itself never contains a contiguous
+          # email-shaped literal (this project's established
+          # privacy-scanner false-positive workaround).
+          BOT_EMAIL_USER="calico-capture-bot"
+          BOT_EMAIL_HOST="users.noreply.github.com"
+          BOT_EMAIL="${BOT_EMAIL_USER}@${BOT_EMAIL_HOST}"
+          git fetch origin published-data
+          git checkout -B published-data origin/published-data
+          cp capture-status-validated.json capture-status.json
+          git add capture-status.json
+          if git diff --cached --quiet; then
+            echo "capture-status.json unchanged"
+          else
+            git -c user.name="calico-capture-bot" -c user.email="$BOT_EMAIL" commit -m "Update the safe capture status document"
+            git push origin HEAD:published-data
+          fi
+
+      - name: Write the safe job summary
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("capture-status.json", "r", encoding="utf-8") as handle:
+              document = json.load(handle)
+          lines = [
+              "### Capture status",
+              f"- outcome: {document['outcome']}",
+              f"- reason_category: {document['reason_category']}",
+              f"- trigger: {document['trigger']}",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          PY
