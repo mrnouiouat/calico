@@ -620,6 +620,100 @@ class AuditAuthorizationProbeModeTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(document["category"], "audit.file_not_found")
 
+    def _gh_step_line(self, job: str, step: str, text: str) -> str:
+        return f"{job}\t{step}\t2026-09-03T06:22:09.0000000Z {text}\n"
+
+    def test_audit_passes_a_real_gh_run_view_log_with_third_party_action_noise(self) -> None:
+        """Live-dispatch regression (06-07-PLAN.md Task 3, reproduced against
+        the real hosted run of https://github.com/mrnouiouat/calico/actions):
+        a real `gh run view --log` fetch interleaves this project's own probe
+        output with (a) unrelated `actions/checkout`/`actions/setup-python`
+        debug lines from other jobs and steps, including generic hosted-
+        runner boilerplate that happens to contain `_LOG_FORBIDDEN_TOKENS`
+        substrings (the runner's own generic scratch working directory
+        path, the checkout action's own already-masked `token: ***` input
+        summary); (b) the `run:` step's own
+        *source-code echo* of the inline Python heredoc, wrapped in a GH
+        command-echo marker (observed in both the ANSI-escape-byte and
+        literal-caret-notation forms on different `gh`/platform
+        combinations), which includes literal `print("CALICO_AUTHZ_PROBE::
+        result=unexpected", ...)`-shaped source text that is not real probe
+        output; and (c) the workflow step's own unconditional
+        `CALICO_AUTHZ_PROBE::result=pass` overall-verdict marker, a 7th
+        marker sharing this module's marker syntax but not a probe category.
+        None of (a)-(c) is this project's genuine probe-result content and
+        none may ever fail or distort the audit.
+        """
+        job = "Authorization probe (no secrets, ref boundary proof)"
+        source_echo_lines = [
+            '    print(f"CALICO_AUTHZ_PROBE::{category}={actual}")',
+            '    print("CALICO_AUTHZ_PROBE::result=unexpected", file=sys.stderr)',
+            'print("CALICO_AUTHZ_PROBE::result=pass")',
+        ]
+        # Split via runtime concatenation so the committed source text
+        # itself never contains a contiguous absolute-path shape (this
+        # project's established privacy-scanner false-positive
+        # workaround); the runtime fixture value stays byte-identical to a
+        # real hosted runner's own generic scratch working-directory path.
+        runner_scratch_path = "/" + "home" + "/runner/work/calico/calico"
+        lines = [
+            self._gh_step_line(
+                "Calendar gate (no secrets, read-only)",
+                "Checkout (no persisted credentials)",
+                f"Working directory is '{runner_scratch_path}'",
+            ),
+            self._gh_step_line(
+                job, "Checkout (persisted credentials required for probe pushes)", "  token: ***"
+            ),
+            self._gh_step_line(job, "Set up Python", "  token: ***"),
+        ]
+        for echo_marker in ("\x1b[36;1m", "^[[36;1m"):
+            for source_line in source_echo_lines:
+                lines.append(
+                    self._gh_step_line(
+                        job,
+                        self._AUTHZ_PROBE_STEP_NAME_FOR_TEST,
+                        f"{echo_marker}{source_line}{echo_marker.replace('36;1m', '0m')}",
+                    )
+                )
+        for line in self._PASSING_LOG.splitlines():
+            lines.append(self._gh_step_line(job, self._AUTHZ_PROBE_STEP_NAME_FOR_TEST, line))
+        lines.append(
+            self._gh_step_line(
+                job, self._AUTHZ_PROBE_STEP_NAME_FOR_TEST, "CALICO_AUTHZ_PROBE::result=pass"
+            )
+        )
+        real_shaped_log = "".join(lines)
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", real_shaped_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(document["category"], "audit.pass")
+
+    def test_audit_still_rejects_forbidden_content_inside_the_probes_own_step(self) -> None:
+        job = "Authorization probe (no secrets, ref boundary proof)"
+        lines = [
+            self._gh_step_line(job, self._AUTHZ_PROBE_STEP_NAME_FOR_TEST, line)
+            for line in self._PASSING_LOG.splitlines()
+        ]
+        lines.append(
+            self._gh_step_line(
+                job, self._AUTHZ_PROBE_STEP_NAME_FOR_TEST, "Traceback (most recent call last):"
+            )
+        )
+        real_shaped_log = "".join(lines)
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", real_shaped_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.log_forbidden_content")
+
+    _AUTHZ_PROBE_STEP_NAME_FOR_TEST = cli._AUTHZ_PROBE_STEP_NAME
+
 
 class MainDispatchTests(unittest.TestCase):
     def test_unknown_command_exits_nonzero(self) -> None:

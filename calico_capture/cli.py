@@ -149,6 +149,38 @@ _LOG_FORBIDDEN_TOKENS: tuple[str, ...] = (
 #: `capture`/`status` path and never produces one).
 _AUDIT_MODES = ("capture-status", "authorization-probe")
 
+#: The exact committed step name (`.github/workflows/capture-current.yml`,
+#: `authorization-probe` job) whose own printed output this audit scans --
+#: never the full multi-job `gh run view --log` fetch. `gh run view --log`
+#: prefixes every line `<job>\t<step>\t<timestamp> <text>`; scoping to only
+#: this project's own script step excludes third-party `actions/checkout`
+#: and `actions/setup-python` infrastructure debug output (e.g. the generic
+#: hosted runner's own generic per-run scratch working directory and the
+#: checkout action's own already-GitHub-masked `token: ***` input-summary
+#: line), which is universal GitHub Actions boilerplate present on every
+#: public run of every repository, not project-specific content, and would
+#: otherwise always false-positive `_LOG_FORBIDDEN_TOKENS` against a real
+#: hosted log regardless of what this project's own code ever prints.
+_AUTHZ_PROBE_STEP_NAME = "Run the no-secret authorization probe"
+
+#: `gh run view --log` wraps every echoed *source* line of a `run:` step's
+#: inline script (GitHub's own "$ command" display, not this project's
+#: runtime output) in a fixed ANSI cyan-bold escape pair. A `python -
+#: <<'PY' ... PY` heredoc step therefore has its literal script text
+#: (including any string literal that happens to *contain* a
+#: `CALICO_AUTHZ_PROBE::...` marker shape inside a `print(...)` call's own
+#: source, e.g. `print("CALICO_AUTHZ_PROBE::result=pass")`) echoed back
+#: verbatim in the hosted log before the script ever runs. Only this
+#: project's genuine runtime `print()` output -- never wrapped in this
+#: escape pair -- is authoritative for both the forbidden-content scan and
+#: the marker-line parse below. Both observed on-the-wire forms are
+#: checked: a real ESC (0x1B) control byte (`gh` on some platforms/
+#: versions passes the raw terminal escape through), and the literal
+#: two-character caret-notation text `^[` (observed from a live
+#: `gh run view --log` fetch on this project's own Windows toolchain) --
+#: neither form is ever legitimate project-generated content.
+_GH_COMMAND_ECHO_MARKERS = ("\x1b[36;1m", "^[[36;1m")
+
 #: The exact closed marker line pattern the `authorization-probe` workflow job
 #: prints once per probe outcome (never a raw ref name, provider error body, or
 #: secret) -- mirrors this module's own `_LOG_FORBIDDEN_TOKENS` positive-projection
@@ -167,6 +199,11 @@ _AUTHZ_PROBE_REQUIRED_RESULTS: dict[str, str] = {
     "force_push": "denied",
     "published_data_update": "allowed",
 }
+
+#: The workflow step's own unconditional overall-verdict marker key
+#: (`CALICO_AUTHZ_PROBE::result=pass|unexpected`) -- excluded from the
+#: closed per-probe category set above (see `_audit_authorization_probe`).
+_AUTHZ_PROBE_SUMMARY_CATEGORY = "result"
 
 
 class _SkipBuildOutcome:
@@ -606,6 +643,25 @@ def _audit_capture_status(
     return {"category": "audit.pass"}, 0
 
 
+def _extract_named_step_output(log_text: str, step_name: str) -> str:
+    """Return only the named step's own printed lines from a `gh run view
+    --log` fetch (tab-separated `<job>\\t<step>\\t<timestamp> <text>` per
+    line), stripping the job/step/timestamp prefix. If no line matches
+    (e.g. a bare, already-scoped log with no `gh` prefix at all, as this
+    module's own unit tests use), the input is returned unchanged so a
+    pre-scoped log still audits correctly.
+    """
+
+    matched: list[str] = []
+    for line in log_text.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) == 3 and parts[1] == step_name:
+            if any(marker in parts[2] for marker in _GH_COMMAND_ECHO_MARKERS):
+                continue
+            matched.append(parts[2])
+    return "\n".join(matched) if matched else log_text
+
+
 def _audit_authorization_probe(log_text: str, credential_env: str | None) -> tuple[dict, int]:
     """`authorization-probe` mode audit (06-07-PLAN.md Task 3): the
     `authorization-probe` workflow job never produces a `CaptureStatus` document
@@ -613,29 +669,49 @@ def _audit_authorization_probe(log_text: str, credential_env: str | None) -> tup
     `CALICO_AUTHZ_PROBE::<category>=<denied|allowed>` marker line per probe
     instead. This validates the closed marker set positively (exact category set,
     exact required result per category) and still applies the same forbidden-
-    content/credential-sentinel scan the `capture-status` mode applies.
+    content/credential-sentinel scan the `capture-status` mode applies -- scoped
+    to this project's own `_AUTHZ_PROBE_STEP_NAME` step output only, never the
+    full multi-job hosted log (see `_extract_named_step_output`).
     """
 
+    scoped_text = _extract_named_step_output(log_text, _AUTHZ_PROBE_STEP_NAME)
+
     for token in _LOG_FORBIDDEN_TOKENS:
-        if token in log_text:
+        if token in scoped_text:
             return {"category": "audit.log_forbidden_content"}, 1
 
     found: dict[str, str] = {}
-    for category, value in _AUTHZ_PROBE_MARKER_PATTERN.findall(log_text):
+    for category, value in _AUTHZ_PROBE_MARKER_PATTERN.findall(scoped_text):
         if category in found and found[category] != value:
             return {"category": "audit.authz_probe_malformed"}, 1
         found[category] = value
 
-    if set(found.keys()) != set(_AUTHZ_PROBE_REQUIRED_RESULTS.keys()):
+    # The committed workflow step also unconditionally prints one
+    # `CALICO_AUTHZ_PROBE::result=<pass|unexpected>` overall-verdict marker
+    # (`.github/workflows/capture-current.yml`) sharing this module's own
+    # marker syntax by construction, not a seventh probe category -- its
+    # own vocabulary (`pass`/`unexpected`) differs from every real
+    # category's `denied`/`allowed` vocabulary, and an `unexpected` verdict
+    # already makes the workflow step exit non-zero, which the hosted
+    # run/job `conclusion` check (this plan's own outer `<verify>`) already
+    # catches independently. Excluded here so it is never mistaken for an
+    # unrecognized/extra probe category.
+    probe_categories = {
+        category: value
+        for category, value in found.items()
+        if category != _AUTHZ_PROBE_SUMMARY_CATEGORY
+    }
+
+    if set(probe_categories.keys()) != set(_AUTHZ_PROBE_REQUIRED_RESULTS.keys()):
         return {"category": "audit.authz_probe_incomplete"}, 1
 
     for category, expected in _AUTHZ_PROBE_REQUIRED_RESULTS.items():
-        if found[category] != expected:
+        if probe_categories[category] != expected:
             return {"category": "audit.authz_probe_unexpected_result"}, 1
 
     if credential_env:
         sentinel = os.environ.get(credential_env)
-        if sentinel and sentinel in log_text:
+        if sentinel and sentinel in scoped_text:
             return {"category": "audit.credential_leak_detected"}, 1
 
     return {"category": "audit.pass"}, 0
