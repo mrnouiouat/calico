@@ -294,6 +294,25 @@ jobs:
                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
               )
 
+          # A fresh runner checkout carries no git identity; every commit
+          # this job makes (the harmless main-probe/force-probe empty
+          # commits and the real published-data status commit) needs one
+          # configured first, or `git commit` fails closed with exit 128
+          # before any probe even runs. The bot email is assembled at
+          # runtime from two halves, matching the status job's own
+          # established privacy-scanner workaround.
+          bot_email_user = "calico-capture-bot"
+          bot_email_host = "users.noreply.github.com"
+          bot_email = f"{bot_email_user}@{bot_email_host}"
+          subprocess.run(
+              ["git", "config", "user.name", "calico-capture-bot"],
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+          )
+          subprocess.run(
+              ["git", "config", "user.email", bot_email],
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+          )
+
           results = {}
           base = _head()
 
@@ -363,16 +382,9 @@ jobs:
                   % (RUN_ID, observed_at)
               )
           subprocess.run(["git", "add", "authorization-probe-status.json"], check=True)
-          # The bot email is assembled at runtime from two halves, matching
-          # the status job's own established privacy-scanner workaround.
-          bot_email_user = "calico-capture-bot"
-          bot_email_host = "users.noreply.github.com"
-          bot_email = f"{bot_email_user}@{bot_email_host}"
+          # Reuses the same bot identity already configured above.
           subprocess.run(
-              [
-                  "git", "-c", "user.name=calico-capture-bot", "-c", f"user.email={bot_email}",
-                  "commit", "-m", "Record the safe authorization-probe status document",
-              ],
+              ["git", "commit", "-m", "Record the safe authorization-probe status document"],
               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
           )
           results["published_data_update"] = "allowed" if _run_git(
