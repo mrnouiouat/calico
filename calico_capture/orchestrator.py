@@ -22,14 +22,25 @@ the mandatory manual-recovery path (D-06).
 
 Every step follows 06-RESEARCH.md Pattern 2 ("Restore Before Capture,
 Archive Before Success"): establish a fresh external store, restore
-(currently a fresh-layout establishment; full reconstruction from prior
-archived transactions is `calico_capture.restore`'s job in a later plan),
-call the existing atomic `calico_landing.admission.admit()` with the
+(`_restore_before_capture` still only establishes a fresh empty layout;
+`calico_capture.restore.restore_verified_transaction` now exists as a
+real, independently proven single-transaction restore-and-build primitive,
+06-03-PLAN.md Task 2, but looping it over every catalog-known transaction
+needs a catalog-aware caller a later plan's CLI wave supplies -- wiring
+that into this function's body is intentionally deferred, not this
+function's call site or signature), call the existing atomic
+`calico_landing.admission.admit()` with the
 closed status-vocabulary contract explicitly opted in, synchronize and
 read-back-verify the resulting transaction against the archive boundary
 before ever reporting acceptance, then invoke the existing real-mode
 `calico_dbt.runner.build()` seam (or an injected spy) before advancing
 visible last-accepted status.
+
+Per D-06 (06-03-PLAN.md Task 1), `fetch_candidate` now defaults to the real
+production source boundary -- `calico_capture.source.fetch_candidate`, a
+fixed four-object bounded HTTPS download -- so schedule, `workflow_dispatch`,
+and the local runbook all reach the same production fetcher without each
+having to wire it up independently; only tests ever inject a fake fetcher.
 
 Per D-05, only two conditions are retried, at the fixed `retry_delays`
 schedule: a `no_new_release` outcome whose reported release date is still
@@ -143,6 +154,12 @@ def _default_build(store_root: Path) -> object:
     return dbt_build(mode="real", store=store_root)
 
 
+def _default_fetch_candidate() -> "str | Path":
+    from calico_capture.source import fetch_candidate as _fetch_candidate
+
+    return _fetch_candidate()
+
+
 def is_capture_day(when: date, trigger: str) -> bool:
     """The D-04 calendar gate.
 
@@ -175,14 +192,19 @@ def _restore_before_capture(destination_root: Path) -> None:
     admission attempt (Pattern 2, D-13).
 
     Full reconstruction of `destination_root` from every prior archived
-    transaction is `calico_capture.restore`'s responsibility (a later
-    plan's wave). This call still performs the mandated restore-before-
-    capture ordering so the production entry point never skips the step;
-    for the very first capture into a never-before-archived history the
-    correct restored state genuinely is the empty, freshly laid out store
-    this establishes. A later plan extends this function's body -- without
-    changing its call site or signature -- to actually repopulate
-    `destination_root` from every existing archived transaction.
+    transaction needs the committed real-mode input catalog
+    (`contracts/dbt-input-catalog-v1.json`) to know *which* transactions to
+    restore -- `calico_capture.restore.restore_verified_transaction`
+    (06-03-PLAN.md Task 2) is the real, independently proven primitive that
+    restores one such transaction given its release identity, but looping
+    it over the whole catalog is a catalog-aware caller's job, not this
+    single-argument function's. This call still performs the mandated
+    restore-before-capture ordering so the production entry point never
+    skips the step; for the very first capture into a never-before-archived
+    history the correct restored state genuinely is the empty, freshly laid
+    out store this establishes. A later plan extends this function's body
+    -- without changing its call site or signature -- to actually
+    repopulate `destination_root` from every existing archived transaction.
     """
 
     ensure_store_layout(destination_root)
@@ -224,7 +246,7 @@ def capture(
     *,
     trigger: str,
     archive: Archive,
-    fetch_candidate: CandidateFetcher,
+    fetch_candidate: CandidateFetcher | None = None,
     build: BuildFn | None = None,
     clock: Clock = _default_clock,
     sleeper: Sleeper = _default_sleeper,
@@ -234,13 +256,15 @@ def capture(
     and return its closed, non-echo `CaptureStatus`.
 
     `trigger` is one of the closed `"schedule"`/`"workflow_dispatch"`/
-    `"local"` values `calico_capture.status` accepts. `archive` and
-    `fetch_candidate` are always injected -- there is no default source or
-    archive boundary, since this module never contacts a live provider
-    itself. `build` defaults to the real `calico_dbt.runner.build(mode=
-    "real", ...)` seam; tests inject a spy instead. `clock` defaults to the
-    real UTC clock; tests inject a deterministic one. `sleeper` defaults to
-    a real `time.sleep`-backed sleeper; tests inject a recording no-op.
+    `"local"` values `calico_capture.status` accepts. `archive` is always
+    injected -- there is no default archive boundary, since this module
+    never contacts a live private archive itself. `fetch_candidate`
+    defaults to the real bounded HTTPS source boundary
+    (`calico_capture.source.fetch_candidate`, D-06); tests inject a fake
+    fetcher instead. `build` defaults to the real `calico_dbt.runner.build(
+    mode="real", ...)` seam; tests inject a spy instead. `clock` defaults to
+    the real UTC clock; tests inject a deterministic one. `sleeper` defaults
+    to a real `time.sleep`-backed sleeper; tests inject a recording no-op.
     `restore` defaults to the internal fresh-layout stub (`Known Stubs`,
     06-01-SUMMARY.md); production callers never pass it, but tests may
     inject a boundary that pre-populates the fresh store with an
@@ -281,6 +305,10 @@ def capture(
             except Exception as exc:
                 raise CaptureError("restore_error") from exc
 
+            fetch_candidate_fn = (
+                fetch_candidate if fetch_candidate is not None else _default_fetch_candidate
+            )
+
             result: AdmissionResult | None = None
             last_attempt_index = len(retry_delays) - 1
             for attempt_index, delay_seconds in enumerate(retry_delays):
@@ -288,7 +316,7 @@ def capture(
                 is_last_attempt = attempt_index == last_attempt_index
 
                 try:
-                    candidate_input = fetch_candidate()
+                    candidate_input = fetch_candidate_fn()
                 except Exception as exc:
                     if is_last_attempt:
                         raise CaptureError("source_transfer_error") from exc
