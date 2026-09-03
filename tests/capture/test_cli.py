@@ -110,6 +110,26 @@ class ParserContractTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parser.parse_args(["run", "--trigger", "not-a-real-trigger"])
 
+    def test_audit_hosted_output_mode_defaults_to_capture_status(self) -> None:
+        parser = cli._build_parser()
+        args = parser.parse_args(["audit-hosted-output", "--log-file", "x"])
+        self.assertEqual(args.mode, "capture-status")
+        self.assertIsNone(args.status_file)
+
+    def test_audit_hosted_output_mode_is_closed_vocabulary(self) -> None:
+        parser = cli._build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(
+                ["audit-hosted-output", "--log-file", "x", "--mode", "not-a-real-mode"]
+            )
+
+    def test_audit_hosted_output_status_file_is_optional(self) -> None:
+        parser = cli._build_parser()
+        args = parser.parse_args(
+            ["audit-hosted-output", "--log-file", "x", "--mode", "authorization-probe"]
+        )
+        self.assertIsNone(args.status_file)
+
     def test_run_requires_trigger(self) -> None:
         parser = cli._build_parser()
         with self.assertRaises(SystemExit):
@@ -490,6 +510,115 @@ class AuditHostedOutputCommandTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(document["category"], "audit.file_not_found")
         self.assertNotIn("does-not-exist", json.dumps(document))
+
+
+class AuditAuthorizationProbeModeTests(unittest.TestCase):
+    """06-07-PLAN.md Task 3: `--mode authorization-probe` validates the
+    no-secret `authorization-probe` workflow job's own closed marker log
+    only -- never a `CaptureStatus` document, since that job never enters
+    the `capture`/`status` path."""
+
+    _PASSING_LOG = (
+        "CALICO_AUTHZ_PROBE::nontarget_branch_create=denied\n"
+        "CALICO_AUTHZ_PROBE::main_update=denied\n"
+        "CALICO_AUTHZ_PROBE::tag_create=denied\n"
+        "CALICO_AUTHZ_PROBE::deletion=denied\n"
+        "CALICO_AUTHZ_PROBE::force_push=denied\n"
+        "CALICO_AUTHZ_PROBE::published_data_update=allowed\n"
+    )
+
+    def _write(self, tmp_dir: Path, name: str, content: str) -> str:
+        path = tmp_dir / name
+        path.write_text(content, encoding="utf-8")
+        return str(path)
+
+    def test_audit_passes_a_clean_authorization_probe_log(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", self._PASSING_LOG)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(document["category"], "audit.pass")
+
+    def test_audit_rejects_a_missing_probe_category(self) -> None:
+        incomplete_log = self._PASSING_LOG.replace(
+            "CALICO_AUTHZ_PROBE::force_push=denied\n", ""
+        )
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", incomplete_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.authz_probe_incomplete")
+
+    def test_audit_rejects_an_extra_unrecognized_probe_category(self) -> None:
+        extra_log = self._PASSING_LOG + "CALICO_AUTHZ_PROBE::unexpected_category=denied\n"
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", extra_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.authz_probe_incomplete")
+
+    def test_audit_rejects_an_unexpected_allowed_result(self) -> None:
+        bad_log = self._PASSING_LOG.replace(
+            "CALICO_AUTHZ_PROBE::main_update=denied\n",
+            "CALICO_AUTHZ_PROBE::main_update=allowed\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", bad_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.authz_probe_unexpected_result")
+
+    def test_audit_rejects_an_unexpected_denied_positive_probe(self) -> None:
+        bad_log = self._PASSING_LOG.replace(
+            "CALICO_AUTHZ_PROBE::published_data_update=allowed\n",
+            "CALICO_AUTHZ_PROBE::published_data_update=denied\n",
+        )
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", bad_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.authz_probe_unexpected_result")
+
+    def test_audit_rejects_forbidden_log_content_in_authorization_probe_mode(self) -> None:
+        bad_log = self._PASSING_LOG + "Traceback (most recent call last):\n"
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", bad_log)
+            document, exit_code = cli._audit_hosted_output(
+                log_path, None, None, mode="authorization-probe"
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.log_forbidden_content")
+
+    def test_audit_rejects_a_leaked_credential_sentinel_in_authorization_probe_mode(self) -> None:
+        sentinel = "sentinel-hosted-authz-probe-leak-77"
+        bad_log = self._PASSING_LOG + f"value={sentinel}\n"
+        with tempfile.TemporaryDirectory(prefix="calico-cli-audit-authz-") as tmp:
+            log_path = self._write(Path(tmp), "log.txt", bad_log)
+            with mock.patch.dict(os.environ, {"CALICO_TEST_SENTINEL_ENV": sentinel}):
+                document, exit_code = cli._audit_hosted_output(
+                    log_path, None, "CALICO_TEST_SENTINEL_ENV", mode="authorization-probe"
+                )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.credential_leak_detected")
+
+    def test_audit_reports_missing_log_file_without_status_file_in_authorization_probe_mode(
+        self,
+    ) -> None:
+        document, exit_code = cli._audit_hosted_output(
+            "calico-cli-test-does-not-exist/log.txt", None, None, mode="authorization-probe"
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(document["category"], "audit.file_not_found")
 
 
 class MainDispatchTests(unittest.TestCase):

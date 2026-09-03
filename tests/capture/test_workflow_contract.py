@@ -208,6 +208,79 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         self.assertIn("needs.calendar-gate.outputs.trigger", capture_block)
 
 
+class AuthorizationProbeJobTests(unittest.TestCase):
+    """06-07-PLAN.md Task 3: the `authorization-probe` job exists, runs only
+    for an explicit `workflow_dispatch` with `mode: authorization_probe`,
+    never enters the `capture`/`status` path, and carries no B2 secret."""
+
+    def _workflow(self) -> str:
+        return _read(WORKFLOW_PATH)
+
+    def test_authorization_probe_job_exists(self) -> None:
+        content = self._workflow()
+        self.assertIn("  authorization-probe:", content)
+
+    def test_authorization_probe_job_runs_only_for_authorization_probe_mode(self) -> None:
+        probe_block = _job_block(self._workflow(), "authorization-probe")
+        self.assertIn("needs.calendar-gate.outputs.mode == 'authorization_probe'", probe_block)
+        self.assertNotIn("mode == 'capture'", probe_block)
+
+    def test_authorization_probe_job_has_no_b2_secrets_and_no_environment(self) -> None:
+        probe_block = _job_block(self._workflow(), "authorization-probe")
+        self.assertNotIn("CALICO_B2_APPLICATION_KEY", probe_block)
+        self.assertNotIn("CALICO_B2_RETENTION_KEY", probe_block)
+        self.assertNotIn("secrets.", probe_block)
+        self.assertNotIn("environment:", probe_block)
+
+    def test_authorization_probe_job_force_push_and_deletion_target_only_the_disposable_probe_ref(
+        self,
+    ) -> None:
+        probe_block = _job_block(self._workflow(), "authorization-probe")
+        force_push_lines = [line for line in probe_block.splitlines() if '"--force"' in line]
+        self.assertTrue(force_push_lines, "expected exactly one --force push call")
+        for line in force_push_lines:
+            self.assertIn("PROBE_BRANCH", line)
+            self.assertNotIn("main", line)
+            self.assertNotIn("published-data", line)
+        delete_lines = [line for line in probe_block.splitlines() if '"--delete"' in line]
+        self.assertTrue(delete_lines, "expected disposable-ref deletion calls")
+        for line in delete_lines:
+            self.assertTrue("PROBE_BRANCH" in line or "PROBE_TAG" in line)
+            self.assertNotIn("main", line)
+            self.assertNotIn("published-data", line)
+
+    def test_authorization_probe_job_main_probe_is_never_forced_or_deleted(self) -> None:
+        probe_block = _job_block(self._workflow(), "authorization-probe")
+        # The only reference to main is the one ordinary (non-force)
+        # fast-forward candidate push described in the plan's safety
+        # constraints -- never combined with --force or --delete.
+        main_lines = [line for line in probe_block.splitlines() if "refs/heads/main" in line]
+        self.assertTrue(main_lines, "expected exactly one main-update probe line")
+        for line in main_lines:
+            self.assertNotIn("--force", line)
+            self.assertNotIn("--delete", line)
+
+    def test_authorization_probe_job_prints_the_closed_marker_categories(self) -> None:
+        probe_block = _job_block(self._workflow(), "authorization-probe")
+        for category in (
+            "nontarget_branch_create",
+            "main_update",
+            "tag_create",
+            "deletion",
+            "force_push",
+            "published_data_update",
+        ):
+            self.assertIn(f'"{category}"', probe_block)
+        self.assertIn("CALICO_AUTHZ_PROBE::", probe_block)
+
+    def test_capture_and_status_jobs_never_run_for_authorization_probe_mode(self) -> None:
+        content = self._workflow()
+        capture_block = _job_block(content, "capture")
+        status_block = _job_block(content, "status")
+        for block in (capture_block, status_block):
+            self.assertNotIn("authorization_probe", block)
+
+
 class RunbookContractTests(unittest.TestCase):
     """Test 3: same CLI, mandatory manual/local recovery, no-deletion rule,
     honest (non-exact-time) delayed/dropped cron recovery language."""

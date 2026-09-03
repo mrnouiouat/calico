@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Callable
@@ -140,6 +141,32 @@ _LOG_FORBIDDEN_TOKENS: tuple[str, ...] = (
 #: kept identical to `STATUS_DOCUMENT_KEYS` (imported indirectly via
 #: `validate_capture_status_document`), so this module never maintains a
 #: second, drifting copy of that vocabulary.
+
+#: Closed `audit-hosted-output` mode vocabulary (06-07-PLAN.md Task 3):
+#: `capture-status` is the original hosted-run status/log audit; `authorization-probe`
+#: validates the no-secret `authorization-probe` workflow job's own closed-category
+#: marker lines instead (never a `CaptureStatus` document -- that job never enters the
+#: `capture`/`status` path and never produces one).
+_AUDIT_MODES = ("capture-status", "authorization-probe")
+
+#: The exact closed marker line pattern the `authorization-probe` workflow job
+#: prints once per probe outcome (never a raw ref name, provider error body, or
+#: secret) -- mirrors this module's own `_LOG_FORBIDDEN_TOKENS` positive-projection
+#: discipline: only a fixed category name and a fixed `denied`/`allowed` result.
+_AUTHZ_PROBE_MARKER_PATTERN = re.compile(r"CALICO_AUTHZ_PROBE::([a-z_]+)=([a-z_]+)")
+
+#: The exact closed set of probe categories and their single required outcome
+#: (T-06-07A/B: every forbidden-ref probe must be `denied`; the one target-branch
+#: update probe must be `allowed`). Any category missing, any extra category, or
+#: any category whose observed result does not match here is a hard audit failure.
+_AUTHZ_PROBE_REQUIRED_RESULTS: dict[str, str] = {
+    "nontarget_branch_create": "denied",
+    "main_update": "denied",
+    "tag_create": "denied",
+    "deletion": "denied",
+    "force_push": "denied",
+    "published_data_update": "allowed",
+}
 
 
 class _SkipBuildOutcome:
@@ -543,10 +570,18 @@ def _read_text_no_echo(path: str) -> str | None:
         return None
 
 
-def _audit_hosted_output(log_file: str, status_file: str, credential_env: str | None) -> tuple[dict, int]:
+def _audit_capture_status(
+    log_text: str, status_file: str | None, credential_env: str | None
+) -> tuple[dict, int]:
+    """Original `capture-status` mode audit (unchanged behavior): validate the
+    real hosted `CaptureStatus` document and scan the log for forbidden content
+    or a leaked credential sentinel.
+    """
+
+    if not status_file:
+        return {"category": "audit.file_not_found"}, 1
     status_text = _read_text_no_echo(status_file)
-    log_text = _read_text_no_echo(log_file)
-    if status_text is None or log_text is None:
+    if status_text is None:
         return {"category": "audit.file_not_found"}, 1
 
     try:
@@ -571,8 +606,60 @@ def _audit_hosted_output(log_file: str, status_file: str, credential_env: str | 
     return {"category": "audit.pass"}, 0
 
 
+def _audit_authorization_probe(log_text: str, credential_env: str | None) -> tuple[dict, int]:
+    """`authorization-probe` mode audit (06-07-PLAN.md Task 3): the
+    `authorization-probe` workflow job never produces a `CaptureStatus` document
+    (it never enters the `capture`/`status` path) -- it prints one fixed
+    `CALICO_AUTHZ_PROBE::<category>=<denied|allowed>` marker line per probe
+    instead. This validates the closed marker set positively (exact category set,
+    exact required result per category) and still applies the same forbidden-
+    content/credential-sentinel scan the `capture-status` mode applies.
+    """
+
+    for token in _LOG_FORBIDDEN_TOKENS:
+        if token in log_text:
+            return {"category": "audit.log_forbidden_content"}, 1
+
+    found: dict[str, str] = {}
+    for category, value in _AUTHZ_PROBE_MARKER_PATTERN.findall(log_text):
+        if category in found and found[category] != value:
+            return {"category": "audit.authz_probe_malformed"}, 1
+        found[category] = value
+
+    if set(found.keys()) != set(_AUTHZ_PROBE_REQUIRED_RESULTS.keys()):
+        return {"category": "audit.authz_probe_incomplete"}, 1
+
+    for category, expected in _AUTHZ_PROBE_REQUIRED_RESULTS.items():
+        if found[category] != expected:
+            return {"category": "audit.authz_probe_unexpected_result"}, 1
+
+    if credential_env:
+        sentinel = os.environ.get(credential_env)
+        if sentinel and sentinel in log_text:
+            return {"category": "audit.credential_leak_detected"}, 1
+
+    return {"category": "audit.pass"}, 0
+
+
+def _audit_hosted_output(
+    log_file: str,
+    status_file: str | None,
+    credential_env: str | None,
+    mode: str = "capture-status",
+) -> tuple[dict, int]:
+    log_text = _read_text_no_echo(log_file)
+    if log_text is None:
+        return {"category": "audit.file_not_found"}, 1
+
+    if mode == "authorization-probe":
+        return _audit_authorization_probe(log_text, credential_env)
+    return _audit_capture_status(log_text, status_file, credential_env)
+
+
 def _cmd_audit_hosted_output(args: argparse.Namespace) -> int:
-    document, exit_code = _audit_hosted_output(args.log_file, args.status_file, args.credential_env)
+    document, exit_code = _audit_hosted_output(
+        args.log_file, args.status_file, args.credential_env, mode=args.mode
+    )
     print(_dict_json(document))
     print(document["category"], file=sys.stderr)
     return exit_code
@@ -618,8 +705,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Validate a hosted run's status document and scan its log for leaks.",
     )
     audit_parser.add_argument("--log-file", required=True)
-    audit_parser.add_argument("--status-file", required=True)
+    audit_parser.add_argument("--status-file", required=False, default=None)
     audit_parser.add_argument("--credential-env", required=False, default=None)
+    audit_parser.add_argument(
+        "--mode",
+        required=False,
+        default="capture-status",
+        choices=_AUDIT_MODES,
+        help=(
+            "capture-status (default): validate a real hosted CaptureStatus document "
+            "and log. authorization-probe: validate the no-secret authorization-probe "
+            "job's own closed marker log only (no --status-file)."
+        ),
+    )
 
     return parser
 

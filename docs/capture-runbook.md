@@ -112,12 +112,17 @@ credential from your shell as soon as the command completes; it is never wired i
 
 ```
 python -m calico_capture audit-hosted-output --log-file <path> --status-file <path> [--credential-env NAME]
+python -m calico_capture audit-hosted-output --mode authorization-probe --log-file <path>
 ```
 
-Validates a status document against the closed capture-status schema and scans a log file for
-non-allowlisted content (paths, tracebacks, provider text, the source host) and, if
-`--credential-env` names an environment variable currently holding a private value, for that exact
-value appearing anywhere in either file. Reports only a fixed pass/fail category.
+`--mode` defaults to `capture-status`: validates a real hosted status document against the closed
+capture-status schema and scans a log file for non-allowlisted content (paths, tracebacks,
+provider text, the source host) and, if `--credential-env` names an environment variable currently
+holding a private value, for that exact value appearing anywhere in either file. `--mode
+authorization-probe` instead validates the no-secret `authorization-probe` workflow job's own
+fixed `CALICO_AUTHZ_PROBE::<category>=<denied|allowed>` marker lines (no `--status-file`, since
+that job never produces a capture-status document). Both modes report only a fixed pass/fail
+category.
 
 ## Missed or delayed runs
 
