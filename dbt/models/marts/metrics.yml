@@ -71,6 +71,20 @@ models:
           - not_null
           - accepted_values:
               values: [matched_observed_entry_population_v1]
+      - name: support_share_of_matched_entries
+        description: "SQL-computed support count divided by the matched observed entry denominator; null for zero denominator."
+      - name: dominant_source_reported_status_date
+        description: "Deterministic most frequent source-reported status date among matched observed entries."
+      - name: dominant_status_date_share
+        description: "SQL-computed dominant status-date count divided by its matched observed entry denominator."
+      - name: next_from_as_of_date
+        description: "Start date of the next exact adjacent accepted-release pair."
+      - name: next_to_as_of_date
+        description: "End date of the next exact adjacent accepted-release pair."
+      - name: next_gap_days
+        description: "Calendar-day gap in the next adjacent accepted-release pair."
+      - name: next_total_matched_entry_count
+        description: "Matched observed entry count in the next exact adjacent pair."
 
   - name: mart_last_renewal_diagnostic
     description: >
@@ -99,6 +113,26 @@ models:
         tests: [not_null]
       - name: denominator_count
         tests: [not_null]
+      - name: from_as_of_date
+        description: "Starting accepted release as-of date."
+      - name: from_release_revision
+        description: "Starting accepted release revision number."
+      - name: from_revision_fingerprint
+        description: "Starting accepted release ordered-source fingerprint."
+      - name: to_as_of_date
+        description: "Ending accepted release as-of date."
+      - name: to_release_revision
+        description: "Ending accepted release revision number."
+      - name: to_revision_fingerprint
+        description: "Ending accepted release ordered-source fingerprint."
+      - name: gap_days
+        description: "Calendar-day gap between the accepted release endpoints."
+      - name: measure_value
+        description: "SQL-computed diagnostic numerator divided by its visible denominator; null for zero denominator."
+      - name: wilson_95_lower
+        description: "SQL-computed 95 percent Wilson lower bound for the diagnostic proportion."
+      - name: wilson_95_upper
+        description: "SQL-computed 95 percent Wilson upper bound for the diagnostic proportion."
 
   - name: mart_release_snapshot_metrics
     description: >
@@ -124,6 +158,28 @@ models:
         tests:
           - accepted_values:
               values: [all_promoted_release_records_v1]
+      - name: release_revision
+        description: "Accepted release revision number."
+      - name: revision_fingerprint
+        description: "Accepted release ordered-source fingerprint."
+      - name: parser_contract_version
+        description: "Parser contract used for the accepted release."
+      - name: keyed_record_count
+        description: "Promoted records admitted to the keyed analytical path in this release."
+      - name: unkeyed_record_count
+        description: "Promoted records excluded from the keyed analytical path in this release."
+      - name: keyed_coverage_proportion
+        description: "SQL-computed keyed records divided by all promoted release records."
+      - name: keyed_coverage_wilson_95_lower
+        description: "SQL-computed 95 percent Wilson lower bound for keyed coverage."
+      - name: keyed_coverage_wilson_95_upper
+        description: "SQL-computed 95 percent Wilson upper bound for keyed coverage."
+      - name: unkeyed_coverage_proportion
+        description: "SQL-computed unkeyed records divided by all promoted release records."
+      - name: unkeyed_coverage_wilson_95_lower
+        description: "SQL-computed 95 percent Wilson lower bound for unkeyed coverage."
+      - name: unkeyed_coverage_wilson_95_upper
+        description: "SQL-computed 95 percent Wilson upper bound for unkeyed coverage."
 
   - name: mart_starting_cohort_persistence
     description: >
@@ -140,6 +196,24 @@ models:
         tests:
           - accepted_values:
               values: [starting_published_delinquent_cohort_v1]
+      - name: from_release_revision
+        description: "Starting accepted release revision number."
+      - name: from_revision_fingerprint
+        description: "Starting accepted release ordered-source fingerprint."
+      - name: to_release_revision
+        description: "Ending accepted release revision number."
+      - name: to_revision_fingerprint
+        description: "Ending accepted release ordered-source fingerprint."
+      - name: starting_delinquent_count
+        description: "Starting published delinquent population at the exact endpoint pair."
+      - name: still_delinquent_count
+        description: "Starting published delinquent population observed in that population at the endpoint."
+      - name: observed_exit_count
+        description: "Starting published delinquent population observed outside the closed statuses at the endpoint."
+      - name: not_observed_count
+        description: "Starting published delinquent population absent at the endpoint; never an observed exit."
+      - name: persistence_proportion
+        description: "SQL-computed still-observed published delinquent population divided by its starting cohort."
 
   - name: mart_source_reported_status_age
     description: >
@@ -153,6 +227,14 @@ models:
               values: [valid_reported_date, future_reported_date, missing, invalid_nonblank]
       - name: record_count
         tests: [not_null]
+      - name: as_of_date
+        description: "Accepted release as-of date."
+      - name: release_revision
+        description: "Accepted release revision number."
+      - name: revision_fingerprint
+        description: "Accepted release ordered-source fingerprint."
+      - name: source_reported_status_age_days
+        description: "Source-reported status-date age in days within this prevalent snapshot; null for missing, invalid, or future dates."
 
   - name: mart_spell_censoring_summary
     description: 'Grain: one row per authoritative closed spell terminal state.'
@@ -182,6 +264,32 @@ models:
               values: [registry-csv-contract-v1]
       - name: parser_contract_version
         tests: [not_null]
+      - name: release_revision
+        description: "Accepted release revision number."
+      - name: revision_fingerprint
+        description: "Accepted release ordered-source fingerprint."
+      - name: release_flag_count
+        description: "Release-scoped diagnostic flag count."
+      - name: release_flag_pass_count
+        description: "Release-scoped diagnostic flags whose result is pass."
+      - name: release_flag_review_count
+        description: "Release-scoped diagnostic flags whose result is review."
+      - name: release_flag_rule_versions
+        description: "Deterministically ordered release diagnostic rule and parameter versions."
+      - name: schema_added_column_count
+        description: "Added source-contract columns in this accepted release; zero under strict admission."
+      - name: schema_removed_column_count
+        description: "Removed source-contract columns in this accepted release; zero under strict admission."
+      - name: schema_type_changed_column_count
+        description: "Changed source-contract column types in this accepted release; zero under strict admission."
+      - name: capture_attempted_count
+        description: "Capture attempts attributed to this accepted release identity."
+      - name: capture_succeeded_count
+        description: "Accepted or recovered capture attempts attributed to this release identity."
+      - name: capture_failed_count
+        description: "Rejected capture attempts attributed to this release identity."
+      - name: capture_unavailable_count
+        description: "No-new-release capture attempts attributed to this release identity."
 
   - name: mart_adjacent_pair_metrics
     description: >

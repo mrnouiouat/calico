@@ -122,7 +122,7 @@ class PublicationTracerTests(unittest.TestCase):
             outcome = runner.build(mode="fixture", export=export)
             self.assertEqual(outcome.status, "success", outcome.category)
             staged = captured["first"]
-            self.assertEqual(len(staged), 2)
+            self.assertEqual(len(staged), 11)
             self.assertEqual(
                 [item.sha256 for item in staged],
                 [item.sha256 for item in captured["second"]],
@@ -187,8 +187,7 @@ class PublicationTracerTests(unittest.TestCase):
                 {
                     "authorization-probe-status.json",
                     "capture-status.json",
-                    "exports/dim_public_organizations.csv",
-                    "exports/mart_registry_population_coverage.csv",
+                    *(item.relative_path for item in staged),
                     "manifest/published-manifest-v1.json",
                 },
             )

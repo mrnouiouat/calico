@@ -12,6 +12,13 @@ AGGREGATE_PROHIBITED_COLUMNS = frozenset(
     {"state_charity_registration_number", "organization_name", "city", "state"}
 )
 CSV_DIALECT_NAME = "calico-csv-v1"
+ALLOWLIST_ERROR_CATEGORIES = frozenset({
+    "allowlist.not_found", "allowlist.invalid_encoding", "allowlist.invalid_json",
+    "allowlist.invalid_schema", "allowlist.duplicate_export_name",
+    "allowlist.duplicate_file_name", "allowlist.duplicate_source_relation",
+    "allowlist.grain_not_in_columns", "allowlist.aggregate_identity_column",
+    "allowlist.aggregate_column_not_grain_or_measure", "allowlist.measures_not_allowed_for_class",
+})
 
 _TOP_LEVEL_KEYS = frozenset({"schema_version", "allowlist_version", "exports"})
 _ENTRY_KEYS = frozenset(
@@ -128,7 +135,7 @@ def load_allowlist(path: str | Path) -> Allowlist:
     if (
         not isinstance(document, dict)
         or set(document) != _TOP_LEVEL_KEYS
-        or isinstance(document.get("schema_version"), bool)
+        or type(document.get("schema_version")) is not int
         or document.get("schema_version") != 1
         or document.get("allowlist_version") != "publication-exports-v1"
         or not isinstance(document.get("exports"), list)
@@ -164,6 +171,7 @@ def load_allowlist(path: str | Path) -> Allowlist:
 
 
 __all__ = [
+    "ALLOWLIST_ERROR_CATEGORIES",
     "AGGREGATE_PROHIBITED_COLUMNS",
     "CSV_DIALECT_NAME",
     "EXPORT_CLASSES",

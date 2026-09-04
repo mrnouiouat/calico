@@ -59,6 +59,8 @@ def _varchar_columns(connection: duckdb.DuckDBPyConnection, entry: ExportEntry) 
     query += " FROM " + _identifier(entry.source_relation) + " LIMIT 0"
     try:
         description = connection.execute("DESCRIBE " + query).fetchall()
+    except duckdb.BinderException as exc:
+        raise ExportError("export.header_mismatch", entry.export_name) from exc
     except duckdb.Error as exc:
         raise ExportError("export.copy_failed", entry.export_name) from exc
     types = {str(row[0]): str(row[1]).upper() for row in description}
@@ -67,7 +69,7 @@ def _varchar_columns(connection: duckdb.DuckDBPyConnection, entry: ExportEntry) 
 
 def _copy_statement(entry: ExportEntry, destination: Path, varchar_columns: tuple[str, ...]) -> str:
     select_list = ", ".join(_identifier(column) for column in entry.columns)
-    order_list = ", ".join(_identifier(column) + " ASC" for column in entry.grain)
+    order_list = ", ".join(_identifier(column) + " ASC NULLS LAST" for column in entry.grain)
     options = _COPY_OPTIONS
     if varchar_columns:
         options += ", FORCE_QUOTE (" + ", ".join(_identifier(column) for column in varchar_columns) + ")"
@@ -99,10 +101,18 @@ def _readback(path: Path, entry: ExportEntry) -> tuple[str, int]:
         raise ExportError("export.byte_order_mark_present", entry.export_name)
     if b"\r" in payload:
         raise ExportError("export.carriage_return_present", entry.export_name)
-    lines = text.splitlines()
-    if not lines or tuple(lines[0].split(",")) != entry.columns:
-        raise ExportError("export.header_mismatch", entry.export_name)
-    return _hash_file(path), len(lines) - 1
+    try:
+        rows = csv.reader(io.StringIO(text, newline=""), strict=True)
+        if tuple(next(rows, ())) != entry.columns:
+            raise ExportError("export.header_mismatch", entry.export_name)
+        row_count = 0
+        for row in rows:
+            if len(row) != len(entry.columns):
+                raise ExportError("export.row_arity_mismatch", entry.export_name)
+            row_count += 1
+        return _hash_file(path), row_count
+    except (OSError, csv.Error) as exc:
+        raise ExportError("export.readback_failed", entry.export_name) from exc
 
 
 def _normalize_header(path: Path, entry: ExportEntry) -> None:
@@ -133,21 +143,26 @@ def export_all(
     """Export every allowlisted relation through one fixed, inert COPY path."""
 
     root = Path(staging_dir)
-    if root.exists() and any(root.iterdir()):
-        raise ExportError("export.staging_not_empty")
     export_dir = root / _EXPORT_SUBDIR
     try:
+        if export_dir.exists() and any(export_dir.iterdir()):
+            raise ExportError("export.staging_not_empty")
         export_dir.mkdir(parents=True, exist_ok=True)
         connection = duckdb.connect(str(duckdb_path), read_only=True)
     except (OSError, duckdb.Error) as exc:
         raise ExportError("export.copy_failed") from exc
 
     staged: list[StagedExport] = []
+    written: list[Path] = []
     try:
-        for entry in allowlist.exports:
+        entries = sorted(allowlist.exports, key=lambda entry: entry.export_name)
+        # Resolve every projection before writing the first file, so a late
+        # missing column cannot leave a superficially successful partial set.
+        projections = [(entry, _varchar_columns(connection, entry)) for entry in entries]
+        for entry, varchar_columns in projections:
             destination = export_dir / entry.file_name
+            written.append(destination)
             try:
-                varchar_columns = _varchar_columns(connection, entry)
                 connection.execute(_copy_statement(entry, destination, varchar_columns))
             except ExportError:
                 raise
@@ -164,6 +179,15 @@ def export_all(
                     row_count=row_count,
                 )
             )
+    except ExportError:
+        for path in written:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                # The original safe failure still blocks publication; a future
+                # attempt refuses the occupied directory if cleanup is denied.
+                pass
+        raise
     finally:
         connection.close()
     return tuple(staged)
