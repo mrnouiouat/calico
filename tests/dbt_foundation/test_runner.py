@@ -187,6 +187,47 @@ class FixtureModeBuildTests(RunnerTestCase):
         self.assertGreater(proof.verified_object_count, 0)
         self.assertGreater(proof.dbt_model_count, 0)
 
+    def test_export_hook_receives_live_duckdb_before_cleanup(self) -> None:
+        captured: dict[str, Path] = {}
+
+        def export(duckdb_path: Path) -> None:
+            import duckdb
+
+            captured["duckdb_path"] = duckdb_path
+            self.assertTrue(duckdb_path.is_file())
+            connection = duckdb.connect(str(duckdb_path), read_only=True)
+            try:
+                self.assertGreater(
+                    connection.execute("select count(*) from runtime_input.revision_catalog").fetchone()[0],
+                    0,
+                )
+            finally:
+                connection.close()
+
+        outcome = runner.build(
+            mode="fixture", export=export, _dbt_project_dir_override=self.project_dir
+        )
+        self.assertEqual(outcome.status, "success", outcome.category)
+        self.assertFalse(captured["duckdb_path"].exists())
+
+    def test_export_hook_exception_fails_closed(self) -> None:
+        def export(_duckdb_path: Path) -> None:
+            raise RuntimeError("private detail")
+
+        outcome = runner.build(
+            mode="fixture", export=export, _dbt_project_dir_override=self.project_dir
+        )
+        self.assertEqual(outcome.status, "failed")
+        self.assertEqual(outcome.category, "runner.export_hook_failed")
+        self.assertIsNone(outcome.proof)
+
+    def test_export_none_preserves_default_build_behavior(self) -> None:
+        outcome = runner.build(
+            mode="fixture", export=None, _dbt_project_dir_override=self.project_dir
+        )
+        self.assertEqual(outcome.status, "success", outcome.category)
+        self.assertIsNotNone(outcome.proof)
+
     def test_proof_json_is_closed_and_value_free(self) -> None:
         outcome = runner.build(mode="fixture", _dbt_project_dir_override=self.project_dir)
         document = json.loads(outcome.proof.to_json())

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "allowlist_version": "publication-exports-v1",
+  "exports": [
+    {
+      "export_name": "dim_public_organizations",
+      "export_class": "named_history",
+      "source_relation": "dim_public_organizations",
+      "columns": [
+        "state_charity_registration_number",
+        "organization_name",
+        "city",
+        "state",
+        "latest_source_reported_status",
+        "latest_observed_as_of_date",
+        "latest_observed_release_revision",
+        "official_verification_instructions"
+      ],
+      "grain": ["state_charity_registration_number"],
+      "measures": [],
+      "file_name": "dim_public_organizations.csv",
+      "dialect": "calico-csv-v1"
+    },
+    {
+      "export_name": "mart_registry_population_coverage",
+      "export_class": "aggregate",
+      "source_relation": "mart_registry_population_coverage",
+      "columns": [
+        "as_of_date",
+        "release_revision",
+        "revision_fingerprint",
+        "source_list",
+        "source_reported_registry_status",
+        "coverage_class",
+        "record_count"
+      ],
+      "grain": [
+        "as_of_date",
+        "release_revision",
+        "revision_fingerprint",
+        "source_list",
+        "source_reported_registry_status",
+        "coverage_class"
+      ],
+      "measures": ["record_count"],
+      "file_name": "mart_registry_population_coverage.csv",
+      "dialect": "calico-csv-v1"
+    }
+  ]
+}

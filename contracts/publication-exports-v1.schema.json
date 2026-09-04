@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calico.internal/contracts/publication-exports-v1.schema.json",
+  "title": "Calico publication export allowlist (v1)",
+  "description": "The sole closed authority for approved publication exports under D-01, with D-03 aggregate boundaries, D-04 enforced grains, and D-05 export classes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "allowlist_version", "exports"],
+  "properties": {
+    "schema_version": {"const": 1, "description": "The closed document schema version."},
+    "allowlist_version": {"const": "publication-exports-v1", "description": "The stable publication authority identifier."},
+    "exports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/export_entry"}, "description": "Every approved export, sorted by export name."}
+  },
+  "$defs": {
+    "export_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["export_name", "export_class", "source_relation", "columns", "grain", "measures", "file_name", "dialect"],
+      "properties": {
+        "export_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The stable public export name."},
+        "export_class": {"enum": ["aggregate", "named_history"], "description": "The closed class selecting the applicable boundary rules."},
+        "source_relation": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The one existing dbt relation serialized by this export."},
+        "columns": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "The exact ordered positive public column projection; order is significant."},
+        "grain": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "The exact key columns whose uniqueness the gate proves."},
+        "measures": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "Aggregate measure columns; empty for named history."},
+        "file_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*\\.csv$", "description": "The fixed publication CSV file name."},
+        "dialect": {"const": "calico-csv-v1", "description": "The one deterministic UTF-8 CSV dialect."}
+      }
+    }
+  }
+}

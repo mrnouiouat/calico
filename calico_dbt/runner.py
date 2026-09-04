@@ -690,6 +690,7 @@ def build(
     proof_output: bool = False,
     fixture_store_factory: Callable[[], AbstractContextManager] | None = None,
     inspector: Callable[["FixtureBuildInspection"], None] | None = None,
+    export: Callable[[Path], None] | None = None,
     _dbt_project_dir_override: str | Path | None = None,
 ) -> BuildOutcome:
     """Prepare verified input and run one full pinned dbt build for `mode`.
@@ -705,6 +706,9 @@ def build(
     seams -- `fixture_store_factory` defaults to Plan 01's
     `gate_b_fixture_store` and is never exposed by the CLI; `inspector` is
     rejected outright in real mode and is never invoked when dbt fails.
+    `export`, when supplied, is permitted in both modes and receives the
+    built DuckDB path after dbt and its tests succeed but before the
+    runner-owned temporary root is removed.
     `_dbt_project_dir_override` exists solely so this module's own test
     suite can exercise real dbt subprocess behavior before the wave-3
     product project exists; it is never a CLI option and production
@@ -793,6 +797,14 @@ def build(
                 except Exception as exc:  # noqa: BLE001 -- fixed safe category only
                     return BuildOutcome(
                         status="failed", category="runner.fixture_inspection_failed", proof=None
+                    )
+
+            if export is not None:
+                try:
+                    export(binding.duckdb_path)
+                except Exception as exc:  # noqa: BLE001 -- fixed safe category only
+                    return BuildOutcome(
+                        status="failed", category="runner.export_hook_failed", proof=None
                     )
 
             proof = SafeBuildProof(

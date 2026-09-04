@@ -15,3 +15,10 @@ tests/fixtures/landing/**/*.csv -text -diff
 # above (Plan 02-08), surfaced here by Plan 04-06's Task 3 full-suite run
 # (04-06-PLAN.md).
 docs/ag-registry-migration-2026-08.md -text
+
+# Publication CSV and manifest fixtures are byte-exact determinism inputs.
+# This prevents the same checkout-time newline rewrite already guarded for
+# landing CSV fixtures and the redacted migration document; D-07 depends on
+# identical bytes across platforms and core.autocrlf settings.
+tests/fixtures/publish/**/*.csv -text -diff
+tests/fixtures/publish/**/*.json -text -diff
