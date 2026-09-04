@@ -322,6 +322,109 @@ class NoNewReleaseEqualityAndRetryTests(unittest.TestCase):
         self.assertEqual(len(build_spy.calls), 1)
 
 
+class DefaultRestoreDiscoveryTests(unittest.TestCase):
+    """Proves the real production default restore-before-capture boundary
+    (`_restore_before_capture` / `calico_capture.restore.
+    restore_latest_known_transaction`) correctly restores prior archived
+    history across two separate, real `capture()` calls sharing one
+    `FakeArchive` -- unlike every other test in this module, neither call
+    below injects a `restore=` override (2026-09-03 code review, CR-01 fix:
+    production `capture()` previously never restored prior history at all,
+    so a same-date `no_new_release` could never fire and every accepted
+    capture was always assigned `release_revision=1`)."""
+
+    def test_second_capture_same_content_is_no_new_release_via_default_restore(
+        self,
+    ) -> None:
+        with _status_contract_compliant_candidate() as candidate:
+            archive = FakeArchive()
+
+            first_status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: candidate.root,
+                build=_BuildSpy(succeeds=True),
+                sleeper=_RecordingSleeper(),
+            )
+            self.assertEqual(first_status.outcome, "accepted")
+            self.assertEqual(first_status.last_accepted_release_revision, 1)
+
+            second_build_spy = _BuildSpy(succeeds=True)
+            second_status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: candidate.root,
+                build=second_build_spy,
+                clock=_fixed_clock(_CURRENT_DATE_CLOCK_TIMESTAMP),
+                sleeper=_RecordingSleeper(),
+            )
+
+        self.assertEqual(second_status.outcome, "no_new_release")
+        self.assertEqual(second_status.reason_category, "source_not_advanced")
+        self.assertEqual(second_status.last_accepted_as_of_date, _BASELINE_AS_OF_DATE)
+        self.assertEqual(second_status.last_accepted_release_revision, 1)
+        self.assertEqual(len(second_build_spy.calls), 0)
+
+    def test_second_capture_different_content_allocates_revision_two_via_default_restore(
+        self,
+    ) -> None:
+        with _status_contract_compliant_candidate() as seed_candidate, \
+                _status_contract_compliant_same_date_revision() as revised_candidate:
+            archive = FakeArchive()
+
+            first_status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: seed_candidate.root,
+                build=_BuildSpy(succeeds=True),
+                sleeper=_RecordingSleeper(),
+            )
+            self.assertEqual(first_status.outcome, "accepted")
+            self.assertEqual(first_status.last_accepted_release_revision, 1)
+
+            second_build_spy = _BuildSpy(succeeds=True)
+            second_status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: revised_candidate.root,
+                build=second_build_spy,
+                clock=_fixed_clock(_CURRENT_DATE_CLOCK_TIMESTAMP),
+                sleeper=_RecordingSleeper(),
+            )
+
+        self.assertEqual(second_status.outcome, "accepted")
+        self.assertEqual(second_status.reason_category, "none")
+        self.assertEqual(second_status.last_accepted_as_of_date, _BASELINE_AS_OF_DATE)
+        self.assertEqual(second_status.last_accepted_release_revision, 2)
+        self.assertEqual(len(second_build_spy.calls), 1)
+
+    def test_first_ever_capture_bootstraps_from_an_empty_layout_via_default_restore(
+        self,
+    ) -> None:
+        """No prior transaction exists yet (a brand new archive) -- the
+        default restore boundary must fall back to establishing an empty
+        store layout exactly like the pre-fix stub always did for this
+        case, never fail closed just because there is nothing to
+        discover."""
+
+        with _status_contract_compliant_candidate() as candidate:
+            archive = FakeArchive()
+            self.assertEqual(
+                archive.list_versions("archive/v1/latest-transaction-pointer.json"), ()
+            )
+
+            status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: candidate.root,
+                build=_BuildSpy(succeeds=True),
+                sleeper=_RecordingSleeper(),
+            )
+
+        self.assertEqual(status.outcome, "accepted")
+        self.assertEqual(status.last_accepted_release_revision, 1)
+
+
 class SourceTransferFailureRetryTests(unittest.TestCase):
     """`replay-v1.json` scenarios:
     transient_source_transfer_failure_then_accepted,

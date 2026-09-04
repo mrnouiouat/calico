@@ -22,6 +22,24 @@ absolute caller path -- every failure crosses its boundary as one fixed
 safe `ArchiveError` category (mirrors `calico_landing.store.StoreError`'s
 non-echo discipline). It never deletes, hides, or overwrites an existing
 archive object (COVERAGE.md explicit opt-outs 1/2/3).
+
+`read_latest_transaction_pointer` reads (and `synchronize_verified_transaction`
+maintains) one additional fixed, well-known object --
+`archive/v1/latest-transaction-pointer.json`, matching
+`contracts/latest-transaction-pointer-v1.schema.json` -- recording the safe
+release identity of the most recently synchronized transaction (2026-09-03
+code review, CR-01). The Archive protocol has no prefix-listing capability by
+design, so a caller with no local state (a fresh `capture()` working store)
+has no other way to discover which transaction, if any, was archived last;
+this fixed key is the one deliberately mutable exception to this module's
+otherwise strictly immutable, content-addressed key space, and is itself
+still append-only -- every write is a brand new provider-kept version, never
+a delete/hide/overwrite of a prior one. It is advanced only forward (never
+regressed by an out-of-order synchronize call, e.g. a historical `seed`
+backfill) and is never the source of truth for any individual transaction's
+own validity -- that always remains the transaction's own read-back-verified
+manifest; the pointer is purely a best-effort discovery accelerator for
+`calico_capture.restore.restore_latest_known_transaction`.
 """
 
 from __future__ import annotations
@@ -63,6 +81,20 @@ _TRANSACTION_MANIFEST_KEYS = frozenset(
 )
 
 _SHA256_PATTERN_LENGTH = 64
+
+#: Fixed, well-known discovery pointer key (CR-01 fix) -- deliberately
+#: *not* under `_STORE_PREFIX` or `_TRANSACTIONS_PREFIX`, so it can never
+#: collide with any content-object or transaction-manifest key pattern.
+_LATEST_TRANSACTION_POINTER_KEY = f"{_ARCHIVE_PREFIX}/latest-transaction-pointer.json"
+
+_LATEST_POINTER_SCHEMA_VERSION = 1
+
+#: Closed key set for the pointer document -- the same safe release
+#: identity fields `ArchiveTransaction`/the transaction manifest already
+#: carry, nothing else.
+_LATEST_POINTER_KEYS = frozenset(
+    {"schema_version", "as_of_date", "release_revision", "revision_fingerprint"}
+)
 
 
 class ArchiveError(Exception):
@@ -240,6 +272,150 @@ def _validate_transaction_manifest_document(document: object) -> None:
         raise ArchiveError("archive.malformed_transaction_manifest")
 
 
+def _validate_latest_pointer_document(document: object) -> dict[str, object]:
+    """Closed-schema validation for the discovery pointer document -- the
+    same safe release-identity field checks
+    `_validate_transaction_manifest_document` already applies to the
+    equivalent transaction-manifest fields.
+    """
+
+    if not isinstance(document, dict) or set(document.keys()) != _LATEST_POINTER_KEYS:
+        raise ArchiveError("archive.malformed_latest_pointer")
+    if document.get("schema_version") != _LATEST_POINTER_SCHEMA_VERSION:
+        raise ArchiveError("archive.malformed_latest_pointer")
+
+    as_of_date = document.get("as_of_date")
+    if not isinstance(as_of_date, str) or not as_of_date:
+        raise ArchiveError("archive.malformed_latest_pointer")
+
+    release_revision = document.get("release_revision")
+    if (
+        not isinstance(release_revision, int)
+        or isinstance(release_revision, bool)
+        or release_revision < 1
+    ):
+        raise ArchiveError("archive.malformed_latest_pointer")
+
+    revision_fingerprint = document.get("revision_fingerprint")
+    if (
+        not isinstance(revision_fingerprint, str)
+        or len(revision_fingerprint) != _SHA256_PATTERN_LENGTH
+    ):
+        raise ArchiveError("archive.malformed_latest_pointer")
+
+    return document
+
+
+def read_latest_transaction_pointer(archive: Archive) -> dict[str, object] | None:
+    """Read the fixed, well-known discovery pointer (CR-01 fix; module
+    docstring), if one has ever been written.
+
+    Returns `None` if the pointer key has never been written -- the
+    correct, safe signal for a genuinely first-ever transaction into a
+    never-before-archived history (a caller restoring before capture must
+    treat this identically to "nothing to restore", never as a failure).
+    Returns the closed-schema-validated pointer document (a plain `dict`
+    with `as_of_date`/`release_revision`/`revision_fingerprint`) otherwise.
+
+    Ignores any non-`"upload"` version at the pointer key (this module
+    never writes a hide marker or leaves an unfinished upload there) and
+    resolves to the newest remaining `"upload"` version, matching
+    `list_versions`'s documented oldest-first ordering.
+
+    Raises `ArchiveError` on any list/read failure or malformed document --
+    never partially trusts a corrupted or unexpected pointer shape.
+    """
+
+    versions = archive.list_versions(_LATEST_TRANSACTION_POINTER_KEY)
+    uploads = [version for version in versions if version.action == "upload"]
+    if not uploads:
+        return None
+
+    newest = uploads[-1]
+    raw_bytes = archive.get_object(_LATEST_TRANSACTION_POINTER_KEY, version_id=newest.version_id)
+    try:
+        document = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ArchiveError("archive.malformed_latest_pointer") from exc
+
+    return _validate_latest_pointer_document(document)
+
+
+def _advance_latest_transaction_pointer(
+    archive: Archive,
+    *,
+    as_of_date: str,
+    release_revision: int,
+    revision_fingerprint: str,
+) -> None:
+    """Best-effort-safe advance of the fixed discovery pointer to
+    `(as_of_date, release_revision, revision_fingerprint)` -- called only
+    after `synchronize_verified_transaction`'s own transaction manifest has
+    already been written and read-back verified (module docstring; never
+    before, so the pointer can never name a transaction that turns out not
+    to exist).
+
+    A no-op if the pointer already names an identity whose
+    `(as_of_date, release_revision)` is greater than or equal to this
+    call's own identity -- an out-of-order synchronize call (e.g. a
+    historical `seed` backfill, or an exact idempotent replay) never
+    regresses or redundantly rewrites the pointer. ISO `YYYY-MM-DD` dates
+    compare correctly as plain strings, so no date parsing is needed.
+
+    Raises `ArchiveError` on any list/write/read/verification failure.
+    Because this call happens only after the transaction's own manifest is
+    already durably written, a failure here fails the whole enclosing
+    `synchronize_verified_transaction` call closed (matching every other
+    write step in that function) but never leaves the just-written
+    transaction itself invalid -- a retried `synchronize_verified_transaction`
+    call for the same identity is fully idempotent (every content object and
+    the manifest are already byte-identical no-ops) and only needs this
+    pointer-advance step to succeed.
+    """
+
+    current = read_latest_transaction_pointer(archive)
+    new_key = (as_of_date, release_revision)
+    if current is not None:
+        current_key = (current["as_of_date"], current["release_revision"])
+        if new_key <= current_key:
+            return
+
+    pointer_document = {
+        "schema_version": _LATEST_POINTER_SCHEMA_VERSION,
+        "as_of_date": as_of_date,
+        "release_revision": release_revision,
+        "revision_fingerprint": revision_fingerprint,
+    }
+    pointer_bytes = json.dumps(
+        pointer_document, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+
+    archive.put_object(_LATEST_TRANSACTION_POINTER_KEY, pointer_bytes)
+
+    # Read-back verification (Pattern 6), adapted for an append-only key: a
+    # concurrent writer could in principle advance the pointer again between
+    # our own `put_object` and this `list_versions` call, in which case the
+    # newest version would no longer be the one this call just wrote --
+    # this is an accepted, documented limitation of a best-effort discovery
+    # accelerator (module docstring), never the source of truth for any
+    # individual transaction's own validity.
+    uploads = [
+        version
+        for version in archive.list_versions(_LATEST_TRANSACTION_POINTER_KEY)
+        if version.action == "upload"
+    ]
+    if (
+        not uploads
+        or uploads[-1].content_length != len(pointer_bytes)
+        or uploads[-1].sha256 != _sha256_bytes(pointer_bytes)
+    ):
+        raise ArchiveError("archive.latest_pointer_write_verification_failed")
+
+    readback = archive.get_object(_LATEST_TRANSACTION_POINTER_KEY, version_id=uploads[-1].version_id)
+    if readback != pointer_bytes:
+        raise ArchiveError("archive.latest_pointer_readback_mismatch")
+
+
 def synchronize_verified_transaction(
     archive: Archive, store_root: str | Path, result: AdmissionResult
 ) -> ArchiveTransaction:
@@ -327,6 +503,17 @@ def synchronize_verified_transaction(
         raise ArchiveError("archive.malformed_transaction_manifest") from exc
     _validate_transaction_manifest_document(readback_document)
 
+    # Only after the transaction manifest itself is durably written and
+    # read-back verified -- never before -- advance the fixed discovery
+    # pointer (CR-01 fix; module docstring) so a caller with no local state
+    # can find this transaction on a later, separate `capture()` call.
+    _advance_latest_transaction_pointer(
+        archive,
+        as_of_date=result.as_of_date,
+        release_revision=result.release_revision,
+        revision_fingerprint=result.revision_fingerprint,
+    )
+
     return ArchiveTransaction(
         transaction_id=transaction_id,
         as_of_date=result.as_of_date,
@@ -341,5 +528,6 @@ __all__ = [
     "ArchiveError",
     "ArchiveObjectVersion",
     "ArchiveTransaction",
+    "read_latest_transaction_pointer",
     "synchronize_verified_transaction",
 ]

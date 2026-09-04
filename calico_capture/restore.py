@@ -31,6 +31,23 @@ Every failure crosses this module's boundary as a `RestoreError` carrying
 only a fixed safe `category` -- never an offending key, path, byte, or
 provider exception text (mirrors `calico_capture.archive.ArchiveError`'s
 non-echo discipline).
+
+`restore_latest_known_transaction` is the actual production restore-before-
+capture boundary `calico_capture.orchestrator.capture()` now wires by
+default (2026-09-03 code review, CR-01 fix): it discovers the single most
+recently archived transaction, if any, via
+`calico_capture.archive.read_latest_transaction_pointer` and restores only
+that one transaction with `restore_verified_transaction`. Only the single
+latest transaction is restored, not the full historical catalog --
+`calico_landing.admission.admit()`'s own `no_new_release`/next-revision-
+number decision (`calico_landing.store.commit_revision`) only ever inspects
+the current attempt's expected `as_of_date` and the promotion pointer
+snapshot, both of which the latest transaction's own restored
+`promoted-releases.json` already carries, so restoring every earlier date's
+history is unnecessary for that comparison to be correct. A caller needing
+the *complete* historical catalog restored (e.g. a from-scratch warehouse
+rebuild) uses `calico_capture.cli`'s separate `restore-build` operator
+command instead, which loops every catalog anchor explicitly.
 """
 
 from __future__ import annotations
@@ -42,7 +59,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from calico_capture.archive import Archive, ArchiveError
+from calico_capture.archive import Archive, ArchiveError, read_latest_transaction_pointer
 from calico_landing.store import StoreError, ensure_store_layout
 
 #: Fixed versioned archive prefix and object families -- must match
@@ -368,9 +385,63 @@ def restore_verified_transaction(
     )
 
 
+def restore_latest_known_transaction(
+    archive: Archive,
+    destination_root: str | Path,
+    *,
+    build: BuildFn | None = None,
+) -> RestoredTransaction | None:
+    """Restore the single most recently archived transaction, if any, into
+    `destination_root` (CR-01 fix; module docstring) -- the real production
+    restore-before-capture boundary
+    `calico_capture.orchestrator.capture()` now wires by default.
+
+    Discovers the latest transaction via
+    `calico_capture.archive.read_latest_transaction_pointer` -- the fixed,
+    well-known discovery pointer every `synchronize_verified_transaction`
+    call maintains -- rather than looping the full historical catalog: see
+    the module docstring for why restoring only the single latest
+    transaction is sufficient for `calico_landing.admission.admit()`'s own
+    revision-sequencing/`no_new_release` comparison to be correct.
+
+    Returns `None` -- and still leaves `destination_root` an established
+    (still empty) store layout, exactly like a plain `ensure_store_layout`
+    call -- if no transaction has ever been archived (a genuinely
+    first-ever capture into a never-before-archived history). Otherwise
+    restores that one transaction with `restore_verified_transaction` and
+    returns its `RestoredTransaction`.
+
+    Raises `RestoreError` on any pointer-discovery or restore failure --
+    never partially materializes `destination_root` (the same guarantee
+    `restore_verified_transaction` itself already provides).
+    """
+
+    try:
+        pointer = read_latest_transaction_pointer(archive)
+    except ArchiveError as exc:
+        raise RestoreError("restore.latest_pointer_read_failed") from exc
+
+    if pointer is None:
+        try:
+            ensure_store_layout(destination_root)
+        except StoreError as exc:
+            raise RestoreError("restore.invalid_destination_root") from exc
+        return None
+
+    return restore_verified_transaction(
+        archive,
+        destination_root,
+        as_of_date=pointer["as_of_date"],
+        release_revision=pointer["release_revision"],
+        revision_fingerprint=pointer["revision_fingerprint"],
+        build=build,
+    )
+
+
 __all__ = [
     "BuildFn",
     "RestoreError",
     "RestoredTransaction",
+    "restore_latest_known_transaction",
     "restore_verified_transaction",
 ]

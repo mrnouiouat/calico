@@ -18,7 +18,11 @@ import unittest
 from pathlib import Path
 
 from calico_capture import archive as archive_module
-from calico_capture.archive import ArchiveError, synchronize_verified_transaction
+from calico_capture.archive import (
+    ArchiveError,
+    read_latest_transaction_pointer,
+    synchronize_verified_transaction,
+)
 from calico_landing.admission import admit
 from calico_landing.result import AdmissionResult
 from tests.capture.fakes import FakeArchive
@@ -327,6 +331,101 @@ class SynchronizeTransactionTests(unittest.TestCase):
                     synchronize_verified_transaction(archive, store_root, bad_result)
                 self.assertEqual(ctx.exception.category, "archive.invalid_result_status")
         self.assertEqual(archive.all_keys(), ())
+
+
+class LatestTransactionPointerTests(unittest.TestCase):
+    """CR-01 fix (2026-09-03 code review): the fixed, well-known discovery
+    pointer `synchronize_verified_transaction` maintains and
+    `read_latest_transaction_pointer` reads, so a caller with no local
+    state can discover the most recently archived transaction."""
+
+    def test_no_pointer_yet_returns_none(self) -> None:
+        archive = FakeArchive()
+        self.assertIsNone(read_latest_transaction_pointer(archive))
+
+    def test_synchronize_advances_the_pointer_to_the_new_identity(self) -> None:
+        store_root, result, store_tmp = _admit_baseline_into_fresh_store()
+        try:
+            archive = FakeArchive()
+            synchronize_verified_transaction(archive, store_root, result)
+
+            pointer = read_latest_transaction_pointer(archive)
+
+            self.assertIsNotNone(pointer)
+            self.assertEqual(pointer["as_of_date"], result.as_of_date)
+            self.assertEqual(pointer["release_revision"], result.release_revision)
+            self.assertEqual(pointer["revision_fingerprint"], result.revision_fingerprint)
+        finally:
+            store_tmp.cleanup()
+
+    def test_pointer_write_happens_strictly_after_the_manifest(self) -> None:
+        store_root, result, store_tmp = _admit_baseline_into_fresh_store()
+        try:
+            archive = FakeArchive()
+            transaction = synchronize_verified_transaction(archive, store_root, result)
+
+            manifest_write_order = int(
+                archive.list_versions(transaction.manifest_key)[0].version_id[1:]
+            )
+            pointer_write_order = int(
+                archive.list_versions("archive/v1/latest-transaction-pointer.json")[0].version_id[
+                    1:
+                ]
+            )
+            self.assertLess(manifest_write_order, pointer_write_order)
+        finally:
+            store_tmp.cleanup()
+
+    def test_idempotent_replay_does_not_grow_the_pointer_history(self) -> None:
+        store_root, result, store_tmp = _admit_baseline_into_fresh_store()
+        try:
+            archive = FakeArchive()
+            synchronize_verified_transaction(archive, store_root, result)
+            synchronize_verified_transaction(archive, store_root, result)
+
+            self.assertEqual(archive.version_count("archive/v1/latest-transaction-pointer.json"), 1)
+        finally:
+            store_tmp.cleanup()
+
+    def test_out_of_order_synchronize_never_regresses_the_pointer(self) -> None:
+        archive = FakeArchive()
+
+        newer_result = AdmissionResult.accepted("2020-06-01", 1, "a" * 64)
+        older_result = AdmissionResult.accepted("2020-01-15", 1, "b" * 64)
+
+        with tempfile.TemporaryDirectory(prefix="calico-archive-test-newer-") as newer_name:
+            newer_root = Path(newer_name).resolve()
+            revision_dir = (
+                newer_root / "releases" / newer_result.as_of_date / "rev-0001-aaaaaaaa"
+            )
+            revision_dir.mkdir(parents=True)
+            (revision_dir / "manifest.json").write_bytes(b"{}")
+            (newer_root / "promoted-releases.json").write_bytes(b"{}")
+            synchronize_verified_transaction(archive, newer_root, newer_result)
+
+        with tempfile.TemporaryDirectory(prefix="calico-archive-test-older-") as older_name:
+            older_root = Path(older_name).resolve()
+            revision_dir = (
+                older_root / "releases" / older_result.as_of_date / "rev-0001-bbbbbbbb"
+            )
+            revision_dir.mkdir(parents=True)
+            (revision_dir / "manifest.json").write_bytes(b"{}")
+            (older_root / "promoted-releases.json").write_bytes(b"{}")
+            synchronize_verified_transaction(archive, older_root, older_result)
+
+        pointer = read_latest_transaction_pointer(archive)
+        self.assertEqual(pointer["as_of_date"], newer_result.as_of_date)
+        self.assertEqual(archive.version_count("archive/v1/latest-transaction-pointer.json"), 1)
+
+    def test_malformed_pointer_document_is_a_closed_category(self) -> None:
+        archive = FakeArchive()
+        archive.put_object(
+            "archive/v1/latest-transaction-pointer.json", b'{"not": "a valid pointer"}'
+        )
+
+        with self.assertRaises(ArchiveError) as ctx:
+            read_latest_transaction_pointer(archive)
+        self.assertEqual(ctx.exception.category, "archive.malformed_latest_pointer")
 
 
 class TransactionManifestValidationTests(unittest.TestCase):

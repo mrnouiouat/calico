@@ -35,6 +35,15 @@ from tests.fixtures.landing.fixture_builder import MANIFEST_FILENAME, MutatedCan
 #: landing test suite.
 _BASELINE_AS_OF_DATE = "2020-01-15"
 
+#: A clock reporting exactly the baseline candidate's own As-of Date --
+#: makes a `no_new_release` result against the baseline candidate a
+#: *current*-date (idempotent, single-attempt, no real sleep) result rather
+#: than a *prior*-date result the D-05 retry loop would otherwise treat as
+#: "the source has not yet republished today" and retry against a real
+#: `time.sleep`-backed default sleeper (mirrors
+#: `tests.capture.test_orchestrator._CURRENT_DATE_CLOCK_TIMESTAMP` exactly).
+_CURRENT_DATE_CLOCK_TIMESTAMP = f"{_BASELINE_AS_OF_DATE}T17:17:00.000Z"
+
 
 def _recompute_content_length(candidate_root: Path) -> None:
     """Resynchronize a mutated candidate's manifest `content_length`
@@ -149,10 +158,17 @@ class TracerAcceptedPathTests(unittest.TestCase):
         self.assertNotIn("Temp", serialized)
 
     def test_replaying_the_same_accepted_candidate_is_idempotent(self) -> None:
-        """A second capture() call against a fresh store with the exact same
-        identity-free candidate re-admits as `no_new_release` against its own
-        fresh store (each `capture()` call restores into a brand-new
-        external store in this plan's skeleton), and its own archive
+        """A second `capture()` call with the exact same identity-free
+        candidate correctly re-admits as `no_new_release` -- proving the
+        real default restore-before-capture boundary
+        (`calico_capture.orchestrator._restore_before_capture` /
+        `calico_capture.restore.restore_latest_known_transaction`, CR-01
+        fix) actually restores the first call's already-archived
+        transaction into the second call's own fresh store before
+        admission runs, rather than always presenting `admit()` with an
+        empty store (which would silently re-admit as a spurious
+        `accepted` revision 1 every time, exactly the bug CR-01 fixed).
+        Neither call injects a `restore=` override. Its own archive
         synchronization is itself byte-verified idempotent against the
         first call's already-written transaction when replayed against the
         same archive instance.
@@ -166,23 +182,35 @@ class TracerAcceptedPathTests(unittest.TestCase):
                 archive=archive,
                 fetch_candidate=lambda: candidate.root,
                 build=_BuildSpy(succeeds=True),
+                clock=lambda: _CURRENT_DATE_CLOCK_TIMESTAMP,
             )
             self.assertEqual(first.outcome, "accepted")
+            self.assertEqual(first.last_accepted_release_revision, 1)
             keys_after_first = archive.all_keys()
 
+            second_build_spy = _BuildSpy(succeeds=True)
             second = capture(
                 trigger="local",
                 archive=archive,
                 fetch_candidate=lambda: candidate.root,
-                build=_BuildSpy(succeeds=True),
+                build=second_build_spy,
+                clock=lambda: _CURRENT_DATE_CLOCK_TIMESTAMP,
             )
 
-        # The second call's own fresh store also admits the identical
-        # candidate as revision 1 for that store, so its own
-        # synchronize_verified_transaction resolves to the exact same
-        # archive keys as the first call and is a byte-verified no-op
-        # against them -- no new or different keys ever appear.
-        self.assertEqual(second.outcome, "accepted")
+        # The second call's default restore discovers and restores the
+        # first call's already-archived transaction, so admission correctly
+        # observes the same content already promoted for the same date and
+        # reports no_new_release -- not a second, spuriously-numbered
+        # revision 1. Its own synchronize_verified_transaction resolves to
+        # the exact same archive keys as the first call and is a
+        # byte-verified no-op against them -- no new or different keys ever
+        # appear, and the real build boundary is never invoked (build only
+        # ever runs for a genuinely accepted outcome).
+        self.assertEqual(second.outcome, "no_new_release")
+        self.assertEqual(second.reason_category, "source_not_advanced")
+        self.assertEqual(second.last_accepted_as_of_date, _BASELINE_AS_OF_DATE)
+        self.assertEqual(second.last_accepted_release_revision, 1)
+        self.assertEqual(len(second_build_spy.calls), 0)
         self.assertEqual(archive.all_keys(), keys_after_first)
         for key in keys_after_first:
             self.assertEqual(archive.version_count(key), 1)

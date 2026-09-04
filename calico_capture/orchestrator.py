@@ -22,13 +22,14 @@ the mandatory manual-recovery path (D-06).
 
 Every step follows 06-RESEARCH.md Pattern 2 ("Restore Before Capture,
 Archive Before Success"): establish a fresh external store, restore
-(`_restore_before_capture` still only establishes a fresh empty layout;
-`calico_capture.restore.restore_verified_transaction` now exists as a
-real, independently proven single-transaction restore-and-build primitive,
-06-03-PLAN.md Task 2, but looping it over every catalog-known transaction
-needs a catalog-aware caller a later plan's CLI wave supplies -- wiring
-that into this function's body is intentionally deferred, not this
-function's call site or signature), call the existing atomic
+(`_restore_before_capture` now restores the single most recently archived
+transaction, if any, via `calico_capture.restore.restore_latest_known_transaction`
+-- the real, independently proven single-transaction restore-and-build
+primitive 06-03-PLAN.md Task 2 built, finally wired into this production
+entry point by the 2026-09-03 code review's CR-01 fix; see that module's
+docstring for why restoring only the single latest transaction, not the
+full historical catalog, is sufficient for `admit()`'s own comparison to be
+correct), call the existing atomic
 `calico_landing.admission.admit()` with the
 closed status-vocabulary contract explicitly opted in, synchronize and
 read-back-verify the resulting transaction against the archive boundary
@@ -73,7 +74,6 @@ from calico_capture.status import CaptureStatus, project_safe_status
 from calico_landing.admission import admit, load_default_status_contract
 from calico_landing.attempts import utc_now_iso
 from calico_landing.result import AdmissionResult
-from calico_landing.store import ensure_store_layout
 
 #: A candidate fetcher supplies exactly what `calico_landing.admission.admit`
 #: accepts as `candidate_input` -- a directory containing `candidate-set.json`
@@ -103,13 +103,13 @@ Clock = Callable[[], str]
 #: real multi-hour wall-clock wait.
 Sleeper = Callable[[int], None]
 
-#: `_restore_before_capture`'s signature (below) -- injectable so tests can
+#: The single-argument boundary a caller may inject in place of the real
+#: default restore-before-capture step (below) -- injectable so tests can
 #: pre-populate a fresh store with an already-promoted revision before
-#: `capture()`'s own retry loop runs, the only way to exercise a genuine
-#: `no_new_release` outcome while this plan's restore step is still the
-#: fresh-empty-layout stub (06-01-SUMMARY.md Known Stubs; full
-#: archive-backed reconstruction is Plan 06-03's job). Production callers
-#: never pass this -- the default always wins outside tests.
+#: `capture()`'s own retry loop runs, without needing a real archive
+#: double wired through the discovery-pointer path the real default now
+#: uses (CR-01 fix). Production callers never pass this -- the default
+#: always wins outside tests.
 RestoreFn = Callable[[Path], None]
 
 #: Fixed D-05 bounded same-day retry policy: exactly three total domain
@@ -187,27 +187,55 @@ def is_capture_day(when: date, trigger: str) -> bool:
     return 1 <= when.day <= 7 or 15 <= when.day <= 21
 
 
-def _restore_before_capture(destination_root: Path) -> None:
-    """Establish a fresh, verified store layout before this call's own
-    admission attempt (Pattern 2, D-13).
+class _SkipBuildOutcome:
+    """A fixed, always-succeeded `BuildFn` result for the restore-before-
+    capture step (mirrors `calico_capture.cli._SkipBuildOutcome` exactly).
 
-    Full reconstruction of `destination_root` from every prior archived
-    transaction needs the committed real-mode input catalog
-    (`contracts/dbt-input-catalog-v1.json`) to know *which* transactions to
-    restore -- `calico_capture.restore.restore_verified_transaction`
-    (06-03-PLAN.md Task 2) is the real, independently proven primitive that
-    restores one such transaction given its release identity, but looping
-    it over the whole catalog is a catalog-aware caller's job, not this
-    single-argument function's. This call still performs the mandated
-    restore-before-capture ordering so the production entry point never
-    skips the step; for the very first capture into a never-before-archived
-    history the correct restored state genuinely is the empty, freshly laid
-    out store this establishes. A later plan extends this function's body
-    -- without changing its call site or signature -- to actually
-    repopulate `destination_root` from every existing archived transaction.
+    `restore_latest_known_transaction`/`restore_verified_transaction`
+    unconditionally invoke their own `build` boundary once per restored
+    transaction; running the real, expensive `calico_dbt` build again here
+    would be redundant work with no observable benefit -- this function's
+    caller (`capture()`, below) already invokes the one real build this
+    admission attempt needs, and only for a genuinely `accepted` outcome.
     """
 
-    ensure_store_layout(destination_root)
+    succeeded = True
+
+
+def _skip_build(_store_root: Path) -> object:
+    return _SkipBuildOutcome()
+
+
+def _restore_before_capture(archive: Archive, destination_root: Path) -> None:
+    """Restore the single most recently archived transaction, if any, into
+    `destination_root` before this call's own admission attempt (Pattern 2,
+    D-13; CR-01 fix, 2026-09-03 code review).
+
+    `calico_landing.admission.admit()`'s own `no_new_release`/next-
+    revision-number decision (`calico_landing.store.commit_revision`) only
+    ever inspects the current attempt's expected `as_of_date` and the
+    promotion pointer -- both of which the single latest archived
+    transaction's own restored `promoted-releases.json` already carries --
+    so restoring only that one transaction (via
+    `calico_capture.restore.restore_latest_known_transaction`, the real,
+    independently proven primitive 06-03-PLAN.md Task 2 built) is
+    sufficient for this comparison to be correct; looping the full
+    historical catalog is unnecessary here and remains a separate,
+    explicitly-invoked operator command (`calico_capture.cli`'s
+    `restore-build`). For the very first capture into a never-before-
+    archived history, `restore_latest_known_transaction` returns `None` and
+    only establishes the empty, freshly laid out store layout this function
+    has always established for that case.
+
+    The real `calico_dbt` build is deliberately never re-run during this
+    restore step (`build=_skip_build`) -- `capture()`'s own build step,
+    below, is the one real build this admission attempt needs, and only
+    for a genuinely `accepted` outcome.
+    """
+
+    from calico_capture.restore import restore_latest_known_transaction
+
+    restore_latest_known_transaction(archive, destination_root, build=_skip_build)
 
 
 def _reason_category_for(result: AdmissionResult) -> str:
@@ -265,10 +293,11 @@ def capture(
     mode="real", ...)` seam; tests inject a spy instead. `clock` defaults to
     the real UTC clock; tests inject a deterministic one. `sleeper` defaults
     to a real `time.sleep`-backed sleeper; tests inject a recording no-op.
-    `restore` defaults to the internal fresh-layout stub (`Known Stubs`,
-    06-01-SUMMARY.md); production callers never pass it, but tests may
-    inject a boundary that pre-populates the fresh store with an
-    already-promoted revision before the retry loop runs.
+    `restore` defaults to the internal `_restore_before_capture` boundary,
+    which restores the single most recently archived transaction (if any)
+    for `archive` (CR-01 fix; see that function's docstring); production
+    callers never pass it, but tests may inject a boundary that
+    pre-populates the fresh store differently before the retry loop runs.
 
     Per D-05, this call attempts `fetch_candidate()` + `admit()` up to
     `len(retry_delays)` times against the *same* restored store, sleeping
@@ -297,7 +326,11 @@ def capture(
         with tempfile.TemporaryDirectory(prefix="calico-capture-") as temp_name:
             destination_root = Path(temp_name).resolve()
 
-            restore_fn = restore if restore is not None else _restore_before_capture
+            restore_fn = (
+                restore
+                if restore is not None
+                else (lambda root: _restore_before_capture(archive, root))
+            )
             try:
                 restore_fn(destination_root)
             except CaptureError:

@@ -23,7 +23,11 @@ import unittest
 from pathlib import Path
 
 from calico_capture.archive import synchronize_verified_transaction
-from calico_capture.restore import RestoreError, restore_verified_transaction
+from calico_capture.restore import (
+    RestoreError,
+    restore_latest_known_transaction,
+    restore_verified_transaction,
+)
 from calico_landing.admission import admit
 from calico_landing.result import AdmissionResult
 from tests.capture.fakes import FakeArchive
@@ -162,6 +166,61 @@ class CompleteRestoreTests(unittest.TestCase):
                 self.assertEqual(before, after)
         finally:
             store_tmp.cleanup()
+
+
+class RestoreLatestKnownTransactionTests(unittest.TestCase):
+    """CR-01 fix (2026-09-03 code review): the real production restore-
+    before-capture boundary discovers and restores the single most
+    recently archived transaction via the fixed discovery pointer, rather
+    than requiring a caller to already know its identity."""
+
+    def test_no_prior_transaction_returns_none_and_establishes_empty_layout(self) -> None:
+        archive = FakeArchive()
+        with tempfile.TemporaryDirectory(prefix="calico-restore-dest-") as dest_name:
+            destination_root = Path(dest_name)
+
+            outcome = restore_latest_known_transaction(archive, destination_root)
+
+            self.assertIsNone(outcome)
+            self.assertTrue((destination_root / "releases").is_dir())
+            self.assertTrue((destination_root / ".staging").is_dir())
+            self.assertFalse((destination_root / "promoted-releases.json").exists())
+
+    def test_prior_transaction_is_discovered_and_restored(self) -> None:
+        archive, result, store_tmp = _synchronized_archive_and_result()
+        try:
+            with tempfile.TemporaryDirectory(prefix="calico-restore-dest-") as dest_name:
+                destination_root = Path(dest_name)
+                build_spy = _BuildSpy(succeeds=True)
+
+                outcome = restore_latest_known_transaction(
+                    archive, destination_root, build=build_spy
+                )
+
+                self.assertIsNotNone(outcome)
+                self.assertEqual(outcome.as_of_date, result.as_of_date)
+                self.assertEqual(outcome.release_revision, result.release_revision)
+                revision_dir = (
+                    destination_root
+                    / "releases"
+                    / result.as_of_date
+                    / f"rev-{result.release_revision:04d}-{result.revision_fingerprint[:8]}"
+                )
+                self.assertTrue((revision_dir / "manifest.json").is_file())
+                self.assertTrue((destination_root / "promoted-releases.json").is_file())
+                self.assertEqual(build_spy.calls, [destination_root.resolve()])
+        finally:
+            store_tmp.cleanup()
+
+    def test_malformed_pointer_fails_closed_with_a_dedicated_category(self) -> None:
+        archive = FakeArchive()
+        archive.put_object(
+            "archive/v1/latest-transaction-pointer.json", b'{"not": "a valid pointer"}'
+        )
+        with tempfile.TemporaryDirectory(prefix="calico-restore-dest-") as dest_name:
+            with self.assertRaises(RestoreError) as ctx:
+                restore_latest_known_transaction(archive, Path(dest_name))
+            self.assertEqual(ctx.exception.category, "restore.latest_pointer_read_failed")
 
 
 class MalformedAndUnknownManifestTests(unittest.TestCase):
