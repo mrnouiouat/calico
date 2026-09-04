@@ -764,6 +764,25 @@ class InspectRetentionPostureTests(unittest.TestCase):
 
         self.assertEqual(posture.lifecycle_category, "lifecycle_archive_deletion_rule_present")
 
+    def test_lifecycle_rule_scoped_to_a_sub_path_of_the_archive_prefix_is_unsafe(self) -> None:
+        """A rule prefixed more specifically than `archive/v1/` (e.g. a
+        single sub-directory of the archive's own store layout) still
+        covers real archived objects under that sub-path and must be
+        detected -- the inverted-comparison regression this test guards
+        against previously reported this as `lifecycle_no_archive_deletion_rule`
+        (2026-09-03 code review CR-02)."""
+
+        raw = _new_simulator()
+        sub_path_rule = {
+            "fileNamePrefix": "archive/v1/store/",
+            "daysFromHidingToDeleting": 30,
+        }
+        bucket = self._owner_bucket(raw, lifecycle_rules=[sub_path_rule], is_file_lock_enabled=False)
+
+        posture = inspect_retention_posture(bucket)
+
+        self.assertEqual(posture.lifecycle_category, "lifecycle_archive_deletion_rule_present")
+
     def test_lifecycle_rule_outside_the_archive_prefix_is_clear(self) -> None:
         raw = _new_simulator()
         unrelated_rule = {

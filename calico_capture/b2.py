@@ -320,10 +320,20 @@ class RetentionPosture:
 
 
 def _lifecycle_rule_covers_archive_prefix(rule: object) -> bool:
+    """True if `rule`'s `fileNamePrefix` overlaps `EXPECTED_NAME_PREFIX`'s
+    object-key space in *either* direction: a rule prefix that is an
+    ancestor of `archive/v1/` (e.g. `""`, `"archive/"`) covers every
+    archived object, and a rule prefix that is a *descendant* of
+    `archive/v1/` (e.g. `"archive/v1/store/"`) still covers whichever
+    archived objects fall under that narrower sub-path. Two prefix-based
+    rules overlap exactly when either string is a prefix of the other."""
+
     if not isinstance(rule, dict):
         return False
     rule_prefix = rule.get("fileNamePrefix") or ""
-    return EXPECTED_NAME_PREFIX.startswith(rule_prefix)
+    return EXPECTED_NAME_PREFIX.startswith(rule_prefix) or rule_prefix.startswith(
+        EXPECTED_NAME_PREFIX
+    )
 
 
 def _lifecycle_rule_can_hide_or_delete(rule: object) -> bool:
