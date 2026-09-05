@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "allowlist_version": "publication-exports-v1",
+  "parser_contract_version": "registry-csv-v1",
+  "toolchain": {
+    "python": "3.13.15",
+    "dbt_core": "1.10.23",
+    "dbt_duckdb": "1.10.1",
+    "duckdb": "1.5.5"
+  },
+  "accepted_releases": [
+    {
+      "as_of_date": "2099-01-01",
+      "release_revision": 1,
+      "revision_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_objects": [
+        {
+          "source_list": "synthetic_source",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "byte_size": 0,
+          "row_count": 0
+        }
+      ]
+    }
+  ],
+  "eligible_key_count": 2,
+  "exports": [
+    {
+      "export_name": "fixture_aggregate_metrics",
+      "file_name": "fixture_aggregate_metrics.csv",
+      "sha256": "b4ccb28a6df42ca5d7e876ca90c64e04366d1ae91d34b0dc684871919de91c6e",
+      "row_count": 3,
+      "grain": ["as_of_date", "release_revision", "coverage_class"]
+    },
+    {
+      "export_name": "fixture_named_history",
+      "file_name": "fixture_named_history.csv",
+      "sha256": "1558ac0e8de685fbee524010cf03d092444da53596cc931edf365c401cf261b0",
+      "row_count": 3,
+      "grain": ["registration_key", "as_of_date"]
+    }
+  ]
+}

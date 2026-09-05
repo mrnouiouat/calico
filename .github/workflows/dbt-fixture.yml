@@ -41,5 +41,10 @@ jobs:
       - name: Run repository, disposition-matrix, and CI contract tests
         run: python -m unittest tests.test_repository_contract tests.dbt_foundation.test_disposition_matrix tests.dbt_foundation.test_ci_contract -v
 
+      - name: Prove the publication gate rejects committed violation fixtures
+        run: |
+          python -m unittest tests.publish.test_gate -v
+          python -m calico_publish verify --mode fixture --staging tests/fixtures/publish/valid
+
       - name: Run privacy gate (candidate tree + full reachable history)
         run: python -m tools.privacy_scan --tree HEAD --history-all

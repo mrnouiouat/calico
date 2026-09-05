@@ -1,0 +1,4 @@
+registration_key,as_of_date,observation_state,display_name
+synthetic_key_alpha,2099-01-01,synthetic_current,synthetic_display_alpha
+synthetic_key_alpha,2099-02-01,synthetic_changed,synthetic_display_alpha
+synthetic_key_beta,2099-01-01,synthetic_current,synthetic_display_beta

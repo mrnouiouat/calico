@@ -152,6 +152,32 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("tests.dbt_foundation.test_disposition_matrix", content)
         self.assertIn("tests.dbt_foundation.test_ci_contract", content)
 
+    def test_workflow_runs_the_publication_gate_entry_point(self) -> None:
+        content = self._workflow()
+        self.assertIn(
+            "Prove the publication gate rejects committed violation fixtures",
+            content,
+        )
+        self.assertIn(
+            "python -m calico_publish verify --mode fixture "
+            "--staging tests/fixtures/publish/valid",
+            content,
+        )
+        self.assertNotIn("from calico_publish.gate import", content)
+
+    def test_workflow_runs_the_committed_gate_violation_tests(self) -> None:
+        self.assertIn(
+            "python -m unittest tests.publish.test_gate -v",
+            self._workflow(),
+        )
+
+    def test_publication_gate_step_precedes_the_privacy_gate(self) -> None:
+        content = self._workflow()
+        self.assertLess(
+            content.index("python -m calico_publish verify"),
+            content.index("python -m tools.privacy_scan"),
+        )
+
     def test_workflow_runs_the_privacy_scan(self) -> None:
         content = self._workflow()
         self.assertIn("python -m tools.privacy_scan --tree HEAD --history-all", content)

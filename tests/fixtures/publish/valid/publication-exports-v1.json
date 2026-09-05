@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "allowlist_version": "publication-exports-v1",
+  "exports": [
+    {
+      "export_name": "fixture_aggregate_metrics",
+      "export_class": "aggregate",
+      "source_relation": "fixture_aggregate_metrics",
+      "columns": ["as_of_date", "release_revision", "coverage_class", "record_count"],
+      "grain": ["as_of_date", "release_revision", "coverage_class"],
+      "measures": ["record_count"],
+      "file_name": "fixture_aggregate_metrics.csv",
+      "dialect": "calico-csv-v1"
+    },
+    {
+      "export_name": "fixture_named_history",
+      "export_class": "named_history",
+      "source_relation": "fixture_named_history",
+      "columns": ["registration_key", "as_of_date", "observation_state", "display_name"],
+      "grain": ["registration_key", "as_of_date"],
+      "measures": [],
+      "file_name": "fixture_named_history.csv",
+      "dialect": "calico-csv-v1"
+    }
+  ]
+}
