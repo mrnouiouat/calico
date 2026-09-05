@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,50 @@ def _invoke(argv: list[str], **kwargs) -> tuple[int, str, str]:
 
 
 class PublicationCliTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX symlink semantics required")
+    def test_manifest_parent_symlink_is_rejected_before_outside_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            outside = root / "outside"
+            staging.mkdir()
+            outside.mkdir()
+            shutil.copy2(BASELINE_DIR / "publication-exports-v1.json", staging)
+            (staging / "manifest").symlink_to(outside, target_is_directory=True)
+
+            def runner(**kwargs):
+                kwargs["export"](Path("synthetic.duckdb"))
+                return BuildOutcome(status="success", category=None, proof=None)
+
+            def exporter(database, allowlist, output_root):
+                del database
+                exports = Path(output_root) / "exports"
+                exports.mkdir()
+                staged = []
+                for entry in allowlist.exports:
+                    payload = (BASELINE_DIR / "exports" / entry.file_name).read_bytes()
+                    (exports / entry.file_name).write_bytes(payload)
+                    staged.append(
+                        StagedExport(
+                            entry.export_name,
+                            entry.file_name,
+                            f"exports/{entry.file_name}",
+                            hashlib.sha256(payload).hexdigest(),
+                            payload.count(b"\n") - 1,
+                        )
+                    )
+                return tuple(staged)
+
+            code, stdout, stderr = _invoke(
+                ["export", "--mode", "fixture", "--staging", str(staging)],
+                build_runner=runner,
+                exporter=exporter,
+            )
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(stdout), {"category": "export.invalid_staging"})
+        self.assertEqual(stderr, "export.invalid_staging\n")
+        self.assertEqual(list(outside.iterdir()), [])
+
     def test_real_catalog_projects_the_complete_canonical_source_set(self) -> None:
         from calico_publish.cli import _accepted_releases
 

@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import inspect
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,7 +51,12 @@ class ExportBoundaryTests(unittest.TestCase):
         manifest = _manifest(self.allowlist, records)
         manifest_path = self.root / "first" / "manifest.json"
         manifest_path.write_text(manifest.to_json(), encoding="ascii")
-        result = verify(self.root / "first", self.allowlist, manifest_path)
+        result = verify(
+            self.root / "first",
+            self.allowlist,
+            manifest_path,
+            eligible_export_name=None,
+        )
         self.assertTrue(result.passed, [v.category for v in result.violations])
 
     def test_readback_rejects_bad_encoding_header_and_row_width(self):
@@ -78,6 +84,25 @@ class ExportBoundaryTests(unittest.TestCase):
         with self.assertRaises(module.ExportError) as caught:
             module.export_all(self.database, self.allowlist, staging)
         self.assertEqual(str(caught.exception), "export.staging_not_empty")
+
+    @unittest.skipIf(os.name == "nt", "POSIX symlink semantics required")
+    def test_symlinked_staging_paths_are_rejected_before_any_outside_write(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        linked_root = self.root / "linked-root"
+        linked_root.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(module.ExportError) as caught:
+            module.export_all(self.database, self.allowlist, linked_root)
+        self.assertEqual(caught.exception.category, "export.invalid_staging")
+        self.assertEqual(list(outside.iterdir()), [])
+
+        staging = self.root / "staging-with-linked-child"
+        staging.mkdir()
+        (staging / "exports").symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(module.ExportError) as caught:
+            module.export_all(self.database, self.allowlist, staging)
+        self.assertEqual(caught.exception.category, "export.invalid_staging")
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_missing_late_projection_fails_before_any_file_is_written(self):
         missing = dataclasses.replace(self.entry, export_name="late_export", file_name="late_export.csv",

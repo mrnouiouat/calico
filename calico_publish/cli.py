@@ -17,7 +17,14 @@ from calico_dbt.catalog import InputCatalog, load_and_verify_revision_manifest, 
 from calico_dbt.runner import BuildOutcome, build
 from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.allowlist import Allowlist, AllowlistError, load_allowlist
-from calico_publish.export import StagedExport, export_all
+from calico_publish.export import (
+    ExportError,
+    StagedExport,
+    export_all,
+    prepare_staging_directory,
+    prepare_staging_subdirectory,
+    write_staged_text,
+)
 from calico_publish.gate import GateError, verify
 from calico_publish.inventory import InventoryError, check_inventory, load_inventory_document
 from calico_publish.manifest import (
@@ -122,8 +129,7 @@ def _prepare_publication(
     archive_factory: Callable[[], Archive] | None,
     catalog_loader: Callable[[], InputCatalog],
 ) -> tuple[Path, Allowlist, tuple[StagedExport, ...], tuple[str, ...]]:
-    staging = Path(args.staging)
-    staging.mkdir(parents=True, exist_ok=True)
+    staging = prepare_staging_directory(args.staging)
     allowlist = allowlist_loader(_allowlist_path(args))
     staged: tuple[StagedExport, ...] = ()
 
@@ -170,8 +176,9 @@ def _prepare_publication(
         source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
     )
     manifest_path = staging / _MANIFEST_RELATIVE_PATH
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(manifest.to_json(), encoding="utf-8", newline="\n")
+    manifest_dir = prepare_staging_subdirectory(staging, "manifest")
+    manifest_path = manifest_dir / _MANIFEST_RELATIVE_PATH.name
+    write_staged_text(manifest_path, manifest.to_json())
     paths = tuple(sorted([*(item.relative_path for item in staged), _MANIFEST_RELATIVE_PATH.as_posix()]))
     return staging, allowlist, staged, paths
 
@@ -325,7 +332,7 @@ def main(
     }
     try:
         return _COMMANDS[args.command](args, runtime=runtime)
-    except (GateError, AllowlistError, ManifestError, InventoryError, TransactionError,
+    except (GateError, AllowlistError, ExportError, ManifestError, InventoryError, TransactionError,
             PolicyError, ScanPathError, ArchiveError) as exc:
         print(_dict_json({"category": exc.category}))
         print(exc.category, file=sys.stderr)

@@ -5,6 +5,8 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,6 +40,67 @@ class StagedExport:
     row_count: int
 
 
+def _is_link_or_reparse(stat_result: os.stat_result) -> bool:
+    if stat.S_ISLNK(stat_result.st_mode):
+        return True
+    attributes = getattr(stat_result, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return bool(reparse_flag and attributes & reparse_flag)
+
+
+def prepare_staging_directory(path: str | Path) -> Path:
+    """Create one directory without traversing an existing link component."""
+
+    try:
+        absolute = Path(os.path.abspath(Path(path)))
+        parts = absolute.parts
+        current = Path(parts[0])
+        for part in parts[1:]:
+            current = current / part
+            try:
+                status = os.lstat(current)
+            except FileNotFoundError:
+                current.mkdir()
+                status = os.lstat(current)
+            if _is_link_or_reparse(status) or not stat.S_ISDIR(status.st_mode):
+                raise ExportError("export.invalid_staging")
+        resolved = absolute.resolve(strict=True)
+    except ExportError:
+        raise
+    except (OSError, TypeError, ValueError) as exc:
+        raise ExportError("export.invalid_staging") from exc
+    if not resolved.is_dir():
+        raise ExportError("export.invalid_staging")
+    return resolved
+
+
+def prepare_staging_subdirectory(root: Path, name: str) -> Path:
+    if name not in {_EXPORT_SUBDIR, "manifest"}:
+        raise ExportError("export.invalid_staging")
+    resolved_root = prepare_staging_directory(root)
+    child = prepare_staging_directory(resolved_root / name)
+    if not child.is_relative_to(resolved_root) or child.parent != resolved_root:
+        raise ExportError("export.invalid_staging")
+    return child
+
+
+def _open_binary_no_follow(path: Path, flags: int):
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags | no_follow)
+    return os.fdopen(descriptor, "rb" if flags == os.O_RDONLY else "wb")
+
+
+def write_staged_text(path: Path, text: str) -> None:
+    """Create a new UTF-8 staging file without following a final symlink."""
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    try:
+        with _open_binary_no_follow(path, flags) as handle:
+            handle.write(text.encode("utf-8"))
+    except OSError as exc:
+        raise ExportError("export.invalid_staging") from exc
+
+
 def _identifier(value: str) -> str:
     return f'"{value}"'
 
@@ -48,7 +111,7 @@ def _sql_string(value: str) -> str:
 
 def _hash_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
+    with _open_binary_no_follow(path, os.O_RDONLY) as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
@@ -90,7 +153,8 @@ def _copy_statement(entry: ExportEntry, destination: Path, varchar_columns: tupl
 
 def _readback(path: Path, entry: ExportEntry) -> tuple[str, int]:
     try:
-        payload = path.read_bytes()
+        with _open_binary_no_follow(path, os.O_RDONLY) as handle:
+            payload = handle.read()
     except OSError as exc:
         raise ExportError("export.readback_failed", entry.export_name) from exc
     try:
@@ -125,12 +189,14 @@ def _normalize_header(path: Path, entry: ExportEntry) -> None:
     """
 
     try:
-        payload = path.read_bytes()
+        with _open_binary_no_follow(path, os.O_RDONLY) as handle:
+            payload = handle.read()
         header, separator, body = payload.partition(b"\n")
         parsed = next(csv.reader(io.StringIO(header.decode("utf-8"))))
         if not separator or tuple(parsed) != entry.columns:
             raise ExportError("export.header_mismatch", entry.export_name)
-        path.write_bytes(",".join(entry.columns).encode("ascii") + b"\n" + body)
+        with _open_binary_no_follow(path, os.O_WRONLY | os.O_TRUNC) as handle:
+            handle.write(",".join(entry.columns).encode("ascii") + b"\n" + body)
     except ExportError:
         raise
     except (OSError, UnicodeDecodeError, csv.Error, StopIteration) as exc:
@@ -142,12 +208,11 @@ def export_all(
 ) -> tuple[StagedExport, ...]:
     """Export every allowlisted relation through one fixed, inert COPY path."""
 
-    root = Path(staging_dir)
-    export_dir = root / _EXPORT_SUBDIR
+    root = prepare_staging_directory(staging_dir)
     try:
+        export_dir = prepare_staging_subdirectory(root, _EXPORT_SUBDIR)
         if export_dir.exists() and any(export_dir.iterdir()):
             raise ExportError("export.staging_not_empty")
-        export_dir.mkdir(parents=True, exist_ok=True)
         connection = duckdb.connect(str(duckdb_path), read_only=True)
     except (OSError, duckdb.Error) as exc:
         raise ExportError("export.copy_failed") from exc
@@ -168,6 +233,18 @@ def export_all(
                 raise
             except duckdb.Error as exc:
                 raise ExportError("export.copy_failed", entry.export_name) from exc
+            try:
+                destination_status = os.lstat(destination)
+                resolved_destination = destination.resolve(strict=True)
+            except OSError as exc:
+                raise ExportError("export.copy_failed", entry.export_name) from exc
+            if (
+                _is_link_or_reparse(destination_status)
+                or not stat.S_ISREG(destination_status.st_mode)
+                or not resolved_destination.is_relative_to(export_dir)
+                or resolved_destination.parent != export_dir
+            ):
+                raise ExportError("export.invalid_staging", entry.export_name)
             _normalize_header(destination, entry)
             sha256, row_count = _readback(destination, entry)
             staged.append(
@@ -193,4 +270,12 @@ def export_all(
     return tuple(staged)
 
 
-__all__ = ["CSV_DIALECT_NAME", "ExportError", "StagedExport", "export_all"]
+__all__ = [
+    "CSV_DIALECT_NAME",
+    "ExportError",
+    "StagedExport",
+    "export_all",
+    "prepare_staging_directory",
+    "prepare_staging_subdirectory",
+    "write_staged_text",
+]
