@@ -156,19 +156,23 @@ def scan_text(path: str, text: str) -> list[Finding]:
 def _scan_record(path: str, record: str, line_number: int) -> list[Finding]:
     """Scan one complete record while preserving its absolute line locator."""
 
-    return [
-        Finding(item.category, item.path, f"line {line_number}")
-        for item in scan_text(path, record)
-    ]
+    findings: list[Finding] = []
+    for item in scan_text(path, record):
+        relative_line = int(item.locator.removeprefix("line "))
+        findings.append(
+            Finding(item.category, item.path, f"line {line_number + relative_line - 1}")
+        )
+    return findings
 
 
 def _scan_utf8_chunks(path: str, chunks: Iterable[bytes]) -> list[Finding]:
-    """Incrementally decode and scan complete newline-delimited records.
+    """Incrementally decode and scan complete logical records.
 
-    Detector tokens may be arbitrarily split across byte chunks because a
-    complete record is retained until its newline. A deliberately overlong
-    record is drained and reported with a value-free finding, preserving the
-    bounded-memory guarantee without introducing a blind spot.
+    CSV paths retain RFC-style quote state so embedded physical newlines stay
+    in the same logical record. Other text paths retain the original physical
+    line boundary. Detector tokens may be arbitrarily split across byte chunks.
+    A deliberately overlong logical record is drained to its real boundary and
+    reported once with a value-free finding, preserving bounded memory.
     """
 
     iterator = iter(chunks)
@@ -193,34 +197,58 @@ def _scan_utf8_chunks(path: str, chunks: Iterable[bytes]) -> list[Finding]:
     findings: list[Finding] = []
     record = ""
     line_number = 1
+    record_line_number = 1
     discarding_overlong = False
+    csv_mode = PurePosixPath(path).suffix.lower() == ".csv"
+    in_quotes = False
+    pending_quote = False
 
     def consume_text(text: str) -> None:
-        nonlocal record, line_number, discarding_overlong
-        position = 0
-        while position < len(text):
-            newline = text.find("\n", position)
-            end = len(text) if newline < 0 else newline + 1
-            piece = text[position:end]
-            position = end
-            if discarding_overlong:
-                if newline >= 0:
-                    discarding_overlong = False
-                    line_number += 1
-                continue
-            if len(record) + len(piece) > _MAX_STREAM_RECORD_CHARS:
-                findings.append(Finding("oversize_record", path, f"line {line_number}"))
-                record = ""
-                if newline >= 0:
-                    line_number += 1
-                else:
+        nonlocal record, line_number, record_line_number
+        nonlocal discarding_overlong, in_quotes, pending_quote
+        for character in text:
+            logical_boundary = False
+
+            if csv_mode:
+                if in_quotes:
+                    if pending_quote:
+                        if character == '"':
+                            pending_quote = False
+                        else:
+                            pending_quote = False
+                            in_quotes = False
+                            if character == '"':
+                                in_quotes = True
+                            elif character == "\n":
+                                logical_boundary = True
+                    elif character == '"':
+                        pending_quote = True
+                elif character == '"':
+                    in_quotes = True
+                elif character == "\n":
+                    logical_boundary = True
+            elif character == "\n":
+                logical_boundary = True
+
+            if not discarding_overlong:
+                if len(record) >= _MAX_STREAM_RECORD_CHARS:
+                    findings.append(
+                        Finding("oversize_record", path, f"line {record_line_number}")
+                    )
+                    record = ""
                     discarding_overlong = True
-                continue
-            record += piece
-            if newline >= 0:
-                findings.extend(_scan_record(path, record, line_number))
-                record = ""
+                else:
+                    record += character
+
+            if character == "\n":
                 line_number += 1
+
+            if logical_boundary:
+                if not discarding_overlong:
+                    findings.extend(_scan_record(path, record, record_line_number))
+                record = ""
+                discarding_overlong = False
+                record_line_number = line_number
 
     try:
         for chunk in itertools.chain((initial,), iterator):
@@ -237,7 +265,7 @@ def _scan_utf8_chunks(path: str, chunks: Iterable[bytes]) -> list[Finding]:
         return [Finding("invalid_utf8", path, "blob")]
 
     if record:
-        findings.extend(_scan_record(path, record, line_number))
+        findings.extend(_scan_record(path, record, record_line_number))
     return findings
 
 

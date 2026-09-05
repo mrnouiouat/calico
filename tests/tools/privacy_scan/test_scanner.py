@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.privacy_scan.git_objects import GitObjectError
 from tools.privacy_scan.policy import Policy, PathRule, PolicyError
@@ -298,9 +299,33 @@ class TestStreamingScanner(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "notes.txt").write_bytes(b"Federal Employer ID Number: 941" + b"234567\n")
-            with unittest.mock.patch("tools.privacy_scan.scanner._STREAM_CHUNK_BYTES", 3):
+            with patch("tools.privacy_scan.scanner._STREAM_CHUNK_BYTES", 3):
                 findings = scan_paths(root, ("notes.txt",), _default_policy())
         self.assertIn("fein", {finding.category for finding in findings})
+
+    def test_csv_detector_preserves_context_across_quoted_newline_chunks(self) -> None:
+        payload = b'"Federal Employer ID Number:\n941' + b'234567"\n'
+        for chunk_size in (1, 2, 3, 7, 17, 65536):
+            with self.subTest(chunk_size=chunk_size), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "published.csv").write_bytes(payload)
+                with patch(
+                    "tools.privacy_scan.scanner._STREAM_CHUNK_BYTES", chunk_size
+                ):
+                    findings = scan_paths(root, ("published.csv",), _default_policy())
+            self.assertEqual(findings, [Finding("fein", "published.csv", "line 2")])
+
+    def test_overlong_quoted_csv_record_is_drained_to_logical_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = b'"' + (b"x" * 600000) + b"\n" + (b"y" * 448576) + b'"\nsafe\n'
+            (root / "published.csv").write_bytes(payload)
+            with patch("tools.privacy_scan.scanner._STREAM_CHUNK_BYTES", 11):
+                findings = scan_paths(root, ("published.csv",), _default_policy())
+        self.assertEqual(
+            findings,
+            [Finding("oversize_record", "published.csv", "line 1")],
+        )
 
     def test_long_record_is_scanned_whole_and_overlong_record_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
