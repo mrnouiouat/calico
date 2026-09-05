@@ -20,7 +20,13 @@ from calico_publish.allowlist import Allowlist, AllowlistError, load_allowlist
 from calico_publish.export import StagedExport, export_all
 from calico_publish.gate import GateError, verify
 from calico_publish.inventory import InventoryError, check_inventory, load_inventory_document
-from calico_publish.manifest import AcceptedRelease, ManifestError, SourceObjectRecord, project_published_manifest
+from calico_publish.manifest import (
+    AcceptedRelease,
+    ManifestError,
+    SourceObjectRecord,
+    compute_revision_fingerprint,
+    project_published_manifest,
+)
 from calico_publish.transaction import TransactionError, publish_tree
 from tools.privacy_scan.policy import PolicyError, load_policy
 from tools.privacy_scan.scanner import ScanPathError, scan_paths
@@ -69,12 +75,17 @@ def _accepted_releases(
     mode: str, store: Path, catalog_loader: Callable[[], InputCatalog]
 ) -> tuple[tuple[AcceptedRelease, ...], str]:
     if mode == "fixture":
+        fixture_hashes = {"synthetic_source": "0" * 64}
         release = AcceptedRelease(
-            "2026-01-01", 1, "0" * 64,
+            "2026-01-01",
+            1,
+            compute_revision_fingerprint(
+                fixture_hashes, source_lists=_FIXTURE_SOURCE_LISTS
+            ),
             (
                 SourceObjectRecord(
                     "synthetic_source",
-                    "0" * 64,
+                    fixture_hashes["synthetic_source"],
                     0,
                     0,
                     _source_lists=_FIXTURE_SOURCE_LISTS,
@@ -175,6 +186,7 @@ def _run_verify(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
         allowlist,
         staging / _MANIFEST_RELATIVE_PATH,
         source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
+        eligible_export_name=None if args.mode == "fixture" else "dim_public_organizations",
     )
     if result.passed:
         print(_dict_json({"category": "gate.verified", "violation_count": 0}))
@@ -201,6 +213,7 @@ def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int
         allowlist,
         staging / _MANIFEST_RELATIVE_PATH,
         source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
+        eligible_export_name=None if args.mode == "fixture" else "dim_public_organizations",
     )
     if not result.passed:
         for finding in result.violations:

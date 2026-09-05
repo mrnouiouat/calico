@@ -12,7 +12,7 @@
     {
       "as_of_date": "2099-01-01",
       "release_revision": 1,
-      "revision_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "revision_fingerprint": "4d3afac0076adf520d5b7bc37012997e2e2aef1c9a2d8a2c32fb0df796b1c973",
       "source_objects": [
         {
           "source_list": "synthetic_source",

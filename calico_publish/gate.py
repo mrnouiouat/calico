@@ -24,6 +24,7 @@ GATE_VIOLATION_CATEGORIES = frozenset(
         "gate.manifest_export_hash_mismatch",
         "gate.manifest_row_count_mismatch",
         "gate.manifest_export_set_mismatch",
+        "gate.manifest_eligible_key_count_mismatch",
     }
 )
 GATE_ERROR_CATEGORIES = frozenset(
@@ -191,6 +192,7 @@ def verify(
     manifest_path: str | Path | None = None,
     *,
     source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
+    eligible_export_name: str | None = "dim_public_organizations",
 ) -> GateResult:
     """Verify exact fields, order, grain, encoding, and optional provenance."""
 
@@ -258,6 +260,17 @@ def verify(
                 violations.append(GateViolation(export_name, "gate.manifest_export_hash_mismatch"))
             if records[export_name]["row_count"] != row_count:
                 violations.append(GateViolation(export_name, "gate.manifest_row_count_mismatch"))
+        if eligible_export_name is not None:
+            eligible_observation = observed.get(eligible_export_name)
+            if eligible_observation is None:
+                raise GateError("gate.manifest_invalid_schema")
+            if document["eligible_key_count"] != eligible_observation[1]:
+                violations.append(
+                    GateViolation(
+                        eligible_export_name,
+                        "gate.manifest_eligible_key_count_mismatch",
+                    )
+                )
 
     return GateResult(
         violations=tuple(

@@ -20,6 +20,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def inputs():
     authority = load_allowlist(ROOT / "contracts/publication-exports-v1.json")
+    source_objects = tuple(
+        module.SourceObjectRecord(name, str(index) * 64, 0, 0)
+        for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
+    )
+    revision_fingerprint = module.compute_revision_fingerprint(
+        {item.source_list: item.sha256 for item in source_objects}
+    )
     return dict(
         allowlist=authority,
         staged_exports=tuple(StagedExport(e.export_name, e.file_name,
@@ -28,11 +35,8 @@ def inputs():
         accepted_releases=(module.AcceptedRelease(
             "2026-01-01",
             1,
-            "b" * 64,
-            tuple(
-                module.SourceObjectRecord(name, str(index) * 64, 0, 0)
-                for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
-            ),
+            revision_fingerprint,
+            source_objects,
         ),),
         eligible_key_count=0, parser_contract_version="registry-csv-contract-v1",
         toolchain=dict(python="3.13.15", dbt_core="1.10.23", dbt_duckdb="1.10.1", duckdb="1.5.5"),
@@ -141,15 +145,18 @@ class ManifestTests(unittest.TestCase):
         arguments["allowlist"] = dataclasses.replace(arguments["allowlist"], exports=arguments["allowlist"].exports[:1])
         arguments["staged_exports"] = arguments["staged_exports"][:1]
         fixture_sources = ("synthetic_source",)
+        fixture_hashes = {"synthetic_source": "c" * 64}
         arguments["accepted_releases"] = (
             module.AcceptedRelease(
                 "2026-01-01",
                 1,
-                "b" * 64,
+                module.compute_revision_fingerprint(
+                    fixture_hashes, source_lists=fixture_sources
+                ),
                 (
                     module.SourceObjectRecord(
                         "synthetic_source",
-                        "c" * 64,
+                        fixture_hashes["synthetic_source"],
                         0,
                         0,
                         _source_lists=fixture_sources,
@@ -166,6 +173,21 @@ class ManifestTests(unittest.TestCase):
             allowlist=arguments["allowlist"],
             source_lists=fixture_sources,
         )
+
+    def test_default_validator_rejects_a_production_export_subset(self):
+        document = copy.deepcopy(self.document)
+        document["exports"] = document["exports"][:-1]
+        self.reject(document, "manifest.invalid_schema")
+
+    def test_revision_fingerprint_is_recomputed_from_ordered_source_hashes(self):
+        for mutate in (
+            lambda release: release.update(revision_fingerprint="f" * 64),
+            lambda release: release["source_objects"][0].update(sha256="e" * 64),
+        ):
+            with self.subTest(mutate=mutate):
+                document = copy.deepcopy(self.document)
+                mutate(document["accepted_releases"][0])
+                self.reject(document, "manifest.invalid_hash")
 
     def test_missing_and_malformed_builder_inputs_are_safe(self):
         for key in self.arguments:
@@ -225,6 +247,7 @@ class ManifestTests(unittest.TestCase):
                     root,
                     authority,
                     path,
+                    eligible_export_name=None,
                 ).passed
             )
             changed = manifest.to_dict()
@@ -235,6 +258,7 @@ class ManifestTests(unittest.TestCase):
                     root,
                     authority,
                     path,
+                    eligible_export_name=None,
                 )
             self.assertEqual(str(raised.exception), "gate.manifest_invalid_schema")
 

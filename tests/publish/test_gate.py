@@ -40,6 +40,7 @@ def _verify(root: Path):
         load_allowlist(root / "publication-exports-v1.json"),
         root / _MANIFEST,
         source_lists=_FIXTURE_SOURCE_LISTS,
+        eligible_export_name=None,
     )
 
 
@@ -60,6 +61,7 @@ class PublicationGateFixtureTests(unittest.TestCase):
                 allowlist,
                 BASELINE_DIR / _MANIFEST,
                 source_lists=_FIXTURE_SOURCE_LISTS,
+                eligible_export_name=None,
             ).violations,
             (),
         )
@@ -143,6 +145,7 @@ class PublicationGateContentTests(unittest.TestCase):
                     "gate.manifest_export_hash_mismatch",
                     "gate.manifest_row_count_mismatch",
                     "gate.manifest_export_set_mismatch",
+                    "gate.manifest_eligible_key_count_mismatch",
                 }
             ),
         )
@@ -208,6 +211,35 @@ class PublicationGateContentTests(unittest.TestCase):
             publication.write_manifest(document)
             self.assertEqual(_categories(publication.root), ["gate.manifest_export_set_mismatch"])
 
+    def test_eligible_key_count_must_match_the_observed_organization_export(self) -> None:
+        with mutated_publication() as publication:
+            document = publication.read_manifest()
+            document["eligible_key_count"] = 3
+            publication.write_manifest(document)
+            allowlist = load_allowlist(publication.allowlist_path)
+            self.assertTrue(
+                verify(
+                    publication.root,
+                    allowlist,
+                    publication.manifest_path,
+                    source_lists=_FIXTURE_SOURCE_LISTS,
+                    eligible_export_name="fixture_named_history",
+                ).passed
+            )
+            document["eligible_key_count"] = 2
+            publication.write_manifest(document)
+            result = verify(
+                publication.root,
+                allowlist,
+                publication.manifest_path,
+                source_lists=_FIXTURE_SOURCE_LISTS,
+                eligible_export_name="fixture_named_history",
+            )
+        self.assertEqual(
+            [item.category for item in result.violations],
+            ["gate.manifest_eligible_key_count_mismatch"],
+        )
+
     def test_gate_is_idempotent_and_does_not_mutate_bytes(self) -> None:
         before = {
             path.relative_to(BASELINE_DIR): path.read_bytes()
@@ -220,12 +252,14 @@ class PublicationGateContentTests(unittest.TestCase):
             allowlist,
             BASELINE_DIR / _MANIFEST,
             source_lists=_FIXTURE_SOURCE_LISTS,
+            eligible_export_name=None,
         )
         second = verify(
             BASELINE_DIR,
             allowlist,
             BASELINE_DIR / _MANIFEST,
             source_lists=_FIXTURE_SOURCE_LISTS,
+            eligible_export_name=None,
         )
         after = {
             path.relative_to(BASELINE_DIR): path.read_bytes()

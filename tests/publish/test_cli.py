@@ -21,6 +21,7 @@ from calico_publish.cli import main
 from calico_dbt.runner import BuildOutcome
 from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.export import StagedExport
+from calico_publish.manifest import compute_revision_fingerprint
 from tests.fixtures.publish.fixture_builder import (
     BASELINE_DIR,
     extra_unapproved_column,
@@ -58,7 +59,9 @@ class PublicationCliTests(unittest.TestCase):
         verified = SimpleNamespace(
             as_of_date=anchor.as_of_date,
             release_revision=anchor.release_revision,
-            revision_fingerprint=anchor.revision_fingerprint,
+            revision_fingerprint=compute_revision_fingerprint(
+                {name: record.raw_sha256 for name, record in logical_lists}
+            ),
             parser_contract_version=1,
             logical_lists=logical_lists,
         )

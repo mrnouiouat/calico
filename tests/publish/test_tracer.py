@@ -19,6 +19,7 @@ from calico_publish.manifest import (
     MANIFEST_DOCUMENT_KEYS,
     AcceptedRelease,
     SourceObjectRecord,
+    compute_revision_fingerprint,
     project_published_manifest,
 )
 from calico_publish.transaction import CARRIED_FORWARD_PATHS, TransactionError, publish_tree
@@ -36,19 +37,22 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _safe_release() -> AcceptedRelease:
+    source_objects = tuple(
+        SourceObjectRecord(
+            source_list=name,
+            sha256=str(index) * 64,
+            byte_size=1,
+            row_count=0,
+        )
+        for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
+    )
     return AcceptedRelease(
         as_of_date="2026-01-01",
         release_revision=1,
-        revision_fingerprint="0" * 64,
-        source_objects=tuple(
-            SourceObjectRecord(
-                source_list=name,
-                sha256=str(index) * 64,
-                byte_size=1,
-                row_count=0,
-            )
-            for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
+        revision_fingerprint=compute_revision_fingerprint(
+            {item.source_list: item.sha256 for item in source_objects}
         ),
+        source_objects=source_objects,
     )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 _SOURCE_LIST_IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]*$")
 _VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _PARSER_VERSION = re.compile(r"^[a-z][a-z0-9_-]*-v[1-9][0-9]*$")
+FINGERPRINT_ALGORITHM = "ordered-source-sha256-json-v1"
 MANIFEST_ERROR_CATEGORIES = frozenset({
     "manifest.invalid_schema", "manifest.unknown_schema_version",
     "manifest.unknown_allowlist_version", "manifest.duplicate_export_name",
@@ -202,6 +204,28 @@ def _validate_source_lists(source_lists: object) -> tuple[str, ...]:
     return source_lists
 
 
+def compute_revision_fingerprint(
+    raw_sha256_by_list: Mapping[str, str],
+    *,
+    source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
+) -> str:
+    """Apply admission's versioned ordered-source JSON framing exactly."""
+
+    source_lists = _validate_source_lists(source_lists)
+    if (
+        not isinstance(raw_sha256_by_list, Mapping)
+        or set(raw_sha256_by_list) != set(source_lists)
+        or not all(
+            isinstance(value, str) and _HASH.fullmatch(value)
+            for value in raw_sha256_by_list.values()
+        )
+    ):
+        raise ManifestError("manifest.invalid_hash")
+    ordered = [[name, raw_sha256_by_list[name]] for name in source_lists]
+    framed = json.dumps(ordered, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+    return hashlib.sha256(framed).hexdigest()
+
+
 def _authority(allowlist: "Allowlist | None") -> "Allowlist":
     from calico_publish.allowlist import Allowlist, AllowlistError, ExportEntry, load_allowlist
 
@@ -263,6 +287,12 @@ def _validate_accepted_release(
         or len(observed_source_lists) != len(source_lists)
     ):
         raise ManifestError("manifest.invalid_schema")
+    fingerprint = compute_revision_fingerprint(
+        {item["source_list"]: item["sha256"] for item in source_objects},
+        source_lists=source_lists,
+    )
+    if document["revision_fingerprint"] != fingerprint:
+        raise ManifestError("manifest.invalid_hash")
 
 
 def _validate_export(document: object) -> None:
@@ -342,7 +372,7 @@ def validate_published_manifest_document(
     if export_names != sorted(export_names):
         raise ManifestError("manifest.unsorted_exports")
     entries = {entry.export_name: entry for entry in _authority(allowlist).exports}
-    if allowlist is not None and set(export_names) != set(entries):
+    if set(export_names) != set(entries):
         raise ManifestError("manifest.invalid_schema")
     for export in exports:
         entry = entries.get(export["export_name"])
@@ -418,10 +448,12 @@ __all__ = [
     "MANIFEST_DOCUMENT_KEYS",
     "MANIFEST_ERROR_CATEGORIES",
     "AcceptedRelease",
+    "FINGERPRINT_ALGORITHM",
     "ExportRecord",
     "ManifestError",
     "PublishedManifest",
     "SourceObjectRecord",
+    "compute_revision_fingerprint",
     "project_published_manifest",
     "validate_published_manifest_document",
 ]
