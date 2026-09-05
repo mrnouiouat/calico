@@ -1,0 +1,3 @@
+from_as_of_date,from_release_revision,from_revision_fingerprint,to_as_of_date,to_release_revision,to_revision_fingerprint,gap_days,starting_delinquent_count,still_delinquent_count,observed_exit_count,not_observed_count,persistence_denominator_id,persistence_proportion
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f",21,5476,5411,65,0,"starting_published_delinquent_cohort_v1",0.9881300219138057
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876",14,13169,13065,104,0,"starting_published_delinquent_cohort_v1",0.9921026653504442

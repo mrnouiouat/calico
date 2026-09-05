@@ -1,0 +1,172 @@
+as_of_date,release_revision,revision_fingerprint,source_list,source_reported_registry_status,coverage_class,record_count
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Delinquent","keyed",5419
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Delinquent - Late Fees Due","keyed",57
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Mutual Benefit","keyed",124
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Mutual Benefit","unkeyed",65777
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Not Registered - Cease and Desist Order","keyed",4
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Not Registered - Cease and Desist Order","unkeyed",827
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Revoked","keyed",32632
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Revoked","unkeyed",12
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Subject to Cease and Desist Order","keyed",30
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Subject to Cease and Desist Order","unkeyed",3
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-not-operate","Suspended","keyed",3539
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current","keyed",57959
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current","unkeyed",3
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current - Awaiting Reporting","keyed",1550
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current - In Process","keyed",27164
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current - Probationary Registration","keyed",1153
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Current - Reporting Incomplete","keyed",14524
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt","keyed",3231
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt","unkeyed",1161
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Facility Financing","keyed",4
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Facility Financing","unkeyed",217
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Form 990-PF Required","keyed",184
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Form 990-PF Required","unkeyed",12
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Religious","keyed",3910
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Exempt - Religious","unkeyed",56370
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-may-operate","Registered - Corporate Trustee","keyed",1008
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Closed - Registration Not Required","keyed",37
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Closed - Registration Not Required","unkeyed",243
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolution Pending","keyed",793
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolution Pending","unkeyed",80
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolution Waiver Issued","keyed",4558
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolution Waiver Issued","unkeyed",439
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolved","keyed",59445
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Dissolved","unkeyed",5633
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolution Pending","keyed",93
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolution Pending","unkeyed",119
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolution Waiver Issued","keyed",135
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolution Waiver Issued","unkeyed",659
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolved","keyed",20571
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Dissolved","unkeyed",2471
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Withdrawn","keyed",7
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Exempt - Withdrawn","unkeyed",9
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Diss. Waiver Issued","keyed",14
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Diss. Waiver Issued","unkeyed",2355
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Dissolution Pending","keyed",608
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Dissolution Pending","unkeyed",467
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Dissolved","keyed",6601
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Dissolved","unkeyed",41734
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Never Registered - Withdrawn","unkeyed",474
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Trust Closed","keyed",243
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Trust Closed","unkeyed",1
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Withdrawn","keyed",1813
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-not-operating","Withdrawn","unkeyed",2114
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-undetermined-status","Enforcement Action Pending","keyed",22
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-undetermined-status","Enforcement Action Pending","unkeyed",1
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-undetermined-status","Not Registered","keyed",9
+"2026-07-15",1,"e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096","charities-undetermined-status","Not Registered","unkeyed",128445
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Delinquent","keyed",13080
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Delinquent - Late Fees Due","keyed",89
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Mutual Benefit","keyed",123
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Mutual Benefit","unkeyed",65771
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Not Registered - Cease and Desist Order","keyed",4
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Not Registered - Cease and Desist Order","unkeyed",827
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Revoked","keyed",32597
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Revoked","unkeyed",12
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Subject to Cease and Desist Order","keyed",29
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Subject to Cease and Desist Order","unkeyed",3
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-not-operate","Suspended","keyed",3510
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current","keyed",60741
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current","unkeyed",2
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current - Awaiting Reporting","keyed",1503
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current - In Process","keyed",24637
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current - Probationary Registration","keyed",1163
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Current - Reporting Incomplete","keyed",7186
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt","keyed",3230
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt","unkeyed",1182
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Facility Financing","keyed",4
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Facility Financing","unkeyed",217
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Form 990-PF Required","keyed",184
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Form 990-PF Required","unkeyed",12
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Religious","keyed",3909
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Exempt - Religious","unkeyed",56358
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-may-operate","Registered - Corporate Trustee","keyed",1009
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Closed - Registration Not Required","keyed",37
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Closed - Registration Not Required","unkeyed",247
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolution Pending","keyed",812
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolution Pending","unkeyed",80
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolution Waiver Issued","keyed",4627
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolution Waiver Issued","unkeyed",439
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolved","keyed",59475
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Dissolved","unkeyed",5634
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolution Pending","keyed",92
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolution Pending","unkeyed",126
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolution Waiver Issued","keyed",137
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolution Waiver Issued","unkeyed",672
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolved","keyed",20571
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Dissolved","unkeyed",2474
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Withdrawn","keyed",7
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Exempt - Withdrawn","unkeyed",9
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Diss. Waiver Issued","keyed",15
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Diss. Waiver Issued","unkeyed",2413
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Dissolution Pending","keyed",607
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Dissolution Pending","unkeyed",488
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Dissolved","keyed",6601
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Dissolved","unkeyed",41744
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Never Registered - Withdrawn","unkeyed",474
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Trust Closed","keyed",245
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Trust Closed","unkeyed",1
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Withdrawn","keyed",1822
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-not-operating","Withdrawn","unkeyed",2113
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-undetermined-status","Enforcement Action Pending","keyed",22
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-undetermined-status","Enforcement Action Pending","unkeyed",1
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-undetermined-status","Not Registered","keyed",9
+"2026-08-05",1,"7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f","charities-undetermined-status","Not Registered","unkeyed",127915
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Delinquent","keyed",12989
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Delinquent - Late Fees Due","keyed",82
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Mutual Benefit","keyed",123
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Mutual Benefit","unkeyed",65766
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Not Registered - Cease and Desist Order","keyed",4
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Not Registered - Cease and Desist Order","unkeyed",827
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Revoked","keyed",32570
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Revoked","unkeyed",12
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Subject to Cease and Desist Order","keyed",29
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Subject to Cease and Desist Order","unkeyed",3
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-not-operate","Suspended","keyed",3497
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current","keyed",62187
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current","unkeyed",2
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current - Awaiting Reporting","keyed",1474
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current - In Process","keyed",23340
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current - Probationary Registration","keyed",1190
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Current - Reporting Incomplete","keyed",7155
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt","keyed",3231
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt","unkeyed",1187
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Facility Financing","keyed",4
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Facility Financing","unkeyed",216
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Form 990-PF Required","keyed",184
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Form 990-PF Required","unkeyed",12
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Religious","keyed",3908
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Exempt - Religious","unkeyed",56334
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-may-operate","Registered - Corporate Trustee","keyed",1010
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Closed - Registration Not Required","keyed",38
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Closed - Registration Not Required","unkeyed",247
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolution Pending","keyed",838
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolution Pending","unkeyed",80
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolution Waiver Issued","keyed",4747
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolution Waiver Issued","unkeyed",440
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolved","keyed",59479
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Dissolved","unkeyed",5636
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolution Pending","keyed",92
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolution Pending","unkeyed",131
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolution Waiver Issued","keyed",139
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolution Waiver Issued","unkeyed",696
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolved","keyed",20571
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Dissolved","unkeyed",2475
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Withdrawn","keyed",7
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Exempt - Withdrawn","unkeyed",9
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Diss. Waiver Issued","keyed",15
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Diss. Waiver Issued","unkeyed",2449
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Dissolution Pending","keyed",607
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Dissolution Pending","unkeyed",509
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Dissolved","keyed",6601
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Dissolved","unkeyed",41744
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Never Registered - Withdrawn","unkeyed",474
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Trust Closed","keyed",248
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Trust Closed","unkeyed",1
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Withdrawn","keyed",1826
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-not-operating","Withdrawn","unkeyed",2113
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-undetermined-status","Enforcement Action Pending","keyed",22
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-undetermined-status","Enforcement Action Pending","unkeyed",1
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-undetermined-status","Not Registered","keyed",8
+"2026-08-19",1,"903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876","charities-undetermined-status","Not Registered","unkeyed",127632
