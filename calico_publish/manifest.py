@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Mapping, Sequence
 
 if TYPE_CHECKING:
@@ -28,9 +29,18 @@ _ACCEPTED_RELEASE_KEYS = frozenset(
 )
 _SOURCE_OBJECT_KEYS = frozenset({"source_list", "sha256", "byte_size", "row_count"})
 _EXPORT_KEYS = frozenset({"export_name", "file_name", "sha256", "row_count", "grain"})
-_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _HASH = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
+_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+_PARSER_VERSION = re.compile(r"^[a-z][a-z0-9_-]*-v[1-9][0-9]*$")
+MANIFEST_ERROR_CATEGORIES = frozenset({
+    "manifest.invalid_schema", "manifest.unknown_schema_version",
+    "manifest.unknown_allowlist_version", "manifest.duplicate_export_name",
+    "manifest.duplicate_accepted_release", "manifest.unsorted_exports",
+    "manifest.empty_exports", "manifest.empty_accepted_releases",
+    "manifest.invalid_hash", "manifest.negative_count", "manifest.missing_input",
+})
 
 
 class ManifestError(Exception):
@@ -48,6 +58,9 @@ class SourceObjectRecord:
     byte_size: int
     row_count: int
 
+    def __post_init__(self) -> None:
+        _validate_source_object(self.to_dict())
+
     def to_dict(self) -> dict[str, object]:
         return {
             "source_list": self.source_list,
@@ -63,6 +76,10 @@ class AcceptedRelease:
     release_revision: int
     revision_fingerprint: str
     source_objects: tuple[SourceObjectRecord, ...]
+
+    def __post_init__(self) -> None:
+        _record_tuple(self.source_objects, SourceObjectRecord)
+        _validate_accepted_release(self.to_dict())
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -80,6 +97,11 @@ class ExportRecord:
     sha256: str
     row_count: int
     grain: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.grain, tuple):
+            raise ManifestError("manifest.invalid_schema")
+        _validate_export(self.to_dict())
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -100,9 +122,19 @@ class PublishedManifest:
     accepted_releases: tuple[AcceptedRelease, ...]
     eligible_key_count: int
     exports: tuple[ExportRecord, ...]
+    _allowlist: "Allowlist | None" = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        validate_published_manifest_document(self.to_dict())
+        _record_tuple(self.accepted_releases, AcceptedRelease)
+        _record_tuple(self.exports, ExportRecord)
+        if (not isinstance(self.toolchain, tuple)
+                or not all(isinstance(item, tuple) and len(item) == 2
+                           and all(isinstance(value, str) for value in item)
+                           for item in self.toolchain)
+                or len(self.toolchain) != len(_TOOLCHAIN_KEYS)):
+            raise ManifestError("manifest.invalid_schema")
+        authority = _authority(self._allowlist)
+        validate_published_manifest_document(self.to_dict(), allowlist=authority)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -117,7 +149,7 @@ class PublishedManifest:
 
     def to_json(self) -> str:
         document = self.to_dict()
-        validate_published_manifest_document(document)
+        validate_published_manifest_document(document, allowlist=_authority(self._allowlist))
         return json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
 
 
@@ -127,6 +159,34 @@ def _is_count(value: object, *, positive: bool = False) -> bool:
         and not isinstance(value, bool)
         and value >= (1 if positive else 0)
     )
+
+
+def _record_tuple(value: object, record_type: type) -> None:
+    if not isinstance(value, tuple) or not all(isinstance(item, record_type) for item in value):
+        raise ManifestError("manifest.invalid_schema")
+
+
+def _authority(allowlist: "Allowlist | None") -> "Allowlist":
+    from calico_publish.allowlist import Allowlist, AllowlistError, ExportEntry, load_allowlist
+
+    if allowlist is None:
+        try:
+            return load_allowlist(Path(__file__).resolve().parents[1] / "contracts/publication-exports-v1.json")
+        except AllowlistError:
+            raise ManifestError("manifest.invalid_schema") from None
+    if (not isinstance(allowlist, Allowlist)
+            or type(allowlist.schema_version) is not int or allowlist.schema_version != 1
+            or allowlist.allowlist_version != "publication-exports-v1"
+            or not isinstance(allowlist.exports, tuple) or not allowlist.exports
+            or not all(isinstance(entry, ExportEntry) for entry in allowlist.exports)):
+        raise ManifestError("manifest.invalid_schema")
+    # The authority is already validated by load_allowlist; validate names here
+    # before using them as keys even when a caller constructs a fixture authority.
+    names = [entry.export_name for entry in allowlist.exports]
+    if (not all(isinstance(name, str) and _IDENTIFIER.fullmatch(name) for name in names)
+            or len(names) != len(set(names))):
+        raise ManifestError("manifest.invalid_schema")
+    return allowlist
 
 
 def _validate_source_object(document: object) -> None:
@@ -183,22 +243,28 @@ def _validate_export(document: object) -> None:
         raise ManifestError("manifest.invalid_schema")
 
 
-def validate_published_manifest_document(document: object) -> None:
-    """Validate an already-decoded manifest as a closed positive projection."""
+def validate_published_manifest_document(document: object, *, allowlist: "Allowlist | None" = None) -> None:
+    """Validate public provenance against the committed authority by default.
+
+    Default readers may inspect a nonempty subset of approved exports. Supplying
+    an authority also requires its exact export set, including fixture contracts.
+    JSON Schema describes structure; this validator also proves ordering,
+    identity uniqueness, and agreement with the external publication authority.
+    """
 
     if not isinstance(document, dict) or set(document) != MANIFEST_DOCUMENT_KEYS:
         raise ManifestError("manifest.invalid_schema")
-    if document.get("schema_version") != 1:
+    if type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
         raise ManifestError("manifest.unknown_schema_version")
     if document.get("allowlist_version") != "publication-exports-v1":
         raise ManifestError("manifest.unknown_allowlist_version")
-    if not isinstance(document.get("parser_contract_version"), str) or not document["parser_contract_version"]:
+    if not isinstance(document.get("parser_contract_version"), str) or not _PARSER_VERSION.fullmatch(document["parser_contract_version"]):
         raise ManifestError("manifest.invalid_schema")
     toolchain = document.get("toolchain")
     if (
         not isinstance(toolchain, dict)
         or set(toolchain) != _TOOLCHAIN_KEYS
-        or not all(isinstance(value, str) and value for value in toolchain.values())
+        or not all(isinstance(value, str) and _VERSION.fullmatch(value) for value in toolchain.values())
     ):
         raise ManifestError("manifest.invalid_schema")
     if not _is_count(document.get("eligible_key_count")):
@@ -225,6 +291,14 @@ def validate_published_manifest_document(document: object) -> None:
         raise ManifestError("manifest.duplicate_export_name")
     if export_names != sorted(export_names):
         raise ManifestError("manifest.unsorted_exports")
+    entries = {entry.export_name: entry for entry in _authority(allowlist).exports}
+    if allowlist is not None and set(export_names) != set(entries):
+        raise ManifestError("manifest.invalid_schema")
+    for export in exports:
+        entry = entries.get(export["export_name"])
+        if (entry is None or export["file_name"] != entry.file_name
+                or tuple(export["grain"]) != entry.grain):
+            raise ManifestError("manifest.invalid_schema")
 
 
 def project_published_manifest(
@@ -238,8 +312,20 @@ def project_published_manifest(
 ) -> PublishedManifest:
     """Construct the manifest only from explicitly named, already-safe fields."""
 
-    if not staged_exports or not accepted_releases:
+    from calico_publish.export import StagedExport
+
+    if (allowlist is None or not isinstance(staged_exports, (tuple, list)) or not staged_exports
+            or not isinstance(accepted_releases, (tuple, list)) or not accepted_releases
+            or not isinstance(toolchain, Mapping)
+            or not all(isinstance(item, StagedExport) for item in staged_exports)
+            or not all(isinstance(item, AcceptedRelease) for item in accepted_releases)):
         raise ManifestError("manifest.missing_input")
+    allowlist = _authority(allowlist)
+    if not all(isinstance(item.export_name, str) for item in staged_exports):
+        raise ManifestError("manifest.invalid_schema")
+    if (set(toolchain) != _TOOLCHAIN_KEYS
+            or not all(isinstance(value, str) for value in toolchain.values())):
+        raise ManifestError("manifest.invalid_schema")
     entries = {entry.export_name: entry for entry in allowlist.exports}
     staged_by_name = {item.export_name: item for item in staged_exports}
     if len(staged_by_name) != len(staged_exports) or set(staged_by_name) != set(entries):
@@ -271,11 +357,13 @@ def project_published_manifest(
         accepted_releases=releases,
         eligible_key_count=eligible_key_count,
         exports=exports,
+        _allowlist=allowlist,
     )
 
 
 __all__ = [
     "MANIFEST_DOCUMENT_KEYS",
+    "MANIFEST_ERROR_CATEGORIES",
     "AcceptedRelease",
     "ExportRecord",
     "ManifestError",

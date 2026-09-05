@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calico.internal/contracts/semantic-model-inventory-v1.schema.json",
+  "title": "Calico semantic-model inventory (v1)",
+  "description": "Closed retained inspection record covering the complete Publish-to-web semantic model, including hidden columns, relationships, and transitive calculated/measure base lineage (D-21/D-22/D-30). No expression bodies or source values. Names use bounded characters so findings cannot echo paths, contacts, or log-control characters. The checker additionally enforces unique table/field names, source-column self-lineage, and all base references against the publication allowlist. Numeric schema_version must decode to a Python integer, not a boolean or float.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "model_name", "inventory_source", "tables", "relationships"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1, "description": "Fixed version of the exposure record."},
+    "model_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?: [A-Za-z][A-Za-z0-9_]*)*$", "description": "Safe model label; every space-separated word begins with a letter, excluding standalone numeric value tokens."},
+    "inventory_source": {"enum": ["machine_readable_metadata", "manual_inspection_record"], "description": "Retain either machine metadata or the owner's complete manual attestation."},
+    "tables": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/table"}, "description": "Every model table, including tables absent from visible report pages."},
+    "relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}, "description": "Every exposed model relationship, even when no chart uses it."}
+  },
+  "$defs": {
+    "table": {
+      "type": "object", "additionalProperties": false, "required": ["table_name", "fields"],
+      "properties": {
+        "table_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Exact export name; unapproved model tables fail the exposure check."},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/field"}, "description": "Complete unique field inventory including hidden columns and measures."}
+      }
+    },
+    "field": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field_name", "visibility", "origin", "lineage_complete", "source_columns"],
+      "properties": {
+        "field_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?: [A-Za-z][A-Za-z0-9_]*)*$", "description": "Safe unique field label; each space-separated word begins with a letter so findings cannot echo standalone numeric value tokens."},
+        "visibility": {"enum": ["visible", "hidden"], "description": "Hidden fields remain exposed by Publish to web and are always checked."},
+        "origin": {"enum": ["source_column", "calculated_column", "measure"], "description": "Source fields require their exact self-pair; derived fields require transitive base lineage."},
+        "lineage_complete": {"const": true, "description": "Producer attests the complete transitive source set; absent or false fails closed."},
+        "source_columns": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/source_column"}, "description": "Complete distinct base references, including hidden dependencies; no expression parsing."}
+      }
+    },
+    "source_column": {
+      "type": "object", "additionalProperties": false, "required": ["table_name", "column_name"],
+      "properties": {
+        "table_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Exact approved export carrying the transitive base source."},
+        "column_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Exact approved base column; never a source value or expression."}
+      }
+    },
+    "relationship": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from_table", "from_column", "to_table", "to_column", "cardinality", "cross_filter_direction"],
+      "properties": {
+        "from_table": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Relationship source must be an approved exported table."},
+        "from_column": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Relationship source key must be an approved exported column."},
+        "to_table": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Relationship destination must be an approved exported table."},
+        "to_column": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Relationship destination key must be an approved exported column."},
+        "cardinality": {"enum": ["one_to_one", "one_to_many", "many_to_one"], "description": "Closed supported cardinalities expose the model's join structure."},
+        "cross_filter_direction": {"enum": ["single", "both"], "description": "Retained filtering direction makes cross-table exposure inspectable."}
+      }
+    }
+  }
+}

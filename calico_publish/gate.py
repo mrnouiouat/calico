@@ -77,10 +77,10 @@ def _read_csv(path: Path) -> tuple[bytes, list[list[str]]]:
     return payload, rows
 
 
-def _load_manifest(path: Path) -> dict[str, object]:
+def _load_manifest(path: Path, allowlist: Allowlist) -> dict[str, object]:
     try:
         document = json.loads(path.read_bytes().decode("utf-8"))
-        validate_published_manifest_document(document)
+        validate_published_manifest_document(document, allowlist=allowlist)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ManifestError) as exc:
         raise GateError("gate.manifest_invalid_schema") from exc
     return document
@@ -136,7 +136,7 @@ def verify(
         observed[entry.export_name] = (hashlib.sha256(payload).hexdigest(), len(rows) - 1)
 
     if manifest_path is not None:
-        document = _load_manifest(Path(manifest_path))
+        document = _load_manifest(Path(manifest_path), allowlist)
         records = {item["export_name"]: item for item in document["exports"]}
         if set(records) != set(observed):
             violations.append(GateViolation("manifest", "gate.manifest_export_set_mismatch"))
