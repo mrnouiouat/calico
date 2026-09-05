@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Mapping, Sequence
 
+from calico_landing.contracts import LOGICAL_LIST_ORDER
+
 if TYPE_CHECKING:
     from calico_publish.allowlist import Allowlist
     from calico_publish.export import StagedExport
@@ -32,6 +34,7 @@ _EXPORT_KEYS = frozenset({"export_name", "file_name", "sha256", "row_count", "gr
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _HASH = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
+_SOURCE_LIST_IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]*$")
 _VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _PARSER_VERSION = re.compile(r"^[a-z][a-z0-9_-]*-v[1-9][0-9]*$")
 MANIFEST_ERROR_CATEGORIES = frozenset({
@@ -57,9 +60,13 @@ class SourceObjectRecord:
     sha256: str
     byte_size: int
     row_count: int
+    _source_lists: tuple[str, ...] = field(
+        default=LOGICAL_LIST_ORDER, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
-        _validate_source_object(self.to_dict())
+        source_lists = _validate_source_lists(self._source_lists)
+        _validate_source_object(self.to_dict(), source_lists=source_lists)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -79,7 +86,12 @@ class AcceptedRelease:
 
     def __post_init__(self) -> None:
         _record_tuple(self.source_objects, SourceObjectRecord)
-        _validate_accepted_release(self.to_dict())
+        authorities = {item._source_lists for item in self.source_objects}
+        if len(authorities) != 1:
+            raise ManifestError("manifest.invalid_schema")
+        _validate_accepted_release(
+            self.to_dict(), source_lists=_validate_source_lists(next(iter(authorities)))
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -123,6 +135,9 @@ class PublishedManifest:
     eligible_key_count: int
     exports: tuple[ExportRecord, ...]
     _allowlist: "Allowlist | None" = field(default=None, repr=False, compare=False)
+    _source_lists: tuple[str, ...] = field(
+        default=LOGICAL_LIST_ORDER, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         _record_tuple(self.accepted_releases, AcceptedRelease)
@@ -134,7 +149,10 @@ class PublishedManifest:
                 or len(self.toolchain) != len(_TOOLCHAIN_KEYS)):
             raise ManifestError("manifest.invalid_schema")
         authority = _authority(self._allowlist)
-        validate_published_manifest_document(self.to_dict(), allowlist=authority)
+        source_lists = _validate_source_lists(self._source_lists)
+        validate_published_manifest_document(
+            self.to_dict(), allowlist=authority, source_lists=source_lists
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -149,7 +167,11 @@ class PublishedManifest:
 
     def to_json(self) -> str:
         document = self.to_dict()
-        validate_published_manifest_document(document, allowlist=_authority(self._allowlist))
+        validate_published_manifest_document(
+            document,
+            allowlist=_authority(self._allowlist),
+            source_lists=_validate_source_lists(self._source_lists),
+        )
         return json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
 
 
@@ -164,6 +186,20 @@ def _is_count(value: object, *, positive: bool = False) -> bool:
 def _record_tuple(value: object, record_type: type) -> None:
     if not isinstance(value, tuple) or not all(isinstance(item, record_type) for item in value):
         raise ManifestError("manifest.invalid_schema")
+
+
+def _validate_source_lists(source_lists: object) -> tuple[str, ...]:
+    if (
+        not isinstance(source_lists, tuple)
+        or not source_lists
+        or not all(
+            isinstance(item, str) and _SOURCE_LIST_IDENTIFIER.fullmatch(item)
+            for item in source_lists
+        )
+        or len(source_lists) != len(set(source_lists))
+    ):
+        raise ManifestError("manifest.invalid_schema")
+    return source_lists
 
 
 def _authority(allowlist: "Allowlist | None") -> "Allowlist":
@@ -189,10 +225,12 @@ def _authority(allowlist: "Allowlist | None") -> "Allowlist":
     return allowlist
 
 
-def _validate_source_object(document: object) -> None:
+def _validate_source_object(
+    document: object, *, source_lists: tuple[str, ...]
+) -> None:
     if not isinstance(document, dict) or set(document) != _SOURCE_OBJECT_KEYS:
         raise ManifestError("manifest.invalid_schema")
-    if not isinstance(document.get("source_list"), str) or not _IDENTIFIER.fullmatch(document["source_list"]):
+    if document.get("source_list") not in source_lists:
         raise ManifestError("manifest.invalid_schema")
     if not isinstance(document.get("sha256"), str) or not _HASH.fullmatch(document["sha256"]):
         raise ManifestError("manifest.invalid_hash")
@@ -200,7 +238,9 @@ def _validate_source_object(document: object) -> None:
         raise ManifestError("manifest.negative_count")
 
 
-def _validate_accepted_release(document: object) -> None:
+def _validate_accepted_release(
+    document: object, *, source_lists: tuple[str, ...]
+) -> None:
     if not isinstance(document, dict) or set(document) != _ACCEPTED_RELEASE_KEYS:
         raise ManifestError("manifest.invalid_schema")
     if not isinstance(document.get("as_of_date"), str) or not _DATE.fullmatch(document["as_of_date"]):
@@ -215,9 +255,13 @@ def _validate_accepted_release(document: object) -> None:
     if not isinstance(source_objects, list) or not source_objects:
         raise ManifestError("manifest.invalid_schema")
     for source_object in source_objects:
-        _validate_source_object(source_object)
-    source_lists = [item["source_list"] for item in source_objects]
-    if source_lists != sorted(source_lists) or len(source_lists) != len(set(source_lists)):
+        _validate_source_object(source_object, source_lists=source_lists)
+    observed_source_lists = [item["source_list"] for item in source_objects]
+    if (
+        observed_source_lists != sorted(observed_source_lists)
+        or set(observed_source_lists) != set(source_lists)
+        or len(observed_source_lists) != len(source_lists)
+    ):
         raise ManifestError("manifest.invalid_schema")
 
 
@@ -243,15 +287,21 @@ def _validate_export(document: object) -> None:
         raise ManifestError("manifest.invalid_schema")
 
 
-def validate_published_manifest_document(document: object, *, allowlist: "Allowlist | None" = None) -> None:
+def validate_published_manifest_document(
+    document: object,
+    *,
+    allowlist: "Allowlist | None" = None,
+    source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
+) -> None:
     """Validate public provenance against the committed authority by default.
 
-    Default readers may inspect a nonempty subset of approved exports. Supplying
-    an authority also requires its exact export set, including fixture contracts.
+    Default readers validate the complete production source-list authority.
+    Fixture readers must supply their own explicit closed source-list tuple.
     JSON Schema describes structure; this validator also proves ordering,
     identity uniqueness, and agreement with the external publication authority.
     """
 
+    source_lists = _validate_source_lists(source_lists)
     if not isinstance(document, dict) or set(document) != MANIFEST_DOCUMENT_KEYS:
         raise ManifestError("manifest.invalid_schema")
     if type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
@@ -274,7 +324,7 @@ def validate_published_manifest_document(document: object, *, allowlist: "Allowl
     if not isinstance(releases, list) or not releases:
         raise ManifestError("manifest.empty_accepted_releases")
     for release in releases:
-        _validate_accepted_release(release)
+        _validate_accepted_release(release, source_lists=source_lists)
     release_keys = [(item["as_of_date"], item["release_revision"]) for item in releases]
     if len(release_keys) != len(set(release_keys)):
         raise ManifestError("manifest.duplicate_accepted_release")
@@ -309,6 +359,7 @@ def project_published_manifest(
     eligible_key_count: int,
     parser_contract_version: str,
     toolchain: Mapping[str, str],
+    source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
 ) -> PublishedManifest:
     """Construct the manifest only from explicitly named, already-safe fields."""
 
@@ -321,6 +372,7 @@ def project_published_manifest(
             or not all(isinstance(item, AcceptedRelease) for item in accepted_releases)):
         raise ManifestError("manifest.missing_input")
     allowlist = _authority(allowlist)
+    source_lists = _validate_source_lists(source_lists)
     if not all(isinstance(item.export_name, str) for item in staged_exports):
         raise ManifestError("manifest.invalid_schema")
     if (set(toolchain) != _TOOLCHAIN_KEYS
@@ -358,6 +410,7 @@ def project_published_manifest(
         eligible_key_count=eligible_key_count,
         exports=exports,
         _allowlist=allowlist,
+        _source_lists=source_lists,
     )
 
 

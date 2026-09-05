@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from calico_dbt import runner
+from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.allowlist import Allowlist, AllowlistError, load_allowlist
 from calico_publish.export import StagedExport, export_all
 from calico_publish.gate import verify
@@ -39,13 +40,14 @@ def _safe_release() -> AcceptedRelease:
         as_of_date="2026-01-01",
         release_revision=1,
         revision_fingerprint="0" * 64,
-        source_objects=(
+        source_objects=tuple(
             SourceObjectRecord(
-                source_list="charities_may_operate",
-                sha256="1" * 64,
+                source_list=name,
+                sha256=str(index) * 64,
                 byte_size=1,
                 row_count=0,
-            ),
+            )
+            for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
         ),
     )
 

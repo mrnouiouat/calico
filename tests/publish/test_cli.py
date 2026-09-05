@@ -12,10 +12,14 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from calico_dbt.catalog import load_input_catalog
 from calico_publish.allowlist import AllowlistError, load_allowlist
 from calico_publish.cli import main
 from calico_dbt.runner import BuildOutcome
+from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.export import StagedExport
 from tests.fixtures.publish.fixture_builder import (
     BASELINE_DIR,
@@ -35,6 +39,48 @@ def _invoke(argv: list[str], **kwargs) -> tuple[int, str, str]:
 
 
 class PublicationCliTests(unittest.TestCase):
+    def test_real_catalog_projects_the_complete_canonical_source_set(self) -> None:
+        from calico_publish.cli import _accepted_releases
+
+        catalog = load_input_catalog(REPO_ROOT / "contracts/dbt-input-catalog-v1.json")
+        anchor = catalog.releases[0]
+        logical_lists = tuple(
+            (
+                name,
+                SimpleNamespace(
+                    raw_sha256=str(index) * 64,
+                    raw_byte_count=index,
+                    parsed_record_count=index,
+                ),
+            )
+            for index, name in enumerate(LOGICAL_LIST_ORDER, start=1)
+        )
+        verified = SimpleNamespace(
+            as_of_date=anchor.as_of_date,
+            release_revision=anchor.release_revision,
+            revision_fingerprint=anchor.revision_fingerprint,
+            parser_contract_version=1,
+            logical_lists=logical_lists,
+        )
+        single_release_catalog = type(catalog)(
+            contract_version=catalog.contract_version,
+            releases=(anchor,),
+        )
+
+        with patch(
+            "calico_publish.cli.load_and_verify_revision_manifest",
+            return_value=verified,
+        ):
+            releases, parser_version = _accepted_releases(
+                "real", Path("unused"), lambda: single_release_catalog
+            )
+
+        self.assertEqual(parser_version, "registry-csv-contract-v1")
+        self.assertEqual(
+            {item.source_list for item in releases[0].source_objects},
+            set(LOGICAL_LIST_ORDER),
+        )
+
     def test_command_table_contains_complete_publication_surface(self) -> None:
         from calico_publish.cli import _COMMANDS
 

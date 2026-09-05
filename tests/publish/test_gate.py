@@ -31,10 +31,16 @@ from tests.fixtures.publish.fixture_builder import (
 )
 
 _MANIFEST = Path("manifest") / "published-manifest-v1.json"
+_FIXTURE_SOURCE_LISTS = ("synthetic_source",)
 
 
 def _verify(root: Path):
-    return verify(root, load_allowlist(root / "publication-exports-v1.json"), root / _MANIFEST)
+    return verify(
+        root,
+        load_allowlist(root / "publication-exports-v1.json"),
+        root / _MANIFEST,
+        source_lists=_FIXTURE_SOURCE_LISTS,
+    )
 
 
 def _categories(root: Path) -> list[str]:
@@ -45,8 +51,18 @@ class PublicationGateFixtureTests(unittest.TestCase):
     def test_01_committed_baseline_loads_and_passes(self) -> None:
         allowlist = load_allowlist(BASELINE_DIR / "publication-exports-v1.json")
         document = json.loads((BASELINE_DIR / _MANIFEST).read_text(encoding="utf-8"))
-        validate_published_manifest_document(document, allowlist=allowlist)
-        self.assertEqual(verify(BASELINE_DIR, allowlist, BASELINE_DIR / _MANIFEST).violations, ())
+        validate_published_manifest_document(
+            document, allowlist=allowlist, source_lists=_FIXTURE_SOURCE_LISTS
+        )
+        self.assertEqual(
+            verify(
+                BASELINE_DIR,
+                allowlist,
+                BASELINE_DIR / _MANIFEST,
+                source_lists=_FIXTURE_SOURCE_LISTS,
+            ).violations,
+            (),
+        )
 
     def test_committed_csv_bytes_are_utf8_lf_without_bom(self) -> None:
         for path in sorted((BASELINE_DIR / "exports").glob("*.csv")):
@@ -199,8 +215,18 @@ class PublicationGateContentTests(unittest.TestCase):
             if path.is_file()
         }
         allowlist = load_allowlist(BASELINE_DIR / "publication-exports-v1.json")
-        first = verify(BASELINE_DIR, allowlist, BASELINE_DIR / _MANIFEST)
-        second = verify(BASELINE_DIR, allowlist, BASELINE_DIR / _MANIFEST)
+        first = verify(
+            BASELINE_DIR,
+            allowlist,
+            BASELINE_DIR / _MANIFEST,
+            source_lists=_FIXTURE_SOURCE_LISTS,
+        )
+        second = verify(
+            BASELINE_DIR,
+            allowlist,
+            BASELINE_DIR / _MANIFEST,
+            source_lists=_FIXTURE_SOURCE_LISTS,
+        )
         after = {
             path.relative_to(BASELINE_DIR): path.read_bytes()
             for path in BASELINE_DIR.rglob("*")

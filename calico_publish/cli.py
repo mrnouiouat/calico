@@ -15,6 +15,7 @@ from calico_capture.b2 import B2ReadOnlyArchive
 from calico_capture.cli import _resolve_local_manifest_path, _restore_build
 from calico_dbt.catalog import InputCatalog, load_and_verify_revision_manifest, load_input_catalog
 from calico_dbt.runner import BuildOutcome, build
+from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.allowlist import Allowlist, AllowlistError, load_allowlist
 from calico_publish.export import StagedExport, export_all
 from calico_publish.gate import GateError, verify
@@ -34,6 +35,7 @@ _PUBLISH_KEY_ID_ENV = "CALICO_B2_PUBLISH_KEY_ID"
 _PUBLISH_KEY_ENV = "CALICO_B2_PUBLISH_KEY"
 _TARGET_REF = "published-data"
 _TOOLCHAIN = {"python": "3.13.15", "dbt_core": "1.10.23", "dbt_duckdb": "1.10.1", "duckdb": "1.5.5"}
+_FIXTURE_SOURCE_LISTS = ("synthetic_source",)
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
@@ -69,7 +71,15 @@ def _accepted_releases(
     if mode == "fixture":
         release = AcceptedRelease(
             "2026-01-01", 1, "0" * 64,
-            (SourceObjectRecord("registry", "0" * 64, 0, 0),),
+            (
+                SourceObjectRecord(
+                    "synthetic_source",
+                    "0" * 64,
+                    0,
+                    0,
+                    _source_lists=_FIXTURE_SOURCE_LISTS,
+                ),
+            ),
         )
         return (release,), "registry-csv-contract-v1"
     catalog = catalog_loader()
@@ -146,6 +156,7 @@ def _prepare_publication(
     manifest = project_published_manifest(
         allowlist=allowlist, staged_exports=staged, accepted_releases=releases,
         eligible_key_count=eligible, parser_contract_version=parser_version, toolchain=_TOOLCHAIN,
+        source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
     )
     manifest_path = staging / _MANIFEST_RELATIVE_PATH
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -159,7 +170,12 @@ def _run_verify(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
     assert callable(loader)
     allowlist = loader(_allowlist_path(args))
     staging = Path(args.staging)
-    result = verify(staging, allowlist, staging / _MANIFEST_RELATIVE_PATH)
+    result = verify(
+        staging,
+        allowlist,
+        staging / _MANIFEST_RELATIVE_PATH,
+        source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
+    )
     if result.passed:
         print(_dict_json({"category": "gate.verified", "violation_count": 0}))
         return 0
@@ -180,7 +196,12 @@ def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int
         raise TransactionError("transaction.parent_not_found")
     staging, allowlist, staged, paths = _prepare_publication(args, **runtime["prepare_kwargs"])
     before_scan = _hash_explicit_files(staging, paths)
-    result = verify(staging, allowlist, staging / _MANIFEST_RELATIVE_PATH)
+    result = verify(
+        staging,
+        allowlist,
+        staging / _MANIFEST_RELATIVE_PATH,
+        source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
+    )
     if not result.passed:
         for finding in result.violations:
             print(finding.render())

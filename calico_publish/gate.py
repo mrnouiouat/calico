@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.allowlist import AGGREGATE_PROHIBITED_COLUMNS, Allowlist
 from calico_publish.manifest import ManifestError, validate_published_manifest_document
 
@@ -126,6 +127,7 @@ def _validate_manifest(
     document: dict[str, object],
     allowlist: Allowlist,
     observed: dict[str, tuple[str, int]],
+    source_lists: tuple[str, ...],
 ) -> bool:
     """Validate identities and return whether a known export is omitted."""
 
@@ -156,12 +158,16 @@ def _validate_manifest(
                 )
             padded["exports"] = sorted(padded_exports, key=lambda item: item["export_name"])
             try:
-                validate_published_manifest_document(padded, allowlist=allowlist)
+                validate_published_manifest_document(
+                    padded, allowlist=allowlist, source_lists=source_lists
+                )
             except ManifestError as exc:
                 raise GateError("gate.manifest_invalid_schema") from exc
             return True
     try:
-        validate_published_manifest_document(document, allowlist=allowlist)
+        validate_published_manifest_document(
+            document, allowlist=allowlist, source_lists=source_lists
+        )
     except ManifestError as exc:
         raise GateError("gate.manifest_invalid_schema") from exc
     return False
@@ -183,6 +189,8 @@ def verify(
     staging_dir: str | Path,
     allowlist: Allowlist,
     manifest_path: str | Path | None = None,
+    *,
+    source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
 ) -> GateResult:
     """Verify exact fields, order, grain, encoding, and optional provenance."""
 
@@ -234,7 +242,9 @@ def verify(
 
     if manifest_path is not None:
         document = _load_manifest_payload(Path(manifest_path))
-        export_set_mismatch = _validate_manifest(document, allowlist, observed)
+        export_set_mismatch = _validate_manifest(
+            document, allowlist, observed, source_lists
+        )
         if export_set_mismatch:
             violations.append(GateViolation("manifest", "gate.manifest_export_set_mismatch"))
         records = {

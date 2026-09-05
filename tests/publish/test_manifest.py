@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from calico_publish import manifest as module
+from calico_landing.contracts import LOGICAL_LIST_ORDER
 from calico_publish.allowlist import load_allowlist
 from calico_publish.export import StagedExport
 from calico_publish.gate import GateError, verify
@@ -24,8 +25,15 @@ def inputs():
         staged_exports=tuple(StagedExport(e.export_name, e.file_name,
                              "exports/" + e.file_name, "a" * 64, 0)
                              for e in authority.exports),
-        accepted_releases=(module.AcceptedRelease("2026-01-01", 1, "b" * 64,
-                           (module.SourceObjectRecord("charities_may_operate", "c" * 64, 0, 0),)),),
+        accepted_releases=(module.AcceptedRelease(
+            "2026-01-01",
+            1,
+            "b" * 64,
+            tuple(
+                module.SourceObjectRecord(name, str(index) * 64, 0, 0)
+                for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)
+            ),
+        ),),
         eligible_key_count=0, parser_contract_version="registry-csv-contract-v1",
         toolchain=dict(python="3.13.15", dbt_core="1.10.23", dbt_duckdb="1.10.1", duckdb="1.5.5"),
     )
@@ -132,9 +140,32 @@ class ManifestTests(unittest.TestCase):
         arguments = inputs()
         arguments["allowlist"] = dataclasses.replace(arguments["allowlist"], exports=arguments["allowlist"].exports[:1])
         arguments["staged_exports"] = arguments["staged_exports"][:1]
+        fixture_sources = ("synthetic_source",)
+        arguments["accepted_releases"] = (
+            module.AcceptedRelease(
+                "2026-01-01",
+                1,
+                "b" * 64,
+                (
+                    module.SourceObjectRecord(
+                        "synthetic_source",
+                        "c" * 64,
+                        0,
+                        0,
+                        _source_lists=fixture_sources,
+                    ),
+                ),
+            ),
+        )
+        arguments["source_lists"] = fixture_sources
         result = module.project_published_manifest(**arguments)
-        module.validate_published_manifest_document(json.loads(result.to_json()))
-        module.validate_published_manifest_document(result.to_dict(), allowlist=arguments["allowlist"])
+        with self.assertRaises(module.ManifestError):
+            module.validate_published_manifest_document(json.loads(result.to_json()))
+        module.validate_published_manifest_document(
+            result.to_dict(),
+            allowlist=arguments["allowlist"],
+            source_lists=fixture_sources,
+        )
 
     def test_missing_and_malformed_builder_inputs_are_safe(self):
         for key in self.arguments:
@@ -189,12 +220,22 @@ class ManifestTests(unittest.TestCase):
             (root / "exports" / entry.file_name).write_bytes(payload)
             path = root / "manifest.json"
             path.write_bytes(manifest.to_json().encode("ascii"))
-            self.assertTrue(verify(root, authority, path).passed)
+            self.assertTrue(
+                verify(
+                    root,
+                    authority,
+                    path,
+                ).passed
+            )
             changed = manifest.to_dict()
             changed["exports"][0]["grain"] = ["unapproved"]
             path.write_text(json.dumps(changed), encoding="utf-8")
             with self.assertRaises(GateError) as raised:
-                verify(root, authority, path)
+                verify(
+                    root,
+                    authority,
+                    path,
+                )
             self.assertEqual(str(raised.exception), "gate.manifest_invalid_schema")
 
     def test_nested_invalid_hashes_and_counts(self):
