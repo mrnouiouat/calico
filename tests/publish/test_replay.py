@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -28,6 +29,66 @@ from tests.capture.test_tracer import (
 )
 from tests.fixtures.landing.fixture_builder import wrong_header
 from tests.fixtures.publish.fixture_builder import BASELINE_DIR, extra_unapproved_column
+
+_WORKFLOW_PATH = Path(__file__).resolve().parents[2] / ".github/workflows/capture-current.yml"
+
+
+def _published_workflow_expression() -> str:
+    lines = _WORKFLOW_PATH.read_text(encoding="utf-8").splitlines()
+    publish_index = lines.index("  publish:")
+    condition = next(
+        line.strip() for line in lines[publish_index + 1 :] if line.strip().startswith("if:")
+    )
+    return condition.removeprefix("if: ${{ ").removesuffix(" }}")
+
+
+def _evaluate_published_workflow_expression(
+    *,
+    mode: str,
+    should_run: str,
+    capture_result: str,
+    status_result: str,
+    status_json: str,
+    cancelled: bool = False,
+) -> bool:
+    """Evaluate the committed publish condition, rather than duplicating it."""
+
+    expression = _published_workflow_expression()
+    if not re.fullmatch(r"[A-Za-z0-9_.'()=!&| ${}\-]+", expression):
+        raise AssertionError("workflow condition left the supported closed grammar")
+    translated = expression.replace(
+        "fromJSON(needs.capture.outputs.status_json).outcome",
+        "_outcome(status_json)",
+    )
+    for reference, variable in (
+        ("needs.calendar-gate.outputs.should_run", "should_run"),
+        ("needs.calendar-gate.outputs.mode", "mode"),
+        ("needs.capture.outputs.status_json", "status_json"),
+        ("needs.capture.result", "capture_result"),
+        ("needs.status.result", "status_result"),
+    ):
+        translated = translated.replace(reference, variable)
+    translated = translated.replace("!cancelled()", "not cancelled")
+    translated = translated.replace("&&", "and").replace("||", "or")
+
+    def _outcome(document: str) -> object:
+        parsed = json.loads(document)
+        return parsed.get("outcome") if isinstance(parsed, dict) else None
+
+    return bool(
+        eval(
+            translated,
+            {"__builtins__": {}, "_outcome": _outcome},
+            {
+                "mode": mode,
+                "should_run": should_run,
+                "capture_result": capture_result,
+                "status_result": status_result,
+                "status_json": status_json,
+                "cancelled": cancelled,
+            },
+        )
+    )
 
 
 class _TransactionSpy:
@@ -108,9 +169,17 @@ class _ReplayHarness:
         *,
         publication: Path = BASELINE_DIR,
         add_privacy_finding: bool = False,
+        mode: str = "capture",
+        capture_result: str = "success",
+        status_result: str = "success",
     ) -> tuple[int | None, dict[str, object] | None]:
-        # This is the same accepted-only condition as the hosted workflow.
-        if status.outcome != "accepted":
+        if not _evaluate_published_workflow_expression(
+            mode=mode,
+            should_run="true",
+            capture_result=capture_result,
+            status_result=status_result,
+            status_json=status.to_json(),
+        ):
             return None, None
 
         if self.staging.exists():
@@ -177,6 +246,38 @@ class _ReplayHarness:
 
 
 class PublicationReplayTests(unittest.TestCase):
+    def test_committed_workflow_expression_routes_every_dependency_state(self) -> None:
+        cases = (
+            ("republish", "true", "skipped", "skipped", "", False, True),
+            ("republish", "true", "success", "skipped", "", False, False),
+            ("republish", "true", "skipped", "success", "", False, False),
+            ("capture", "true", "success", "success", "accepted", False, True),
+            ("capture", "true", "success", "failure", "accepted", False, False),
+            ("capture", "true", "failure", "success", "accepted", False, False),
+            ("capture", "true", "success", "success", "rejected", False, False),
+            ("capture", "false", "success", "success", "accepted", False, False),
+            ("capture", "true", "success", "success", "accepted", True, False),
+        )
+        for mode, should_run, capture_result, status_result, outcome, cancelled, expected in cases:
+            with self.subTest(
+                mode=mode,
+                capture_result=capture_result,
+                status_result=status_result,
+                outcome=outcome,
+            ):
+                status_json = "" if not outcome else json.dumps({"outcome": outcome})
+                self.assertEqual(
+                    _evaluate_published_workflow_expression(
+                        mode=mode,
+                        should_run=should_run,
+                        capture_result=capture_result,
+                        status_result=status_result,
+                        status_json=status_json,
+                        cancelled=cancelled,
+                    ),
+                    expected,
+                )
+
     def _accepted(self) -> CaptureStatus:
         with _status_contract_compliant_candidate() as candidate:
             return capture(
