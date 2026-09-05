@@ -124,6 +124,34 @@ fixed `CALICO_AUTHZ_PROBE::<category>=<denied|allowed>` marker lines (no `--stat
 that job never produces a capture-status document). Both modes report only a fixed pass/fail
 category.
 
+### Build, gate, and publish the accepted history
+
+Use a dedicated publication-read credential with exactly `listFiles` and `readFiles` on the
+fixed archive scope. It is not the capture credential:
+
+```
+set CALICO_B2_PUBLISH_KEY_ID=<owner-supplied-value>
+set CALICO_B2_PUBLISH_KEY=<owner-supplied-value>
+```
+
+Prepare fresh external store and staging directories, then prove the entire production sequence
+without changing the remote ref first:
+
+```
+python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data --dry-run
+```
+
+Only after the dry run succeeds, repeat the same one-process sequence without `--dry-run`:
+
+```
+python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data
+```
+
+The command restores hash-verified history, builds once, writes every allowlisted export and its
+manifest, runs the publication gate and streaming privacy scan over those exact staged files, and
+then makes one non-force atomic update. Clear the dedicated credential from the shell afterward.
+This manual sequence remains the fallback publication path even after the hosted workflow works.
+
 ## Missed or delayed runs
 
 A delayed, disabled, or failed scheduled run is expected operational behavior, not a data-loss

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from tools.privacy_scan.git_objects import GitObjectError
 from tools.privacy_scan.policy import Policy, PathRule, PolicyError
-from tools.privacy_scan.scanner import Finding, scan
+from tools.privacy_scan.scanner import Finding, ScanPathError, scan, scan_paths
 
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[bytes]:
@@ -272,6 +272,57 @@ class TestScannerHistoryDeduplication(unittest.TestCase):
 
         fein_findings = [f for f in findings if f.category == "fein"]
         self.assertEqual(len(fein_findings), 1)
+
+
+class TestStreamingScanner(unittest.TestCase):
+    def test_clean_named_history_larger_than_one_mebibyte_passes(self) -> None:
+        with TempGitRepo() as repo:
+            repo.write_file("large.csv", b"organization_name,city,state\n" + (b"Synthetic Org,Sample,CA\n" * 50000))
+            repo.add("large.csv")
+            commit = repo.commit("add large clean blob")
+            findings = scan(treeish=commit, history_all=False, repo_dir=repo.path, policy=_default_policy())
+        self.assertEqual(findings, [])
+
+    def test_large_git_blob_is_streamed_and_violation_after_one_mebibyte_is_found(self) -> None:
+        with TempGitRepo() as repo:
+            repo.write_file("large.txt", (b"safe line\n" * 110000) + b"FEIN on file: 94-" + b"1234567\n")
+            repo.add("large.txt")
+            commit = repo.commit("add large blob")
+            findings = scan(treeish=commit, history_all=False, repo_dir=repo.path, policy=_default_policy())
+        self.assertIn("fein", {finding.category for finding in findings})
+        self.assertNotIn("oversize_blob", {finding.category for finding in findings})
+        rendered = "\n".join(finding.render() for finding in findings)
+        self.assertNotIn("94-" + "1234567", rendered)
+
+    def test_detector_survives_tiny_arbitrary_chunk_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "notes.txt").write_bytes(b"Federal Employer ID Number: 941" + b"234567\n")
+            with unittest.mock.patch("tools.privacy_scan.scanner._STREAM_CHUNK_BYTES", 3):
+                findings = scan_paths(root, ("notes.txt",), _default_policy())
+        self.assertIn("fein", {finding.category for finding in findings})
+
+    def test_long_record_is_scanned_whole_and_overlong_record_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "long.txt").write_bytes(
+                b"x" * 70000 + b" https://example.invalid/lookup?fe" + b"in=941" + b"234567\n"
+            )
+            findings = scan_paths(root, ("long.txt",), _default_policy())
+            self.assertIn("unapproved_join_field", {finding.category for finding in findings})
+            (root / "long.txt").write_bytes(b"x" * 1048577 + b"\n")
+            findings = scan_paths(root, ("long.txt",), _default_policy())
+        self.assertEqual(findings, [Finding("oversize_record", "long.txt", "line 1")])
+
+    def test_explicit_sorted_path_list_is_required_and_unlisted_files_are_not_walked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "a.txt").write_text("safe\n", encoding="utf-8")
+            (root / "unlisted.txt").write_bytes(b"FEIN: 94-" + b"1234567\n")
+            self.assertEqual(scan_paths(root, ("a.txt",), _default_policy()), [])
+            for paths in (("b.txt", "a.txt"), ("a.txt", "a.txt"), ("../a.txt",), ("C:" + "/a.txt",)):
+                with self.subTest(paths=paths), self.assertRaises(ScanPathError):
+                    scan_paths(root, paths, _default_policy())
 
 
 class TestFindingShape(unittest.TestCase):

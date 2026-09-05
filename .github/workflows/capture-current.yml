@@ -3,7 +3,8 @@ name: Capture Current Registry Release
 # Per D-04/D-06/D-08/D-11 (06-06-PLAN.md): scheduled and ordinary manual
 # `capture` dispatch runs both call the exact same production
 # `python -m calico_capture run` command the mandatory local runbook also
-# calls. `authorization_probe` is a closed, no-secret dispatch mode reserved
+# calls. `republish` enters only the restore/build/publication path, while
+# `authorization_probe` is a closed, no-secret dispatch mode reserved
 # solely for Plan 07's future effective-ref positive/negative tests -- it
 # never enters the source/B2 path (the `capture`/`status` jobs below only
 # run for `mode == 'capture'`). This workflow stays unactivated (no
@@ -21,12 +22,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "capture (normal manual run) or authorization_probe (Plan 07 no-secret ref probe only)"
+        description: "capture, republish, or authorization_probe"
         type: choice
         required: true
         default: capture
         options:
           - capture
+          - republish
           - authorization_probe
 
 permissions:
@@ -217,6 +219,41 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write("\n".join(lines) + "\n")
           PY
+
+  publish:
+    name: Publish (read-only archive restore, contents write)
+    needs: [calendar-gate, capture, status]
+    if: ${{ !cancelled() && needs.calendar-gate.outputs.should_run == 'true' && ( needs.calendar-gate.outputs.mode == 'republish' || ( needs.calendar-gate.outputs.mode == 'capture' && needs.capture.result == 'success' && needs.capture.outputs.status_json != '' && fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment: capture-automation
+    steps:
+      - name: Checkout (persisted credentials required for the non-force publication)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13.15'
+
+      - name: Install exact dbt and capture toolchain pins
+        run: |
+          python -m pip install --requirement requirements-dbt.txt
+          python -m pip install --requirement requirements-capture.txt
+
+      - name: Restore verified history, build once, gate, and publish
+        env:
+          CALICO_B2_PUBLISH_KEY_ID: ${{ secrets.CALICO_B2_PUBLISH_KEY_ID }}
+          CALICO_B2_PUBLISH_KEY: ${{ secrets.CALICO_B2_PUBLISH_KEY }}
+        run: |
+          PUBLISH_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$PUBLISH_ROOT"' EXIT
+          mkdir -p "$PUBLISH_ROOT/store" "$PUBLISH_ROOT/staging"
+          python -m calico_publish publish --mode real --store "$PUBLISH_ROOT/store" --staging "$PUBLISH_ROOT/staging" --remote origin --target-ref published-data
 
   authorization-probe:
     # Plan 07: proves the *effective* server-side ref boundary (not just YAML

@@ -16,16 +16,19 @@ content -- only `category`, POSIX `path`, and a safe `locator` (D-10).
 
 from __future__ import annotations
 
+import codecs
+import itertools
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import Iterable
 from urllib.parse import parse_qsl, urlsplit
 
 from tools.privacy_scan.git_objects import (
-    ObjectSkip,
-    ScannableBlob,
+    BatchBlobReader,
+    GitObjectError,
+    classify_mode,
     iter_target_entries,
-    load_scannable_objects,
 )
 from tools.privacy_scan.policy import Policy
 
@@ -64,6 +67,21 @@ _ALLOWED_VERIFICATION_PATH_PREFIX = "/verification/"
 #: Query-string keys that indicate an unapproved external join (D-007
 #: excluded field), regardless of host.
 _UNAPPROVED_JOIN_QUERY_KEYS = frozenset({"fein", "ein", "ssn"})
+
+_STREAM_CHUNK_BYTES = 65536
+# A publication record may be large, but it must not make scanner memory
+# unbounded. Records beyond this fixed ceiling fail closed instead of being
+# skipped or scanned with an insufficient overlap window.
+_MAX_STREAM_RECORD_CHARS = 1048576
+_LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec"
+
+
+class ScanPathError(Exception):
+    """A fixed, value-free failure at the explicit-path scan boundary."""
+
+    def __init__(self, category: str) -> None:
+        super().__init__(category)
+        self.category = category
 
 
 @dataclass(frozen=True)
@@ -135,6 +153,157 @@ def scan_text(path: str, text: str) -> list[Finding]:
     return findings
 
 
+def _scan_record(path: str, record: str, line_number: int) -> list[Finding]:
+    """Scan one complete record while preserving its absolute line locator."""
+
+    return [
+        Finding(item.category, item.path, f"line {line_number}")
+        for item in scan_text(path, record)
+    ]
+
+
+def _scan_utf8_chunks(path: str, chunks: Iterable[bytes]) -> list[Finding]:
+    """Incrementally decode and scan complete newline-delimited records.
+
+    Detector tokens may be arbitrarily split across byte chunks because a
+    complete record is retained until its newline. A deliberately overlong
+    record is drained and reported with a value-free finding, preserving the
+    bounded-memory guarantee without introducing a blind spot.
+    """
+
+    iterator = iter(chunks)
+    prefix_parts: list[bytes] = []
+    prefix_size = 0
+    while prefix_size < len(_LFS_POINTER_PREFIX):
+        try:
+            part = next(iterator)
+        except StopIteration:
+            break
+        prefix_parts.append(part)
+        prefix_size += len(part)
+    initial = b"".join(prefix_parts)
+    if initial.startswith(_LFS_POINTER_PREFIX):
+        # Exhaust the source so a Git batch reader consumes its protocol
+        # trailer before another object is requested.
+        for _ in iterator:
+            pass
+        return [Finding("lfs_pointer", path, "blob")]
+
+    decoder = codecs.getincrementaldecoder("utf-8")("strict")
+    findings: list[Finding] = []
+    record = ""
+    line_number = 1
+    discarding_overlong = False
+
+    def consume_text(text: str) -> None:
+        nonlocal record, line_number, discarding_overlong
+        position = 0
+        while position < len(text):
+            newline = text.find("\n", position)
+            end = len(text) if newline < 0 else newline + 1
+            piece = text[position:end]
+            position = end
+            if discarding_overlong:
+                if newline >= 0:
+                    discarding_overlong = False
+                    line_number += 1
+                continue
+            if len(record) + len(piece) > _MAX_STREAM_RECORD_CHARS:
+                findings.append(Finding("oversize_record", path, f"line {line_number}"))
+                record = ""
+                if newline >= 0:
+                    line_number += 1
+                else:
+                    discarding_overlong = True
+                continue
+            record += piece
+            if newline >= 0:
+                findings.extend(_scan_record(path, record, line_number))
+                record = ""
+                line_number += 1
+
+    try:
+        for chunk in itertools.chain((initial,), iterator):
+            if b"\x00" in chunk:
+                # Drain before returning when this is a batch Git object.
+                for _ in iterator:
+                    pass
+                return [Finding("binary_content", path, "blob")]
+            consume_text(decoder.decode(chunk, final=False))
+        consume_text(decoder.decode(b"", final=True))
+    except UnicodeDecodeError:
+        for _ in iterator:
+            pass
+        return [Finding("invalid_utf8", path, "blob")]
+
+    if record:
+        findings.extend(_scan_record(path, record, line_number))
+    return findings
+
+
+def _validated_relative_paths(relative_paths: Iterable[str]) -> tuple[str, ...]:
+    try:
+        paths = tuple(relative_paths)
+    except TypeError as exc:
+        raise ScanPathError("privacy_scan.invalid_path_list") from exc
+    if (
+        not paths
+        or not all(isinstance(path, str) and path for path in paths)
+        or tuple(sorted(paths)) != paths
+        or len(paths) != len(set(paths))
+    ):
+        raise ScanPathError("privacy_scan.invalid_path_list")
+    for raw in paths:
+        pure = PurePosixPath(raw)
+        if (
+            "\\" in raw
+            or re.match(r"^[A-Za-z]:", raw)
+            or pure.is_absolute()
+            or ".." in pure.parts
+            or pure.as_posix() != raw
+        ):
+            raise ScanPathError("privacy_scan.invalid_path_list")
+    return paths
+
+
+def scan_paths(
+    root_dir: str | Path,
+    relative_paths: Iterable[str],
+    policy: Policy,
+) -> list[Finding]:
+    """Stream only the caller's explicit, sorted publication path list."""
+
+    try:
+        root = Path(root_dir)
+        if root.is_symlink():
+            raise ScanPathError("privacy_scan.invalid_root")
+        resolved_root = root.resolve(strict=True)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ScanPathError("privacy_scan.invalid_root") from exc
+    if not resolved_root.is_dir():
+        raise ScanPathError("privacy_scan.invalid_root")
+
+    paths = _validated_relative_paths(relative_paths)
+    findings: list[Finding] = []
+    for relative_path in paths:
+        findings.extend(check_path_rules(relative_path, policy))
+        candidate = resolved_root.joinpath(*PurePosixPath(relative_path).parts)
+        try:
+            if candidate.is_symlink() or not candidate.is_file():
+                raise ScanPathError("privacy_scan.non_regular_file")
+            resolved = candidate.resolve(strict=True)
+            if not resolved.is_relative_to(resolved_root):
+                raise ScanPathError("privacy_scan.invalid_path_list")
+            with resolved.open("rb") as handle:
+                chunks = iter(lambda: handle.read(_STREAM_CHUNK_BYTES), b"")
+                findings.extend(_scan_utf8_chunks(relative_path, chunks))
+        except ScanPathError:
+            raise
+        except OSError as exc:
+            raise ScanPathError("privacy_scan.unreadable_file") from exc
+    return sorted(findings, key=lambda item: (item.path, item.locator, item.category))
+
+
 def check_path_rules(path: str, policy: Policy) -> list[Finding]:
     """Apply the strict exact/prefix/suffix path policy to a candidate path."""
 
@@ -170,11 +339,15 @@ def scan(
     for entry in entries:
         findings.extend(check_path_rules(entry.path, policy))
 
-    objects = load_scannable_objects(entries, repo_dir, policy.max_blob_bytes)
-    for obj in objects:
-        if isinstance(obj, ObjectSkip):
-            findings.append(Finding(category=obj.category, path=obj.path, locator="blob"))
-        elif isinstance(obj, ScannableBlob):
-            findings.extend(scan_text(obj.path, obj.text))
+    try:
+        with BatchBlobReader(repo_dir) as reader:
+            for entry in entries:
+                category = classify_mode(entry.mode, entry.obj_type)
+                if category is not None:
+                    findings.append(Finding(category=category, path=entry.path, locator="blob"))
+                    continue
+                findings.extend(_scan_utf8_chunks(entry.path, reader.iter_chunks(entry.oid)))
+    except GitObjectError:
+        raise
 
     return sorted(findings, key=lambda finding: (finding.path, finding.locator, finding.category))

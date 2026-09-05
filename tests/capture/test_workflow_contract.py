@@ -82,16 +82,17 @@ class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
         content = self._workflow()
         self.assertIn(f'cron: "{SCHEDULE_CRON}"', content)
 
-    def test_workflow_dispatch_modes_are_closed_to_capture_and_authorization_probe(self) -> None:
+    def test_workflow_dispatch_modes_are_closed(self) -> None:
         content = self._workflow()
         self.assertIn("workflow_dispatch:", content)
         self.assertIn("options:", content)
         self.assertIn("- capture", content)
+        self.assertIn("- republish", content)
         self.assertIn("- authorization_probe", content)
-        # No third dispatch mode value anywhere in the options list.
         options_start = content.index("options:")
         options_block = content[options_start : options_start + 200]
         self.assertEqual(options_block.count("- capture"), 1)
+        self.assertEqual(options_block.count("- republish"), 1)
         self.assertEqual(options_block.count("- authorization_probe"), 1)
 
     def test_capture_job_timeout_is_exactly_330_minutes(self) -> None:
@@ -156,14 +157,16 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         self.assertNotIn("secrets.", status_block)
         self.assertEqual(_permissions_block(status_block), ["contents: write"])
 
-    def test_only_the_status_job_is_granted_write_permission(self) -> None:
+    def test_only_status_and_publish_jobs_are_granted_write_permission(self) -> None:
         content = self._workflow()
         gate_block = _job_block(content, "calendar-gate")
         capture_block = _job_block(content, "capture")
         status_block = _job_block(content, "status")
+        publish_block = _job_block(content, "publish")
         self.assertNotIn("contents: write", gate_block)
         self.assertNotIn("contents: write", capture_block)
         self.assertIn("contents: write", status_block)
+        self.assertIn("contents: write", publish_block)
         top_level_permissions = content.split("jobs:")[0]
         self.assertIn("contents: read", top_level_permissions)
         self.assertNotIn("contents: write", top_level_permissions)
@@ -206,6 +209,31 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         capture_block = _job_block(self._workflow(), "capture")
         self.assertIn("python -m calico_capture run --trigger", capture_block)
         self.assertIn("needs.calendar-gate.outputs.trigger", capture_block)
+
+    def test_publish_job_has_one_bounded_literal_publication_path(self) -> None:
+        block = _job_block(self._workflow(), "publish")
+        self.assertEqual(_permissions_block(block), ["contents: write"])
+        self.assertIn("needs: [calendar-gate, capture, status]", block)
+        self.assertIn("--target-ref published-data", block)
+        self.assertEqual(block.count("python -m calico_publish publish"), 1)
+        for token in ("--force", "--delete", "push -f", "upload-artifact", "cache@", "continue-on-error", "set -x"):
+            self.assertNotIn(token, block)
+
+    def test_publish_b2_secrets_are_step_scoped_and_exact(self) -> None:
+        block = _job_block(self._workflow(), "publish")
+        env_position = block.index("        env:")
+        step_position = block.index("- name: Restore verified history, build once, gate, and publish")
+        self.assertGreater(env_position, step_position)
+        self.assertEqual(block.count("CALICO_B2_PUBLISH_KEY_ID"), 2)
+        self.assertEqual(block.count("CALICO_B2_PUBLISH_KEY"), 4)
+        self.assertNotIn("CALICO_B2_APPLICATION_KEY", block)
+
+    def test_publish_condition_uses_guarded_accepted_outcome(self) -> None:
+        block = _job_block(self._workflow(), "publish")
+        self.assertIn("!cancelled()", block)
+        self.assertIn("needs.capture.outputs.status_json != ''", block)
+        self.assertLess(block.index("status_json != ''"), block.index("fromJSON"))
+        self.assertIn(".outcome == 'accepted'", block)
 
 
 class AuthorizationProbeJobTests(unittest.TestCase):

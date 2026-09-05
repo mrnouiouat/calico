@@ -70,6 +70,7 @@ _AUTHORIZATION_REALM = "production"
 EXPECTED_BUCKET_NAME = "RegistryData"
 EXPECTED_NAME_PREFIX = "archive/v1/"
 EXPECTED_CAPABILITIES: frozenset[str] = frozenset({"listFiles", "readFiles", "writeFiles"})
+EXPECTED_READ_ONLY_CAPABILITIES: frozenset[str] = frozenset({"listFiles", "readFiles"})
 
 #: The custom `file_info` key this adapter uses to carry the project
 #: SHA-256 identity alongside every uploaded object, since B2 itself only
@@ -110,7 +111,7 @@ class B2Scope:
     capabilities: frozenset[str]
 
 
-def attest_effective_scope(account_info: AbstractAccountInfo) -> B2Scope:
+def _attest_scope(account_info: AbstractAccountInfo, expected_capabilities: frozenset[str]) -> B2Scope:
     """Fail closed unless `account_info` proves exactly the minimum
     automation scope (D-10; COVERAGE.md item 1).
 
@@ -161,7 +162,7 @@ def attest_effective_scope(account_info: AbstractAccountInfo) -> B2Scope:
     if not isinstance(capabilities, list):
         raise ArchiveError(_SCOPE_REJECTED_CATEGORY)
     capability_set = frozenset(capabilities)
-    if capability_set != EXPECTED_CAPABILITIES:
+    if capability_set != expected_capabilities:
         raise ArchiveError(_SCOPE_REJECTED_CATEGORY)
 
     return B2Scope(
@@ -170,6 +171,18 @@ def attest_effective_scope(account_info: AbstractAccountInfo) -> B2Scope:
         name_prefix=name_prefix,
         capabilities=capability_set,
     )
+
+
+def attest_effective_scope(account_info: AbstractAccountInfo) -> B2Scope:
+    """Attest the capture adapter's exact list/read/write capability set."""
+
+    return _attest_scope(account_info, EXPECTED_CAPABILITIES)
+
+
+def attest_read_only_effective_scope(account_info: AbstractAccountInfo) -> B2Scope:
+    """Attest the publication adapter's exact list/read capability set."""
+
+    return _attest_scope(account_info, EXPECTED_READ_ONLY_CAPABILITIES)
 
 
 def _content_length(value: object) -> int:
@@ -307,6 +320,90 @@ class B2Archive:
         return buffer.getvalue()
 
 
+class B2ReadOnlyArchive:
+    """Publication-only archive reader with an exactly read-only B2 key.
+
+    This is intentionally separate from ``B2Archive`` so capture's exact
+    list/read/write contract remains unchanged.  A capture-capable key is
+    rejected at authorization, and the protocol-shaped ``put_object`` method
+    fails locally before provider I/O.
+    """
+
+    def __init__(self, api: B2Api, bucket: Bucket, scope: B2Scope) -> None:
+        self._api = api
+        self._bucket = bucket
+        self._scope = scope
+
+    @classmethod
+    def authorize(
+        cls,
+        application_key_id: str,
+        application_key: str,
+        *,
+        api_config: "B2HttpApiConfig | None" = None,
+    ) -> "B2ReadOnlyArchive":
+        account_info = InMemoryAccountInfo()
+        api = B2Api(account_info, api_config=api_config) if api_config is not None else B2Api(account_info)
+        try:
+            api.authorize_account(application_key_id, application_key, realm=_AUTHORIZATION_REALM)
+        except B2Error as exc:
+            raise ArchiveError(_AUTHORIZATION_FAILED_CATEGORY) from exc
+        scope = attest_read_only_effective_scope(account_info)
+        try:
+            bucket = api.get_bucket_by_id(scope.bucket_id)
+        except B2Error as exc:
+            raise ArchiveError(_AUTHORIZATION_FAILED_CATEGORY) from exc
+        return cls(api, bucket, scope)
+
+    @property
+    def scope(self) -> B2Scope:
+        return self._scope
+
+    def _require_in_scope(self, key: str) -> None:
+        if not key.startswith(self._scope.name_prefix):
+            raise ArchiveError(_SCOPE_REJECTED_CATEGORY)
+
+    def list_versions(self, key: str) -> tuple[ArchiveObjectVersion, ...]:
+        self._require_in_scope(key)
+        try:
+            versions = list(self._bucket.list_file_versions(key))
+        except B2Error as exc:
+            raise ArchiveError(_LIST_FAILED_CATEGORY) from exc
+        versions.sort(key=lambda version: (version.upload_timestamp or 0, version.id_))
+        return tuple(
+            ArchiveObjectVersion(
+                version_id=version.id_,
+                sha256=(version.file_info or {}).get(_SHA256_FILE_INFO_KEY, ""),
+                content_length=_content_length(version.size),
+                action=version.action,
+            )
+            for version in versions
+        )
+
+    def get_object(self, key: str, *, version_id: str | None = None) -> bytes:
+        self._require_in_scope(key)
+        try:
+            downloaded = (
+                self._api.download_file_by_id(version_id)
+                if version_id is not None
+                else self._bucket.download_file_by_name(key)
+            )
+        except FileNotPresent as exc:
+            raise ArchiveError(_OBJECT_NOT_FOUND_CATEGORY) from exc
+        except B2Error as exc:
+            raise ArchiveError(_READ_FAILED_CATEGORY) from exc
+        buffer = io.BytesIO()
+        try:
+            downloaded.save(buffer)
+        except B2Error as exc:
+            raise ArchiveError(_READ_FAILED_CATEGORY) from exc
+        return buffer.getvalue()
+
+    def put_object(self, key: str, data: bytes) -> None:
+        self._require_in_scope(key)
+        raise ArchiveError(_SCOPE_REJECTED_CATEGORY)
+
+
 @dataclass(frozen=True)
 class RetentionPosture:
     """Two closed, safe pass/fail categories describing whether an
@@ -394,8 +491,11 @@ __all__ = [
     "B2Scope",
     "EXPECTED_BUCKET_NAME",
     "EXPECTED_CAPABILITIES",
+    "EXPECTED_READ_ONLY_CAPABILITIES",
     "EXPECTED_NAME_PREFIX",
     "RetentionPosture",
     "attest_effective_scope",
+    "attest_read_only_effective_scope",
+    "B2ReadOnlyArchive",
     "inspect_retention_posture",
 ]

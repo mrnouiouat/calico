@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 from tools.privacy_scan.git_objects import (
+    BatchBlobReader,
     GitObjectError,
     ObjectSkip,
     ScannableBlob,
@@ -215,6 +216,16 @@ class TestHistoryDeduplication(unittest.TestCase):
 
 
 class TestLoadScannableObjects(unittest.TestCase):
+    def test_batch_reader_streams_a_large_blob_in_bounded_chunks(self) -> None:
+        payload = b"safe line\n" * 120000
+        with TempGitRepo() as repo:
+            oid = repo.hash_object(payload)
+            with BatchBlobReader(repo.path) as reader:
+                chunks = tuple(reader.iter_chunks(oid, chunk_bytes=4096))
+        self.assertEqual(b"".join(chunks), payload)
+        self.assertTrue(chunks)
+        self.assertLessEqual(max(map(len, chunks)), 4096)
+
     def test_regular_text_blob_is_scannable(self) -> None:
         with TempGitRepo() as repo:
             repo.write_file("readme.txt", b"hello world\n")

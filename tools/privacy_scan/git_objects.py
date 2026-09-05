@@ -15,6 +15,7 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator
 
 #: Tree entry modes this scanner treats as ordinary scannable blobs.
 _SUPPORTED_BLOB_MODES = frozenset({"100644", "100755"})
@@ -171,14 +172,14 @@ def iter_target_entries(
     return result
 
 
-class _BatchBlobReader:
+class BatchBlobReader:
     """Wraps a single long-lived `git cat-file --batch` process."""
 
     def __init__(self, repo_dir: str | Path) -> None:
         self._repo_dir = repo_dir
         self._proc: subprocess.Popen[bytes] | None = None
 
-    def __enter__(self) -> "_BatchBlobReader":
+    def __enter__(self) -> "BatchBlobReader":
         try:
             self._proc = subprocess.Popen(
                 ["git", "-C", str(self._repo_dir), "cat-file", "--batch"],
@@ -260,6 +261,50 @@ class _BatchBlobReader:
             return size, content, size > cap
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             raise GitObjectError("git_error") from exc
+
+    def iter_chunks(self, oid: str, *, chunk_bytes: int = 65536) -> Iterator[bytes]:
+        """Yield one ordinary blob without retaining it in memory.
+
+        The iterator owns exactly one `cat-file --batch` response. Callers
+        must exhaust it before requesting the next object so the trailing
+        protocol newline is consumed deterministically.
+        """
+
+        assert self._proc is not None
+        assert self._proc.stdin is not None
+        assert self._proc.stdout is not None
+        if chunk_bytes <= 0:
+            raise GitObjectError("git_error")
+
+        try:
+            self._proc.stdin.write(oid.encode("ascii") + b"\n")
+            self._proc.stdin.flush()
+            header = self._proc.stdout.readline()
+            if not header:
+                raise GitObjectError("git_error")
+            header_text = header.decode("ascii").strip()
+            if header_text.endswith("missing"):
+                raise GitObjectError("git_error")
+            parts = header_text.split(" ")
+            if len(parts) != 3 or parts[1] != "blob":
+                raise GitObjectError("git_error")
+            remaining = int(parts[2])
+            if remaining < 0:
+                raise GitObjectError("git_error")
+            while remaining:
+                chunk = self._proc.stdout.read(min(remaining, chunk_bytes))
+                if not chunk:
+                    raise GitObjectError("git_error")
+                remaining -= len(chunk)
+                yield chunk
+            if self._proc.stdout.read(1) != b"\n":
+                raise GitObjectError("git_error")
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            raise GitObjectError("git_error") from exc
+
+
+# Backward-compatible private name for the bounded-prefix loader below.
+_BatchBlobReader = BatchBlobReader
 
 
 def load_scannable_objects(
