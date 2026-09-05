@@ -16,6 +16,23 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["export_name", "export_class", "source_relation", "columns", "grain", "measures", "file_name", "dialect"],
+      "allOf": [
+        {
+          "oneOf": [
+            {"properties": {"export_name": {"const": "dim_public_organizations"}, "file_name": {"const": "dim_public_organizations.csv"}}},
+            {"properties": {"export_name": {"const": "fct_public_status_observations"}, "file_name": {"const": "fct_public_status_observations.csv"}}},
+            {"properties": {"export_name": {"const": "mart_adjacent_pair_metrics"}, "file_name": {"const": "mart_adjacent_pair_metrics.csv"}}},
+            {"properties": {"export_name": {"const": "mart_claim_support"}, "file_name": {"const": "mart_claim_support.csv"}}},
+            {"properties": {"export_name": {"const": "mart_last_renewal_diagnostic"}, "file_name": {"const": "mart_last_renewal_diagnostic.csv"}}},
+            {"properties": {"export_name": {"const": "mart_registry_population_coverage"}, "file_name": {"const": "mart_registry_population_coverage.csv"}}},
+            {"properties": {"export_name": {"const": "mart_release_quality"}, "file_name": {"const": "mart_release_quality.csv"}}},
+            {"properties": {"export_name": {"const": "mart_release_snapshot_metrics"}, "file_name": {"const": "mart_release_snapshot_metrics.csv"}}},
+            {"properties": {"export_name": {"const": "mart_source_reported_status_age"}, "file_name": {"const": "mart_source_reported_status_age.csv"}}},
+            {"properties": {"export_name": {"const": "mart_spell_censoring_summary"}, "file_name": {"const": "mart_spell_censoring_summary.csv"}}},
+            {"properties": {"export_name": {"const": "mart_starting_cohort_persistence"}, "file_name": {"const": "mart_starting_cohort_persistence.csv"}}}
+          ]
+        }
+      ],
       "properties": {
         "export_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The stable public export name."},
         "export_class": {"enum": ["aggregate", "named_history"], "description": "The closed class selecting the applicable boundary rules."},
@@ -23,7 +40,7 @@
         "columns": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "The exact ordered positive public column projection; order is significant."},
         "grain": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "The exact key columns whose uniqueness the gate proves."},
         "measures": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "Aggregate measure columns; empty for named history."},
-        "file_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*\\.csv$", "description": "The fixed publication CSV file name."},
+        "file_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*\\.csv$", "description": "Must equal export_name plus .csv; the production name/file pairs are closed above."},
         "dialect": {"const": "calico-csv-v1", "description": "The one deterministic UTF-8 CSV dialect."}
       }
     }

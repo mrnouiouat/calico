@@ -153,6 +153,8 @@ def load_allowlist(path: str | Path) -> Allowlist:
             raise AllowlistError(category)
 
     for entry in entries:
+        if entry.file_name != f"{entry.export_name}.csv":
+            raise AllowlistError("allowlist.invalid_schema")
         if not set(entry.grain).issubset(entry.columns):
             raise AllowlistError("allowlist.grain_not_in_columns")
         if entry.export_class == "aggregate":

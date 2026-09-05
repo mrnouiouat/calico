@@ -145,6 +145,29 @@ class AllowlistTests(unittest.TestCase):
             changed["exports"].append(added)
             self.rejects("allowlist.duplicate_" + field, changed)
 
+    def test_file_name_must_be_derived_from_export_name_in_loader_and_schema(self):
+        changed = copy.deepcopy(self.document)
+        changed["exports"][0]["file_name"] = "different_name.csv"
+        self.rejects("allowlist.invalid_schema", changed)
+
+        schema = json.loads(
+            (ROOT / "contracts/publication-exports-v1.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        pairs = {
+            (
+                branch["properties"]["export_name"]["const"],
+                branch["properties"]["file_name"]["const"],
+            )
+            for branch in schema["$defs"]["export_entry"]["allOf"][0]["oneOf"]
+        }
+        expected = {
+            (entry["export_name"], entry["export_name"] + ".csv")
+            for entry in self.document["exports"]
+        }
+        self.assertEqual(pairs, expected)
+
     def test_extra_missing_and_identity_columns_fail_closed(self):
         self.load()  # exact grain plus measures is admitted
         for mode, category in (
