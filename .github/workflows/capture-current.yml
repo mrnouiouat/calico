@@ -223,7 +223,7 @@ jobs:
   publish:
     name: Publish (read-only archive restore, contents write)
     needs: [calendar-gate, capture, status]
-    if: ${{ !cancelled() && needs.calendar-gate.outputs.should_run == 'true' && ( needs.calendar-gate.outputs.mode == 'republish' || ( needs.calendar-gate.outputs.mode == 'capture' && needs.capture.result == 'success' && needs.capture.outputs.status_json != '' && fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}
+    if: ${{ !cancelled() && needs.calendar-gate.outputs.should_run == 'true' && ( ( needs.calendar-gate.outputs.mode == 'republish' && needs.capture.result == 'skipped' && needs.status.result == 'skipped' ) || ( needs.calendar-gate.outputs.mode == 'capture' && needs.capture.result == 'success' && needs.status.result == 'success' && needs.capture.outputs.status_json != '' && fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

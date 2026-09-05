@@ -228,12 +228,21 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         self.assertEqual(block.count("CALICO_B2_PUBLISH_KEY"), 4)
         self.assertNotIn("CALICO_B2_APPLICATION_KEY", block)
 
-    def test_publish_condition_uses_guarded_accepted_outcome(self) -> None:
+    def test_publish_condition_requires_exact_dependency_states(self) -> None:
         block = _job_block(self._workflow(), "publish")
-        self.assertIn("!cancelled()", block)
-        self.assertIn("needs.capture.outputs.status_json != ''", block)
-        self.assertLess(block.index("status_json != ''"), block.index("fromJSON"))
-        self.assertIn(".outcome == 'accepted'", block)
+        condition = next(
+            line.strip() for line in block.splitlines() if line.strip().startswith("if:")
+        )
+        self.assertEqual(
+            condition,
+            "if: ${{ !cancelled() && needs.calendar-gate.outputs.should_run == 'true' && "
+            "( ( needs.calendar-gate.outputs.mode == 'republish' && "
+            "needs.capture.result == 'skipped' && needs.status.result == 'skipped' ) || "
+            "( needs.calendar-gate.outputs.mode == 'capture' && "
+            "needs.capture.result == 'success' && needs.status.result == 'success' && "
+            "needs.capture.outputs.status_json != '' && "
+            "fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}",
+        )
 
 
 class AuthorizationProbeJobTests(unittest.TestCase):
