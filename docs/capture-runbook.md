@@ -124,10 +124,20 @@ fixed `CALICO_AUTHZ_PROBE::<category>=<denied|allowed>` marker lines (no `--stat
 that job never produces a capture-status document). Both modes report only a fixed pass/fail
 category.
 
-### Build, gate, and publish the accepted history
+### Verify publication in order, then publish the accepted history
 
-Use a dedicated publication-read credential with exactly `listFiles` and `readFiles` on the
-fixed archive scope. It is not the capture credential:
+Perform these three checks in order. First, run the fully offline replay. It uses only synthetic
+fixtures and a disposable local Git repository; it neither reads the private archive nor writes a
+hosted ref:
+
+```
+python -m unittest tests.publish.test_replay -v
+```
+
+Second, obtain an owner-provided publication-read credential through the private environment
+handoff. This must be a newly and separately scoped key with exactly `listFiles` and `readFiles`
+on the same fixed bucket and prefix as the admitted archive. It is not the capture credential and
+must use these publication-only environment names:
 
 ```
 set CALICO_B2_PUBLISH_KEY_ID=<owner-supplied-value>
@@ -141,7 +151,19 @@ without changing the remote ref first:
 python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data --dry-run
 ```
 
-Only after the dry run succeeds, repeat the same one-process sequence without `--dry-run`:
+Third, only after the dry run succeeds and the repository owner directly authorizes the public
+write, confirm that those same two publication-only secret names are wired into the
+`capture-automation` environment and dispatch the hosted republish path:
+
+```
+gh workflow run capture-current.yml --ref main -f mode=republish
+```
+
+Inspect the resulting `publish` job and confirm that it completed successfully. Do not substitute
+the older capture-key names for the publication-only names.
+
+If the hosted workflow is unavailable, the manual fallback is to repeat the same one-process
+sequence without `--dry-run`, again only after direct owner authorization:
 
 ```
 python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data
