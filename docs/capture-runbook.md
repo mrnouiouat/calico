@@ -193,6 +193,19 @@ manifest, runs the publication gate and streaming privacy scan over those exact 
 then makes one non-force atomic update. Clear the dedicated credential from the shell afterward.
 This manual sequence remains the fallback publication path even after the hosted workflow works.
 
+**Budget the download.** Every run restores the whole archive from B2 before it builds -- that is
+what makes the archive, not the local store, the proven source of truth -- so each run downloads the
+full archive, about 509 MiB as of 2026-09-16 across 33 objects. A dry run and the real publish are
+therefore roughly 1 GiB together, which is exactly Backblaze's free daily download allowance: on
+2026-09-16 the dry run succeeded and the publish that followed it minutes later failed on
+`403 download_cap_exceeded`. That surfaces as `restore.transaction_not_found` and then
+`manifest.missing_input`, because both boundaries collapse every fetch failure into one fixed safe
+category -- neither names the cap. Raise the Daily Download Bandwidth Cap in Backblaze's Caps &
+Alerts before a publication session, and if a restore fails for no apparent reason, check the cap
+before suspecting the store, the key, or the code. Class B transactions are not the constraint: a
+restore uses roughly forty against a free-tier allowance of 2,500, though B2's error text names both
+caps whichever one fired.
+
 ## Missed or delayed runs
 
 A delayed, disabled, or failed scheduled run is expected operational behavior, not a data-loss
