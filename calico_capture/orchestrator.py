@@ -238,12 +238,37 @@ def _restore_before_capture(archive: Archive, destination_root: Path) -> None:
     restore_latest_known_transaction(archive, destination_root, build=_skip_build)
 
 
+#: Closed `calico_landing.result` reason codes that mean the source did not
+#: supply the contracted object set in its contracted shape at all -- a
+#: missing or renamed logical-list object, an unopenable container, or a
+#: header/arity/line-record/decode shape that is not the versioned parse
+#: contract. These describe the source contract, not the data inside a
+#: conforming release, so they project as `source_contract_mismatch` rather
+#: than `structural_rejection` (schema v2). Every other rejection reason --
+#: date, registration-family, duplicate-key, status-vocabulary, canonical
+#: serialization, revision, and store-level codes -- stays
+#: `structural_rejection`.
+_SOURCE_CONTRACT_REASON_CODES = frozenset(
+    {
+        "candidate.invalid_mapping",
+        "container.open_failed",
+        "contract.unsupported_xlsx",
+        "parse.decode_failed",
+        "parse.header_mismatch",
+        "parse.arity_mismatch",
+        "parse.line_record_mismatch",
+    }
+)
+
+
 def _reason_category_for(result: AdmissionResult) -> str:
     if result.status == "accepted":
         return "none"
     if result.status == "no_new_release":
         return "source_not_advanced"
     if result.status == "rejected":
+        if any(reason.code in _SOURCE_CONTRACT_REASON_CODES for reason in result.reasons):
+            return "source_contract_mismatch"
         return "structural_rejection"
     return "none"  # operational_error decided inside admit() itself
 

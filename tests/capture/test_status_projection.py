@@ -1,5 +1,5 @@
 """Closed positive status-projection schema enforcement tests (06-02-PLAN.md
-Task 2; `contracts/capture-status-v1.schema.json`).
+Task 2; `contracts/capture-status-v2.schema.json`).
 
 Proves `calico_capture.status`'s exact closed key set and enums permit only
 the schema version, UTC attempt bounds, the closed outcome/reason/trigger
@@ -29,7 +29,7 @@ from calico_capture.status import (
 )
 
 _SCHEMA_PATH = (
-    Path(__file__).resolve().parents[2] / "contracts" / "capture-status-v1.schema.json"
+    Path(__file__).resolve().parents[2] / "contracts" / "capture-status-v2.schema.json"
 )
 
 _STARTED = "2026-09-02T17:17:00.000Z"
@@ -42,7 +42,7 @@ def _load_schema() -> dict:
 
 def _valid_accepted_document() -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "trigger": "local",
         "outcome": "accepted",
         "reason_category": "none",
@@ -70,7 +70,7 @@ class SchemaFileCrossCheckTests(unittest.TestCase):
 
     def test_schema_version_is_a_fixed_const(self) -> None:
         schema = _load_schema()
-        self.assertEqual(schema["properties"]["schema_version"], {"const": 1})
+        self.assertEqual(schema["properties"]["schema_version"], {"const": 2})
 
     def test_schema_trigger_enum_matches_the_python_closed_vocabulary(self) -> None:
         schema = _load_schema()
@@ -94,6 +94,7 @@ class SchemaFileCrossCheckTests(unittest.TestCase):
                 "none",
                 "source_not_advanced",
                 "structural_rejection",
+                "source_contract_mismatch",
                 "source_transfer_error",
                 "archive_error",
                 "restore_error",
@@ -341,7 +342,7 @@ class SerializationTests(unittest.TestCase):
         # own explicit validate_capture_status_document call does not
         # itself reject a document its own constructor already accepted.
         status = CaptureStatus(
-            schema_version=1,
+            schema_version=2,
             trigger="workflow_dispatch",
             outcome="no_new_release",
             reason_category="source_not_advanced",

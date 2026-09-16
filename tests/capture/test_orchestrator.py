@@ -28,6 +28,7 @@ from calico_landing.admission import admit, load_default_status_contract
 from calico_landing.store import ensure_store_layout
 from tests.capture.fakes import FakeArchive
 from tests.fixtures.landing.fixture_builder import (
+    mismatched_date,
     DATE_STATUS_SET_COLUMN,
     MANIFEST_FILENAME,
     STATUS_COLUMN,
@@ -175,9 +176,27 @@ def _fixed_clock(timestamp: str) -> Callable[[], str]:
     return lambda: timestamp
 
 
+#: The exact contract header, and a byte-length-preserving corruption of it
+#: (`Name` and `City` swapped -- both four characters). Replacing the header
+#: with a *shorter* string, as `wrong_header()` does, changes the object's
+#: byte count and trips the declared-length transfer check before the header
+#: check ever runs, so it proves `structural_rejection`, not a source
+#: contract mismatch. Preserving the length is what reaches the parse
+#: contract -- and it is what a live source that republished a different
+#: report under the same object name would actually hit.
+_CONTRACT_HEADER = (
+    "Registry Status,State Charity Reg#,FEIN,SOS/FTB#,Name,City,State,"
+    "Issue Date,Last Renewal,Date Status Set,As-of Date"
+)
+_LENGTH_PRESERVING_WRONG_HEADER = (
+    "Registry Status,State Charity Reg#,FEIN,SOS/FTB#,City,Name,State,"
+    "Issue Date,Last Renewal,Date Status Set,As-of Date"
+)
+
 class AcceptedAndRejectedOutcomeTests(unittest.TestCase):
     """`replay-v1.json` scenarios: accepted_first_attempt,
-    terminal_rejected_structural, empty_object_set_rejected."""
+    terminal_rejected_structural, empty_object_set_rejected,
+    data_level_rejected_structural, header_contract_mismatch_rejected."""
 
     def test_accepted_first_attempt_stops_after_one_attempt(self) -> None:
         with _status_contract_compliant_candidate() as candidate:
@@ -237,7 +256,69 @@ class AcceptedAndRejectedOutcomeTests(unittest.TestCase):
             )
 
         self.assertEqual(status.outcome, "rejected")
+        self.assertEqual(status.reason_category, "source_contract_mismatch")
+        self.assertEqual(sleeper.calls, [0])
+        self.assertEqual(archive.all_keys(), ())
+        self.assertEqual(len(build_spy.calls), 0)
+
+
+    def test_data_level_rejection_projects_structural_rejection(self) -> None:
+        """A candidate that matches the parse contract exactly but carries a
+        record whose As-of Date disagrees with the set's shared date is a
+        data-level rejection, so it keeps the `structural_rejection`
+        category that `source_contract_mismatch` was split out of.
+        """
+
+        with mismatched_date() as candidate:
+            archive = FakeArchive()
+            build_spy = _BuildSpy(succeeds=True)
+            sleeper = _RecordingSleeper()
+
+            status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: candidate.root,
+                build=build_spy,
+                sleeper=sleeper,
+            )
+
+        self.assertEqual(status.outcome, "rejected")
         self.assertEqual(status.reason_category, "structural_rejection")
+        self.assertEqual(sleeper.calls, [0])
+        self.assertEqual(archive.all_keys(), ())
+        self.assertEqual(len(build_spy.calls), 0)
+        self.assertIsNone(status.last_accepted_as_of_date)
+        self.assertIsNone(status.last_accepted_release_revision)
+
+
+    def test_header_contract_mismatch_projects_source_contract_mismatch(self) -> None:
+        """A candidate whose header no longer matches the versioned parse
+        contract -- at an unchanged byte count, so the declared-length
+        transfer check passes and the header check is what rejects --
+        projects `source_contract_mismatch` rather than
+        `structural_rejection`. This is the shape a source that republishes
+        a different report under the same object name produces.
+        """
+
+        self.assertEqual(len(_LENGTH_PRESERVING_WRONG_HEADER), len(_CONTRACT_HEADER))
+        with mutated_candidate() as candidate:
+            candidate.replace_header(
+                "charities-undetermined-status", _LENGTH_PRESERVING_WRONG_HEADER
+            )
+            archive = FakeArchive()
+            build_spy = _BuildSpy(succeeds=True)
+            sleeper = _RecordingSleeper()
+
+            status = capture(
+                trigger="local",
+                archive=archive,
+                fetch_candidate=lambda: candidate.root,
+                build=build_spy,
+                sleeper=sleeper,
+            )
+
+        self.assertEqual(status.outcome, "rejected")
+        self.assertEqual(status.reason_category, "source_contract_mismatch")
         self.assertEqual(sleeper.calls, [0])
         self.assertEqual(archive.all_keys(), ())
         self.assertEqual(len(build_spy.calls), 0)
@@ -520,6 +601,20 @@ class ReplayFixtureCrossCheckTests(unittest.TestCase):
             "expected_build_invoked": False,
         },
         "empty_object_set_rejected": {
+            "expected_outcome": "rejected",
+            "expected_reason_category": "source_contract_mismatch",
+            "expected_sleep_delays_seconds": [0],
+            "expected_release_revision": None,
+            "expected_build_invoked": False,
+        },
+        "header_contract_mismatch_rejected": {
+            "expected_outcome": "rejected",
+            "expected_reason_category": "source_contract_mismatch",
+            "expected_sleep_delays_seconds": [0],
+            "expected_release_revision": None,
+            "expected_build_invoked": False,
+        },
+        "data_level_rejected_structural": {
             "expected_outcome": "rejected",
             "expected_reason_category": "structural_rejection",
             "expected_sleep_delays_seconds": [0],

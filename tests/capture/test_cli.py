@@ -436,7 +436,7 @@ class AuditHostedOutputCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="calico-cli-audit-") as tmp:
             tmp_path = Path(tmp)
             status_path = self._write(
-                tmp_path, "status.json", json.dumps({"schema_version": 1, "extra_field": True})
+                tmp_path, "status.json", json.dumps({"schema_version": 2, "extra_field": True})
             )
             log_path = self._write(tmp_path, "log.txt", "calendar-gate skipped\ncapture completed\n")
             document, exit_code = cli._audit_hosted_output(log_path, status_path, None)

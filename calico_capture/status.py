@@ -1,6 +1,6 @@
 """Closed positive capture status projection (06-01-PLAN.md D-08/D-09;
 06-02-PLAN.md D-08/D-09; 06-RESEARCH.md "Safe status projection";
-`contracts/capture-status-v1.schema.json`).
+`contracts/capture-status-v2.schema.json`).
 
 `CaptureStatus` is the single closed, deterministic, JSON-serializable
 document every `calico_capture.orchestrator.capture()` call returns. It is
@@ -14,7 +14,7 @@ Mirrors `calico_landing.attempts`'s exact-closed-key-set-and-enum
 discipline: any caller-supplied value outside the closed vocabulary raises
 `StatusError` rather than being silently coerced or echoed. Every field is
 validated at construction time (`CaptureStatus.__post_init__`) *and* again,
-independently, against `contracts/capture-status-v1.schema.json`'s closed
+independently, against `contracts/capture-status-v2.schema.json`'s closed
 key set and vocabularies before this module ever serializes a document
 (`validate_capture_status_document`, called from `to_json()`) -- so a
 caller preparing to write to stdout, a GitHub Actions job summary, or the
@@ -27,7 +27,7 @@ import json
 import re
 from dataclasses import dataclass
 
-_STATUS_SCHEMA_VERSION = 1
+_STATUS_SCHEMA_VERSION = 2
 
 #: Closed trigger vocabulary (06-RESEARCH.md Pattern 3/4): scheduled cron,
 #: manual `workflow_dispatch`, or the mandatory local runbook path.
@@ -41,11 +41,19 @@ _OUTCOMES = frozenset({"accepted", "no_new_release", "rejected", "operational_er
 #: Closed reason-category vocabulary (06-RESEARCH.md "Safe status
 #: projection"). Every category is fixed, provider-neutral, and never a raw
 #: exception string, path, or credential fragment.
+#:
+#: `source_contract_mismatch` was added in schema v2: it separates "the
+#: source stopped supplying the contracted four-file set in its contracted
+#: shape" from `structural_rejection`, which stays a data-level rejection
+#: inside a candidate that still matches the contract. The distinction is
+#: derived only from already-closed admission reason codes, never from an
+#: exception message or a fetched byte.
 _REASON_CATEGORIES = frozenset(
     {
         "none",
         "source_not_advanced",
         "structural_rejection",
+        "source_contract_mismatch",
         "source_transfer_error",
         "archive_error",
         "restore_error",
@@ -58,7 +66,7 @@ _UTC_TIMESTAMP_MIN_LENGTH = len("YYYY-MM-DDTHH:MM:SSZ")
 _AS_OF_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 #: The exact closed top-level key set every serialized `CaptureStatus`
-#: document must have -- mirrors `contracts/capture-status-v1.schema.json`
+#: document must have -- mirrors `contracts/capture-status-v2.schema.json`
 #: exactly (`additionalProperties: false`, every key required though some
 #: are nullable). Used by both `CaptureStatus.to_dict()`'s implicit shape
 #: and `validate_capture_status_document`'s explicit check on an arbitrary
@@ -148,7 +156,7 @@ class CaptureStatus:
 
     def to_json(self) -> str:
         """The exact closed, deterministic, newline-terminated JSON shape
-        (`contracts/capture-status-v1.schema.json`) -- the sole safe
+        (`contracts/capture-status-v2.schema.json`) -- the sole safe
         rendering for stdout, a GitHub Actions job summary, or a
         `published-data` branch write (D-08/D-09).
 
@@ -168,7 +176,7 @@ class CaptureStatus:
 
 def validate_capture_status_document(document: object) -> None:
     """Closed-schema validation mirroring
-    `contracts/capture-status-v1.schema.json` -- rejects any document with
+    `contracts/capture-status-v2.schema.json` -- rejects any document with
     an unexpected type, missing/extra top-level key, unknown enum value, or
     malformed field, positively (an allowlisted key/type/vocabulary check),
     never by copying an already-decoded document and then deleting or
