@@ -80,10 +80,15 @@ class PublicationCliTests(unittest.TestCase):
                 build_runner=runner,
                 exporter=exporter,
             )
-        self.assertEqual(code, 1)
-        self.assertEqual(json.loads(stdout), {"category": "export.invalid_staging"})
-        self.assertEqual(stderr, "export.invalid_staging\n")
-        self.assertEqual(list(outside.iterdir()), [])
+
+            self.assertEqual(code, 1)
+            self.assertEqual(json.loads(stdout), {"category": "export.invalid_staging"})
+            self.assertEqual(stderr, "export.invalid_staging\n")
+            # Inside the TemporaryDirectory block: `outside` is created within
+            # it, so asserting after the block raised FileNotFoundError instead
+            # of proving nothing was written through the symlink. POSIX-only, so
+            # it never ran in CI until discovery was fixed and the dedent showed.
+            self.assertEqual(list(outside.iterdir()), [])
 
     def test_real_catalog_projects_the_complete_canonical_source_set(self) -> None:
         from calico_publish.cli import _accepted_releases
