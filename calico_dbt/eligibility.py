@@ -9,15 +9,22 @@ direct child of the store (`public-eligibility-v1.json`), mirroring
 subdirectory, never a glob, and never resolved through a symlink or reparse
 alias at any path component.
 
-The sidecar is optional in real mode: a store with no sidecar file returns
-an empty tuple, which `calico_dbt.preflight` binds into the identical fixed
-`runtime_input.public_eligibility_classifications` schema fixture mode uses.
-An absent sidecar is a valid state, never a failure -- SQL's own left join
-downstream defaults every unmatched key to `'eligible'` (owner decision
-2026-09-15, superseding D-18's exclude-by-default rule), so this document is
-the exclusion mechanism: an explicit `'ambiguous_natural_person'` or
-`'unclassified'` entry is the only way to keep an identifiable key out of a
-public relation.
+SQL's own left join downstream defaults every unmatched key to `'eligible'`
+(owner decision 2026-09-15, superseding D-18's exclude-by-default rule), so
+this document is the exclusion mechanism: an explicit
+`'ambiguous_natural_person'` or `'unclassified'` entry is the only way to
+keep an identifiable key out of a public relation.
+
+That default is what makes an absent sidecar mode-dependent. Under the
+pre-2026-09-15 rule a missing document published nothing, so its absence was
+harmless; under the publish-by-default rule a missing document publishes
+every identifiable key, so in any build whose output can be published the
+absence is indistinguishable from an exclusion list someone forgot to
+supply. `require_document` is therefore the caller's assertion that this
+build is such a build: real mode passes it and fails closed with
+`eligibility.sidecar_required` rather than silently classifying every key
+eligible. Fixture mode leaves it off, since the committed identity-free
+fixture legitimately carries no sidecar and publishes nothing.
 
 This module performs no fuzzy matching, no name heuristic, and no score
 (D-18, T-04-05F) -- it only validates document structure and returns
@@ -133,10 +140,15 @@ def _parse_classification_entry(raw_entry: object, *, seen_keys: set[str], class
     )
 
 
-def load_eligibility_classifications(store_root: Path) -> tuple[EligibilityClassification, ...]:
-    """Load and strictly validate the optional private eligibility sidecar.
+def load_eligibility_classifications(
+    store_root: Path, *, require_document: bool = False
+) -> tuple[EligibilityClassification, ...]:
+    """Load and strictly validate the private eligibility sidecar.
 
-    Returns an empty tuple when no sidecar exists (valid real-mode state).
+    Returns an empty tuple when no sidecar exists, unless `require_document`
+    is set -- then an absent sidecar raises `eligibility.sidecar_required`,
+    because with the publish-by-default rule an empty result and a missing
+    exclusion list produce the same published surface.
     Fails closed with `EligibilityError` on any symlink/alias, unknown or
     missing top-level/entry key, unsupported `schema_version`, blank
     `classification_version`, duplicate or blank `registration_number`, or
@@ -146,6 +158,8 @@ def load_eligibility_classifications(store_root: Path) -> tuple[EligibilityClass
 
     path = _resolve_eligibility_path(store_root)
     if path is None:
+        if require_document:
+            raise EligibilityError("eligibility.sidecar_required")
         return ()
 
     try:

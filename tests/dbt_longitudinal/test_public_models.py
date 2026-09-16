@@ -63,6 +63,7 @@ _DIM_ORGANIZATIONS_SQL = _MARTS_DIR / "dim_public_organizations.sql"
 _FCT_OBSERVATIONS_SQL = _MARTS_DIR / "fct_public_status_observations.sql"
 _PREFLIGHT_PY = _REPO_ROOT / "calico_dbt" / "preflight.py"
 _ELIGIBILITY_PY = _REPO_ROOT / "calico_dbt" / "eligibility.py"
+_RUNNER_PY = _REPO_ROOT / "calico_dbt" / "runner.py"
 
 _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "valid"
 
@@ -225,7 +226,7 @@ class PreflightPublicEligibilityBindingTests(unittest.TestCase):
                 ),
             )
 
-    def test_absent_sidecar_after_real_admission_binds_empty_relation(self) -> None:
+    def test_absent_sidecar_binds_empty_relation_when_not_required(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store_root = Path(tmp) / "store"
             store_root.mkdir()
@@ -256,6 +257,80 @@ class PreflightPublicEligibilityBindingTests(unittest.TestCase):
                 store_root=store_root, catalog=catalog, temp_root=temp_root
             )
             self.assertEqual(binding.verified_eligibility_classification_count, 0)
+
+    def test_absent_sidecar_fails_closed_when_the_caller_requires_one(self) -> None:
+        """Owner decision 2026-09-15 made an unmatched key default to
+        `'eligible'`, so in a build whose bytes can be published an absent
+        sidecar is indistinguishable from an exclusion list nobody supplied.
+        `require_document` is what makes that state unreachable.
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store_root = Path(tmp) / "store"
+            store_root.mkdir()
+            layout = ensure_store_layout(store_root)
+
+            self.assertEqual(load_eligibility_classifications(layout.store_root), ())
+
+            with self.assertRaises(EligibilityError) as ctx:
+                load_eligibility_classifications(layout.store_root, require_document=True)
+            self.assertEqual(ctx.exception.category, "eligibility.sidecar_required")
+
+    def test_required_absent_sidecar_fails_preflight_with_its_own_category(self) -> None:
+        """A forgotten sidecar and a malformed one are different operator
+        situations, so they never collapse into one category.
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store_root = Path(tmp) / "store"
+            store_root.mkdir()
+            ensure_store_layout(store_root)
+
+            temp_root = Path(tmp) / "runtime"
+            temp_root.mkdir()
+
+            with self.assertRaises(preflight.PreflightError) as ctx:
+                preflight.prepare_runtime_input(
+                    store_root=store_root,
+                    catalog=cat.InputCatalog(contract_version=1, releases=()),
+                    temp_root=temp_root,
+                    require_eligibility_sidecar=True,
+                )
+            self.assertEqual(ctx.exception.category, "preflight.public_eligibility_missing")
+
+    def test_required_malformed_sidecar_still_reports_the_invalid_category(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store_root = Path(tmp) / "store"
+            store_root.mkdir()
+            layout = ensure_store_layout(store_root)
+            (layout.store_root / "public-eligibility-v1.json").write_text(
+                "{not-json", encoding="utf-8"
+            )
+
+            temp_root = Path(tmp) / "runtime"
+            temp_root.mkdir()
+
+            with self.assertRaises(preflight.PreflightError) as ctx:
+                preflight.prepare_runtime_input(
+                    store_root=store_root,
+                    catalog=cat.InputCatalog(contract_version=1, releases=()),
+                    temp_root=temp_root,
+                    require_eligibility_sidecar=True,
+                )
+            self.assertEqual(ctx.exception.category, "preflight.public_eligibility_invalid")
+
+    def test_real_mode_is_the_mode_that_requires_the_sidecar(self) -> None:
+        """Real mode is the only mode that reads an owner store and the only
+        mode whose bytes can reach `published-data`, so it is the mode that
+        must require the exclusion list. Public CI cannot run real mode
+        (`docs/build-modes.md`, "Honest reproducibility boundary"), so the
+        binding itself is asserted structurally, the way this file already
+        asserts the SQL default.
+        """
+
+        source = _RUNNER_PY.read_text(encoding="utf-8")
+        self.assertIn('require_eligibility_sidecar=mode == "real"', source)
+        self.assertEqual(source.count("require_eligibility_sidecar"), 1)
 
     def test_malformed_sidecar_fails_preflight_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

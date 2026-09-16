@@ -29,7 +29,11 @@ Real mode is always explicit and always local. `--store` must point at an owner-
 admitted-release store that lives outside every Git worktree; the command verifies every
 committed catalog anchor (`contracts/dbt-input-catalog-v1.json`) against that store's own revision
 manifests and canonical Parquet objects before dbt reads a single row, and it fails closed on any
-mismatch. `--proof-output` atomically writes the fixed, safe `docs/evidence/gate-b/real-build-proof-v2.json`
+mismatch. It also requires that store to carry the private `public-eligibility-v1.json` exclusion
+sidecar and fails closed with `preflight.public_eligibility_missing` without one: since the owner's
+2026-09-15 decision an unmatched registration key defaults to `eligible`, so a missing sidecar would
+publish every identifiable key rather than none. Fixture mode requires no sidecar -- the committed
+identity-free fixture legitimately has none and publishes nothing. `--proof-output` atomically writes the fixed, safe `docs/evidence/gate-b/real-build-proof-v2.json`
 document from the runner's own `SafeBuildProof` -- a category/count/status summary only, never a
 path, row, or excluded value -- plus an explicit `(path, sha256)` `supersedes` reference to the
 immutable Phase 3 `docs/evidence/gate-b/real-build-proof-v1.json` document, which `--proof-output`

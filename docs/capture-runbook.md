@@ -144,16 +144,32 @@ set CALICO_B2_PUBLISH_KEY_ID=<owner-supplied-value>
 set CALICO_B2_PUBLISH_KEY=<owner-supplied-value>
 ```
 
-Prepare fresh external store and staging directories, then prove the entire production sequence
+Prepare a staging directory and choose the store, then prove the entire production sequence
 without changing the remote ref first:
 
 ```
-python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data --dry-run
+python -m calico_publish publish --mode real --store <owner-admitted-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data --dry-run
 ```
+
+`--store` must be the owner's own admitted store, the one that carries the private
+`public-eligibility-v1.json` exclusion sidecar -- **not** a fresh empty directory. Since the owner's
+2026-09-15 decision an unmatched registration key defaults to `eligible` and publishes, so a store
+with no sidecar would publish every identifiable key including the ones whose source-supplied name
+carries a street address or FEIN. Real mode therefore refuses to build without one and reports
+`preflight.public_eligibility_missing`. `_restore_build` restores the verified releases *into* the
+store you name without clearing it, so naming the owner's store is both safe and required.
 
 Third, only after the dry run succeeds and the repository owner directly authorizes the public
 write, confirm that those same two publication-only secret names are wired into the
 `capture-automation` environment and dispatch the hosted republish path:
+
+> **The hosted republish path does not currently work, by design.** Its `publish` job builds its
+> store in a fresh `mktemp -d` directory and restores it from B2, and the sidecar is a private child
+> of the owner's store that B2 has never carried. Before the eligibility flip that was harmless;
+> after it, that job would have published every excluded key, so real mode now fails it closed with
+> `preflight.public_eligibility_missing`. Until the sidecar is made reachable from a restored store,
+> the manual sequence below is the only publication path. See
+> `2026-09-15-sidecar-absent-on-hosted-republish.md` in the private planning workspace.
 
 ```
 gh workflow run capture-current.yml --ref main -f mode=republish
@@ -166,7 +182,7 @@ If the hosted workflow is unavailable, the manual fallback is to repeat the same
 sequence without `--dry-run`, again only after direct owner authorization:
 
 ```
-python -m calico_publish publish --mode real --store <fresh-external-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data
+python -m calico_publish publish --mode real --store <owner-admitted-store-path> --staging <fresh-staging-path> --remote origin --target-ref published-data
 ```
 
 The command restores hash-verified history, builds once, writes every allowlisted export and its

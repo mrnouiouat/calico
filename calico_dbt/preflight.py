@@ -405,22 +405,34 @@ def _load_capture_attempt_rows(store_root: Path) -> list[tuple]:
     return rows
 
 
-def _load_eligibility_rows(store_root: Path) -> list[tuple[str, str, str]]:
+def _load_eligibility_rows(
+    store_root: Path, *, require_sidecar: bool
+) -> list[tuple[str, str, str]]:
     """Load, validate, and shape every private eligibility classification
     into the fixed three-column row `prepare_runtime_input` parameter-binds
     into `runtime_input.public_eligibility_classifications` (D-16/D-18).
 
-    An absent sidecar is a valid empty result, never a failure (T-04-05B):
-    the fixed relation is still created, just with zero rows, in both
-    fixture and real mode (D-20). Any malformed or aliased document fails
-    the whole preflight closed with a fixed category -- untrusted store
-    content crossing a trust boundary, never silently skipped (T-04-05A).
+    An absent sidecar binds the fixed relation with zero rows (T-04-05B,
+    D-20) unless `require_sidecar` is set, which real mode passes: since the
+    owner's 2026-09-15 flip an unmatched key defaults to `'eligible'`, so a
+    missing exclusion list in a publishable build fails closed with its own
+    category rather than publishing every identifiable key. Any malformed or
+    aliased document fails the whole preflight closed either way -- untrusted
+    store content crossing a trust boundary, never silently skipped
+    (T-04-05A).
     """
 
     try:
-        classifications = load_eligibility_classifications(store_root)
+        classifications = load_eligibility_classifications(
+            store_root, require_document=require_sidecar
+        )
     except EligibilityError as exc:
-        raise PreflightError("preflight.public_eligibility_invalid") from exc
+        category = (
+            "preflight.public_eligibility_missing"
+            if exc.category == "eligibility.sidecar_required"
+            else "preflight.public_eligibility_invalid"
+        )
+        raise PreflightError(category) from exc
 
     return [
         (entry.registration_number, entry.classification, entry.classification_version)
@@ -433,6 +445,7 @@ def prepare_runtime_input(
     store_root: str | Path,
     catalog: InputCatalog,
     temp_root: str | Path,
+    require_eligibility_sidecar: bool = False,
 ) -> RuntimeInputBinding:
     """Verify every catalog-anchored revision and bind it into one on-disk
     DuckDB database under `temp_root`, then close the connection.
@@ -444,6 +457,11 @@ def prepare_runtime_input(
     left in a state a later step could mistake for a fully verified bind
     (a failure here is expected to be followed by whole-root cleanup by the
     caller).
+
+    `require_eligibility_sidecar` makes an absent private eligibility sidecar
+    a `preflight.public_eligibility_missing` failure instead of an empty
+    bound relation. Real mode passes it; fixture mode does not. See
+    `_load_eligibility_rows`.
     """
 
     resolved_store_root = _resolve_store_root(store_root)
@@ -485,7 +503,9 @@ def prepare_runtime_input(
 
     promotions = _validate_pointer_consistency(resolved_store_root, catalog)
     capture_attempt_rows = _load_capture_attempt_rows(resolved_store_root)
-    eligibility_rows = _load_eligibility_rows(resolved_store_root)
+    eligibility_rows = _load_eligibility_rows(
+        resolved_store_root, require_sidecar=require_eligibility_sidecar
+    )
 
     duckdb_path = resolved_temp_root / DUCKDB_FILENAME
     connection = duckdb.connect(str(duckdb_path))

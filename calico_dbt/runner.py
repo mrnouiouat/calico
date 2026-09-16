@@ -655,8 +655,17 @@ def _prepare_environment(
         resolved_store_root = _resolve_real_store(store)
         catalog = _load_real_catalog()
 
+    # Only real mode can produce bytes that reach `published-data`, and only
+    # real mode reads an owner-controlled store that is supposed to carry the
+    # exclusion sidecar. Requiring it here is what keeps a missing sidecar
+    # from silently classifying every identifiable key eligible now that an
+    # unmatched key defaults to publishing (owner decision 2026-09-15). The
+    # committed fixture store legitimately has none and publishes nothing.
     binding = pf.prepare_runtime_input(
-        store_root=resolved_store_root, catalog=catalog, temp_root=temp_root
+        store_root=resolved_store_root,
+        catalog=catalog,
+        temp_root=temp_root,
+        require_eligibility_sidecar=mode == "real",
     )
 
     _write_profile(temp_root, binding.duckdb_path)
