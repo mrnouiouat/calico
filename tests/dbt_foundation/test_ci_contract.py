@@ -113,13 +113,36 @@ class WorkflowContractTests(unittest.TestCase):
         content = self._workflow()
         self.assertIn("3.13.15", content)
 
-    def test_workflow_installs_only_the_approved_pin_file(self) -> None:
+    def test_workflow_installs_only_the_approved_pin_files(self) -> None:
         content = self._workflow()
         self.assertIn("requirements-dbt.txt", content)
-        # No unpinned/ad hoc package install beyond the approved pin file.
+        # The capture pins are required too: without b2sdk, discovery cannot
+        # import the capture modules and silently reports them as errors
+        # instead of running them.
+        self.assertIn("requirements-capture.txt", content)
+        # No unpinned/ad hoc package install beyond the approved pin files.
+        approved = ("requirements-dbt.txt", "requirements-capture.txt")
         for line in content.splitlines():
             if "pip install" in line:
-                self.assertIn("requirements-dbt.txt", line)
+                self.assertTrue(
+                    any(pin in line for pin in approved),
+                    f"unapproved install line: {line.strip()}",
+                )
+
+    def test_workflow_discovery_sets_the_repository_as_top_level(self) -> None:
+        """Without `-t .`, discovery names modules `publish.test_cli` rather
+        than `tests.publish.test_cli`, their absolute `tests.`/`tools.`
+        imports fail, and the modules are reported as loader errors instead
+        of being run -- including the privacy scanner's own tests.
+        """
+
+        content = self._workflow()
+        checked = 0
+        for line in content.splitlines():
+            if "python -m unittest discover" in line:
+                checked += 1
+                self.assertIn("-t .", line)
+        self.assertEqual(checked, 1, "expected exactly one discovery invocation")
 
     def test_workflow_runs_fixture_mode_only_and_never_real_mode(self) -> None:
         content = self._workflow()

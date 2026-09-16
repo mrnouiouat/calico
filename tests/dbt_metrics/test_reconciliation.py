@@ -16,6 +16,14 @@ SQL_PATH = REPO_ROOT / "dbt" / "tests" / "assert_gate_a_reconciliation.sql"
 ORACLE_PATH = REPO_ROOT.parent / "calico-build" / "GATE-A-EVIDENCE.md"
 ORACLE_SHA256 = "82543a3b3b6bc62e42e066d8997e968e2aca440d0c05d6f589905f4d54827133"
 
+#: The Gate A oracle lives in the private `calico-build` workspace beside this
+#: repository, so it is absent from any public checkout -- CI included. Tests
+#: bound to it skip there rather than erroring, which keeps a genuine failure
+#: visible instead of buried in noise. They still run wherever the workspace
+#: is present, which is where the binding actually has to hold.
+_ORACLE_PRESENT = ORACLE_PATH.is_file()
+_ORACLE_REASON = "Gate A oracle is private to the calico-build workspace and absent here"
+
 
 class FixtureReconciliationTests(unittest.TestCase):
     def test_fixture_runs_the_complete_dag(self) -> None:
@@ -23,6 +31,7 @@ class FixtureReconciliationTests(unittest.TestCase):
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
 
+    @unittest.skipUnless(_ORACLE_PRESENT, _ORACLE_REASON)
     def test_oracle_is_byte_identical(self) -> None:
         self.assertEqual(hashlib.sha256(ORACLE_PATH.read_bytes()).hexdigest(), ORACLE_SHA256)
 
@@ -40,6 +49,7 @@ class ReconciliationContractTests(unittest.TestCase):
         self.assertNotIn("calico_verified_mode=", content)
 
 
+@unittest.skipUnless(_ORACLE_PRESENT, _ORACLE_REASON)
 class RealProofProvenanceTests(unittest.TestCase):
     """Task 2: the v3 Gate B exit proof writer and its closed verifier
     (D-11..D-15, D-22, T-05-05A/B/C).

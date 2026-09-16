@@ -29,8 +29,11 @@ jobs:
       - name: Install exact dbt toolchain pins
         run: python -m pip install --requirement requirements-dbt.txt
 
+      - name: Install exact capture toolchain pins
+        run: python -m pip install --requirement requirements-capture.txt
+
       - name: Run full unittest discovery
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -t . -v
 
       - name: Run the complete fixture-mode dbt build
         run: python -m calico_dbt build --mode fixture
