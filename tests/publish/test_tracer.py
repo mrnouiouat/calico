@@ -57,11 +57,19 @@ def _safe_release() -> AcceptedRelease:
 
 
 def _manifest(allowlist: Allowlist, staged: tuple[StagedExport, ...]):
+    # Derived from the export it describes rather than fixed at zero: the gate
+    # cross-checks this count against the staged organization export, and an
+    # absent classification now publishes by default (owner decision
+    # 2026-09-15), so a hardcoded zero only held while every key was excluded.
+    eligible_key_count = next(
+        (item.row_count for item in staged if item.export_name == "dim_public_organizations"),
+        0,
+    )
     return project_published_manifest(
         allowlist=allowlist,
         staged_exports=staged,
         accepted_releases=(_safe_release(),),
-        eligible_key_count=0,
+        eligible_key_count=eligible_key_count,
         parser_contract_version="registry-csv-contract-v1",
         toolchain={
             "python": "3.13.15",

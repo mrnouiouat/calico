@@ -158,7 +158,7 @@ class ExportBoundaryTests(unittest.TestCase):
 
 
 class FullExportTests(unittest.TestCase):
-    def test_fixture_build_exports_all_eleven_twice_and_empty_named_history(self):
+    def test_fixture_build_exports_all_eleven_twice_and_excluded_named_history_is_empty(self):
         allowlist = load_allowlist(_ALLOWLIST_PATH)
         with tempfile.TemporaryDirectory(prefix="calico-full-exports-") as temp:
             root = Path(temp)
@@ -179,10 +179,18 @@ class FullExportTests(unittest.TestCase):
                         captured["keys"][entry.export_name] = connection.execute(
                             'SELECT ' + projection + ' FROM "' + entry.source_relation + '" ORDER BY ' + ordering
                         ).fetchall()
-                    # Empty eligibility is an intentional valid state. Reapply the
-                    # existing named views to an empty classification input; the
-                    # observation fact is materialized, so retain its schema empty.
+                    # An empty named export is still an intentional valid state,
+                    # but it is reached by explicit exclusion now (owner decision
+                    # 2026-09-15): an absent classification publishes by default,
+                    # so emptiness is proved by excluding every observed key
+                    # outright. The observation fact is materialized, so retain
+                    # its schema empty.
                     connection.execute("DELETE FROM runtime_input.public_eligibility_classifications")
+                    connection.execute(
+                        "INSERT INTO runtime_input.public_eligibility_classifications "
+                        "SELECT DISTINCT state_charity_registration_number, 'unclassified', "
+                        "'explicit-exclusion-fixture-v1' FROM int_keyed_snapshots"
+                    )
                     connection.execute("DELETE FROM fct_public_status_observations")
                 captured["empty"] = module.export_all(database, allowlist, root / "empty")
 

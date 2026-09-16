@@ -7,10 +7,13 @@ models:
       registration key ever observed in int_keyed_snapshots. Private audit
       helper, not a required grain owner (D-01). Left joins every key to
       the private runtime_input.public_eligibility_classifications source
-      and normalizes a missing match to 'unclassified' -- the fail-closed
-      default (D-18). Retains all three closed states for private audit;
-      only an explicit 'eligible' row may ever reach dim_public_organizations
-      or fct_public_status_observations downstream. Independently
+      and defaults a missing match to 'eligible' (owner decision
+      2026-09-15, superseding D-18's exclude-by-default rule). Retains all
+      three closed states for private audit; only an explicit 'eligible'
+      row may ever reach dim_public_organizations or
+      fct_public_status_observations downstream, so an explicit
+      'ambiguous_natural_person' or 'unclassified' sidecar entry remains
+      the exclusion mechanism. Independently
       reconciled by assert_public_organization_eligibility.sql.
       Materialized as an explicit view.
     columns:
@@ -20,7 +23,7 @@ models:
           - not_null
           - unique
       - name: eligibility_classification
-        description: "The closed three-value classification, normalized to 'unclassified' whenever the private sidecar carries no matching entry for this key (D-18)."
+        description: "The closed three-value classification, defaulting to 'eligible' whenever the private sidecar carries no matching entry for this key (owner decision 2026-09-15). An explicit sidecar entry is the only way to exclude a key."
         tests:
           - not_null
           - accepted_values:
@@ -29,4 +32,4 @@ models:
                 - ambiguous_natural_person
                 - unclassified
       - name: classification_version
-        description: "The reviewed sidecar's own classification_version, carried through for audit. Null whenever this key has no matching sidecar entry (i.e. eligibility_classification = 'unclassified' by default, not by explicit review)."
+        description: "The reviewed sidecar's own classification_version, carried through for audit. Null whenever this key has no matching sidecar entry (i.e. eligibility_classification = 'eligible' by default, not by explicit review)."

@@ -11,10 +11,10 @@
 --    exactly once -- never zero times (a silently dropped key) and never
 --    more than once (a duplicated key).
 -- 2. Classification correctness: independently re-joining every distinct
---    key directly to the private classification source and normalizing a
---    missing match to 'unclassified' produces the exact same
---    eligibility_classification int_public_organization_eligibility
---    reports for every key.
+--    key directly to the private classification source and defaulting a
+--    missing match to 'eligible' (owner decision 2026-09-15) produces the
+--    exact same eligibility_classification
+--    int_public_organization_eligibility reports for every key.
 -- 3. Positive containment: every key present in dim_public_organizations
 --    recomputes to exactly 'eligible' -- an 'ambiguous_natural_person' or
 --    'unclassified' key never reaches the published relation.
@@ -36,7 +36,7 @@ recomputed_classifications as (
 
     select
         distinct_keys.state_charity_registration_number,
-        coalesce(source_classifications.classification, 'unclassified') as expected_classification
+        coalesce(source_classifications.classification, 'eligible') as expected_classification
     from distinct_keys
     left join {{ source('runtime_input', 'public_eligibility_classifications') }} as source_classifications
         on distinct_keys.state_charity_registration_number = source_classifications.registration_number

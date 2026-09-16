@@ -13,9 +13,11 @@ The sidecar is optional in real mode: a store with no sidecar file returns
 an empty tuple, which `calico_dbt.preflight` binds into the identical fixed
 `runtime_input.public_eligibility_classifications` schema fixture mode uses.
 An absent sidecar is a valid state, never a failure -- SQL's own left join
-downstream normalizes every unmatched key to `'unclassified'`, so a missing
-real classification input fails closed to zero public rows rather than an
-implicit admission (T-04-05B).
+downstream defaults every unmatched key to `'eligible'` (owner decision
+2026-09-15, superseding D-18's exclude-by-default rule), so this document is
+the exclusion mechanism: an explicit `'ambiguous_natural_person'` or
+`'unclassified'` entry is the only way to keep an identifiable key out of a
+public relation.
 
 This module performs no fuzzy matching, no name heuristic, and no score
 (D-18, T-04-05F) -- it only validates document structure and returns

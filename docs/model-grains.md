@@ -69,7 +69,7 @@ the ten responsibilities (D-01).
 | `int_transition_matrix` | Internal Phase 5 integration helper: conditional aggregation over transitions. Asserts no real-data total or claim. |
 | `int_entity_observation_sequence` | Ordered-observation helper feeding the spell grain: global ordinal plus per-key `lag`/`lead`. |
 | `stg_capture_attempts` | Structural pass-through of the fixed `runtime_input.capture_attempts` relation. |
-| `int_public_organization_eligibility` | Private audit helper: normalizes every exact key to `eligible`/`ambiguous_natural_person`/`unclassified`. |
+| `int_public_organization_eligibility` | Private audit helper: classifies every exact key as `eligible`/`ambiguous_natural_person`/`unclassified`, defaulting an unlisted key to `eligible` (owner decision 2026-09-15). |
 
 ## Lineage
 

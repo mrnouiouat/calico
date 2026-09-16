@@ -16,7 +16,7 @@ facade method (deferred to Plan 06, per this plan's own Task 2 action text):
    `gate_b_fixture_store_v2` longitudinal panel plus a hand-written private
    eligibility sidecar exercising all three closed states, including one
    key deliberately left out of the sidecar entirely (proving the missing-
-   match-normalizes-to-unclassified default) -- and proves the complete
+   match-defaults-to-eligible rule) -- and proves the complete
    fixture DAG, including this plan's three new singular tests, builds
    successfully over that panel. A successful `outcome.status == "success"`
    here is itself the row-level semantic proof: any eligibility, aggregate,
@@ -94,8 +94,8 @@ _ELIGIBLE_REAPPEARANCE_KEY = "CT910020"  # observed at d1 and d3 only (loss/reap
 _AMBIGUOUS_KEY = "9210002"  # observed at d1 and d2 (still delinquent)
 _EXPLICIT_UNCLASSIFIED_KEY = "CT910030"  # observed at d2, d3, d4 (exit/re-entry)
 #: Deliberately never listed in the sidecar at all -- proves the missing-
-#: match-normalizes-to-'unclassified' default (T-04-05B), not an explicit
-#: reviewed state.
+#: match-defaults-to-'eligible' rule (owner decision 2026-09-15), not an
+#: explicit reviewed state.
 _UNLISTED_KEY = "9210003"
 
 
@@ -380,9 +380,11 @@ class FullFixtureBuildRemainsGreenWithDefaultFixtureTests(unittest.TestCase):
 
 
 class EligibilitySqlShapeTests(unittest.TestCase):
-    """D-18/T-04-05B: `int_public_organization_eligibility` left joins the
-    private source and normalizes a missing match to 'unclassified', never
-    a fuzzy/name heuristic or score (T-04-05F).
+    """`int_public_organization_eligibility` left joins the private source
+    and defaults a missing match to 'eligible' (owner decision 2026-09-15,
+    superseding D-18's exclude-by-default rule), never a fuzzy/name
+    heuristic or score (T-04-05F). An explicit non-eligible sidecar entry
+    remains the exclusion mechanism.
     """
 
     def test_eligibility_model_left_joins_the_private_source(self) -> None:
@@ -390,9 +392,9 @@ class EligibilitySqlShapeTests(unittest.TestCase):
         self.assertIn("left join", content.lower())
         self.assertIn("source('runtime_input', 'public_eligibility_classifications')", content)
 
-    def test_eligibility_model_normalizes_missing_match_to_unclassified(self) -> None:
+    def test_eligibility_model_defaults_missing_match_to_eligible(self) -> None:
         content = _ELIGIBILITY_SQL.read_text(encoding="utf-8")
-        self.assertIn("coalesce(classifications.classification, 'unclassified')", content)
+        self.assertIn("coalesce(classifications.classification, 'eligible')", content)
 
     def test_eligibility_boundary_has_no_fuzzy_or_scoring_language(self) -> None:
         for path in (_ELIGIBILITY_SQL, _ELIGIBILITY_PY):
