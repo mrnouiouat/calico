@@ -163,12 +163,15 @@ Third, only after the dry run succeeds and the repository owner directly authori
 write, confirm that those same two publication-only secret names are wired into the
 `capture-automation` environment and dispatch the hosted republish path:
 
-> **The hosted republish path does not currently work, by design.** Its `publish` job builds its
-> store in a fresh `mktemp -d` directory and restores it from B2, and the sidecar is a private child
-> of the owner's store that B2 has never carried. Before the eligibility flip that was harmless;
-> after it, that job would have published every excluded key, so real mode now fails it closed with
-> `preflight.public_eligibility_missing`. Until the sidecar is made reachable from a restored store,
-> the manual sequence below is the only publication path. See
+> **The hosted republish path is refused, by design.** Its `publish` job builds its store in a
+> fresh `mktemp -d` directory and restores it from B2, and the sidecar is a private child of the
+> owner's store that B2 has never carried. Before the eligibility flip that was harmless; after it,
+> that job would have published every excluded key. Two things now stop it: real mode fails closed
+> with `preflight.public_eligibility_missing`, and the calendar gate refuses `mode=republish`
+> outright so the dispatch fails in one step with a stated reason instead of after a toolchain
+> install, a B2 authorization, and a full build. The mode is kept in the dispatch enum rather than
+> deleted, so re-enabling it is one gate change once the sidecar can reach a restored store. Until
+> then the manual sequence below is the only publication path. See
 > `2026-09-15-sidecar-absent-on-hosted-republish.md` in the private planning workspace.
 
 ```

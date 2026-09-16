@@ -3,7 +3,9 @@ name: Capture Current Registry Release
 # Per D-04/D-06/D-08/D-11 (06-06-PLAN.md): scheduled and ordinary manual
 # `capture` dispatch runs both call the exact same production
 # `python -m calico_capture run` command the mandatory local runbook also
-# calls. `republish` enters only the restore/build/publication path, while
+# calls. `republish` is refused at the calendar gate as of 2026-09-16 (see
+# the gate step for why); it otherwise enters only the restore/build/
+# publication path, while
 # `authorization_probe` is a closed, no-secret dispatch mode reserved
 # solely for Plan 07's future effective-ref positive/negative tests -- it
 # never enters the source/B2 path (the `capture`/`status` jobs below only
@@ -85,6 +87,36 @@ jobs:
           dispatch_mode = os.environ.get("CALICO_DISPATCH_MODE") or "capture"
           trigger = "schedule" if event_name == "schedule" else "workflow_dispatch"
           mode = "capture" if event_name == "schedule" else dispatch_mode
+
+          # `republish` is refused here, deliberately and loudly, rather than
+          # left to fail deep inside the publish job. That job builds its
+          # store in a fresh `mktemp -d` and restores it from B2, and the
+          # private `public-eligibility-v1.json` exclusion sidecar is a child
+          # of the owner's own store that B2 has never carried. Before the
+          # owner's 2026-09-15 decision a missing sidecar published nothing,
+          # so a restored store was safe; since an unmatched key now defaults
+          # to `eligible`, that same store would publish every identifiable
+          # key, including the ones whose source-supplied name carries a
+          # street address or an FEIN. Real mode already fails closed on it
+          # (`preflight.public_eligibility_missing`), so nothing can leak
+          # either way -- but failing at the gate says why in one line
+          # instead of after a toolchain install, a B2 authorization, and a
+          # full dbt build. The mode is kept rather than deleted so the
+          # capability and its history stay legible; publication is manual
+          # until the sidecar can reach a restored store. See
+          # `docs/capture-runbook.md` and the private planning workspace's
+          # `2026-09-15-sidecar-absent-on-hosted-republish.md`.
+          if mode == "republish":
+              print(
+                  "::error title=Hosted republish is disabled::The publish job "
+                  "restores its store from B2, which does not carry the private "
+                  "eligibility exclusion sidecar. Since an unmatched key defaults "
+                  "to publishing, a restored store would publish every excluded "
+                  "organization. Real mode fails closed on this "
+                  "(preflight.public_eligibility_missing). Publish locally from "
+                  "the owner's admitted store per docs/capture-runbook.md."
+              )
+              raise SystemExit(1)
 
           if trigger == "schedule":
               today = datetime.datetime.now(datetime.timezone.utc).date()

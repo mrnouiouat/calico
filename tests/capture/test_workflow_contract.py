@@ -95,6 +95,32 @@ class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
         self.assertEqual(options_block.count("- republish"), 1)
         self.assertEqual(options_block.count("- authorization_probe"), 1)
 
+    def test_calendar_gate_refuses_the_republish_mode(self) -> None:
+        """The publish job restores its store from B2, which has never
+        carried the private eligibility exclusion sidecar. Since the owner's
+        2026-09-15 decision made an unmatched key default to publishing, a
+        restored store would publish every excluded organization, so the
+        gate refuses the mode outright. Real mode also fails closed on it
+        (`preflight.public_eligibility_missing`) -- this is the fast, legible
+        half of a defence that is already sound without it.
+        """
+
+        gate_block = _job_block(self._workflow(), "calendar-gate")
+        self.assertIn('if mode == "republish":', gate_block)
+        self.assertIn("raise SystemExit(1)", gate_block)
+        self.assertIn("::error title=Hosted republish is disabled::", gate_block)
+
+    def test_republish_stays_a_documented_mode_rather_than_being_deleted(self) -> None:
+        """Refused is not the same as removed: the choice stays in the
+        dispatch enum and the publish job keeps its condition, so the
+        capability and its history remain legible and re-enabling it is one
+        gate change rather than a workflow rewrite.
+        """
+
+        content = self._workflow()
+        self.assertIn("- republish", content)
+        self.assertIn("needs.calendar-gate.outputs.mode == 'republish'", content)
+
     def test_capture_job_timeout_is_exactly_330_minutes(self) -> None:
         capture_block = _job_block(self._workflow(), "capture")
         self.assertIn("timeout-minutes: 330", capture_block)
