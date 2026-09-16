@@ -27,7 +27,7 @@ def document():
 
 class InventoryTests(unittest.TestCase):
     def setUp(self):
-        self.allowlist = load_allowlist(ROOT / "contracts/publication-exports-v1.json")
+        self.allowlist = load_allowlist(ROOT / "contracts/publication-exports-v2.json")
 
     def check(self, data):
         return module.check_inventory(data, self.allowlist)

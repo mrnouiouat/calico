@@ -39,7 +39,7 @@ from tools.privacy_scan.policy import PolicyError, load_policy
 from tools.privacy_scan.scanner import ScanPathError, scan_paths
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_REAL_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v1.json"
+_REAL_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v2.json"
 _REAL_CATALOG_PATH = _REPO_ROOT / "contracts" / "dbt-input-catalog-v1.json"
 _POLICY_PATH = _REPO_ROOT / "policies" / "publishable-tree.json"
 _MANIFEST_RELATIVE_PATH = Path("manifest") / "published-manifest-v1.json"
@@ -64,10 +64,13 @@ def _dict_json(document: dict[str, object]) -> str:
 def _allowlist_path(args: argparse.Namespace) -> Path:
     if getattr(args, "mode", "real") == "real":
         return _REAL_ALLOWLIST_PATH
-    fixture_path = Path(args.staging) / "publication-exports-v1.json"
-    if fixture_path.is_symlink() or (fixture_path.exists() and not fixture_path.is_file()):
-        raise AllowlistError("allowlist.invalid_schema")
-    return fixture_path if fixture_path.exists() else _REAL_ALLOWLIST_PATH
+    for filename in ("publication-exports-v2.json", "publication-exports-v1.json"):
+        fixture_path = Path(args.staging) / filename
+        if fixture_path.is_symlink() or (fixture_path.exists() and not fixture_path.is_file()):
+            raise AllowlistError("allowlist.invalid_schema")
+        if fixture_path.exists():
+            return fixture_path
+    return _REAL_ALLOWLIST_PATH
 
 
 def _default_publication_archive_factory() -> Archive:

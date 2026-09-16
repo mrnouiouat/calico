@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def inputs():
-    authority = load_allowlist(ROOT / "contracts/publication-exports-v1.json")
+    authority = load_allowlist(ROOT / "contracts/publication-exports-v2.json")
     source_objects = tuple(
         module.SourceObjectRecord(name, str(index) * 64, 0, 0)
         for index, name in enumerate(sorted(LOGICAL_LIST_ORDER), start=1)

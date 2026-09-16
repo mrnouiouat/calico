@@ -64,6 +64,16 @@ class Allowlist:
     exports: tuple[ExportEntry, ...]
 
 
+#: The closed set of publication authority identifiers this loader recognizes.
+#: The real publication path pins exactly one of them -- v2, the current
+#: authority. v1 stays loadable because it is the frozen record the manifest
+#: already published on `published-data` cites, and because the committed
+#: publication fixtures carry it; a document naming anything else fails closed.
+KNOWN_ALLOWLIST_VERSIONS = frozenset(
+    {"publication-exports-v1", "publication-exports-v2"}
+)
+
+
 def _is_string_array(value: object, *, nonempty: bool) -> bool:
     return (
         isinstance(value, list)
@@ -137,7 +147,7 @@ def load_allowlist(path: str | Path) -> Allowlist:
         or set(document) != _TOP_LEVEL_KEYS
         or type(document.get("schema_version")) is not int
         or document.get("schema_version") != 1
-        or document.get("allowlist_version") != "publication-exports-v1"
+        or document.get("allowlist_version") not in KNOWN_ALLOWLIST_VERSIONS
         or not isinstance(document.get("exports"), list)
         or not document["exports"]
     ):
@@ -167,13 +177,14 @@ def load_allowlist(path: str | Path) -> Allowlist:
 
     return Allowlist(
         schema_version=1,
-        allowlist_version="publication-exports-v1",
+        allowlist_version=document["allowlist_version"],
         exports=tuple(sorted(entries, key=lambda entry: entry.export_name)),
     )
 
 
 __all__ = [
     "ALLOWLIST_ERROR_CATEGORIES",
+    "KNOWN_ALLOWLIST_VERSIONS",
     "AGGREGATE_PROHIBITED_COLUMNS",
     "CSV_DIALECT_NAME",
     "EXPORT_CLASSES",

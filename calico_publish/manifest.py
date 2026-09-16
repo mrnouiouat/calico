@@ -227,16 +227,22 @@ def compute_revision_fingerprint(
 
 
 def _authority(allowlist: "Allowlist | None") -> "Allowlist":
-    from calico_publish.allowlist import Allowlist, AllowlistError, ExportEntry, load_allowlist
+    from calico_publish.allowlist import (
+        KNOWN_ALLOWLIST_VERSIONS,
+        Allowlist,
+        AllowlistError,
+        ExportEntry,
+        load_allowlist,
+    )
 
     if allowlist is None:
         try:
-            return load_allowlist(Path(__file__).resolve().parents[1] / "contracts/publication-exports-v1.json")
+            return load_allowlist(Path(__file__).resolve().parents[1] / "contracts/publication-exports-v2.json")
         except AllowlistError:
             raise ManifestError("manifest.invalid_schema") from None
     if (not isinstance(allowlist, Allowlist)
             or type(allowlist.schema_version) is not int or allowlist.schema_version != 1
-            or allowlist.allowlist_version != "publication-exports-v1"
+            or allowlist.allowlist_version not in KNOWN_ALLOWLIST_VERSIONS
             or not isinstance(allowlist.exports, tuple) or not allowlist.exports
             or not all(isinstance(entry, ExportEntry) for entry in allowlist.exports)):
         raise ManifestError("manifest.invalid_schema")
@@ -336,7 +342,9 @@ def validate_published_manifest_document(
         raise ManifestError("manifest.invalid_schema")
     if type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
         raise ManifestError("manifest.unknown_schema_version")
-    if document.get("allowlist_version") != "publication-exports-v1":
+    from calico_publish.allowlist import KNOWN_ALLOWLIST_VERSIONS
+
+    if document.get("allowlist_version") not in KNOWN_ALLOWLIST_VERSIONS:
         raise ManifestError("manifest.unknown_allowlist_version")
     if not isinstance(document.get("parser_contract_version"), str) or not _PARSER_VERSION.fullmatch(document["parser_contract_version"]):
         raise ManifestError("manifest.invalid_schema")

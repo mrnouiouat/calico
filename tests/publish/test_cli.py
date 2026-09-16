@@ -154,7 +154,7 @@ class PublicationCliTests(unittest.TestCase):
             allowlist_loader=loader,
         )
         self.assertEqual(code, 1)
-        self.assertEqual(observed, ["publication-exports-v1.json"])
+        self.assertEqual(observed, ["publication-exports-v2.json"])
 
     def test_violation_returns_one_and_value_free_rendered_lines(self) -> None:
         with extra_unapproved_column() as publication:

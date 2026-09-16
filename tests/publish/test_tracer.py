@@ -25,7 +25,7 @@ from calico_publish.manifest import (
 from calico_publish.transaction import CARRIED_FORWARD_PATHS, TransactionError, publish_tree
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v1.json"
+_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v2.json"
 _TARGET_REF = "refs/heads/published-data"
 
 

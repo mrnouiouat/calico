@@ -12,10 +12,34 @@ from pathlib import Path
 from calico_publish import allowlist as module
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT = ROOT / "contracts/publication-exports-v1.json"
-NAMED_OMISSIONS = {
+CONTRACT = ROOT / "contracts/publication-exports-v2.json"
+#: Columns withheld from the public surface entirely under the D-007 field
+#: boundary: the derived delinquency flags and the revision fingerprint. No
+#: named export may carry one of these, which is why the structural check
+#: unions them across relations.
+WITHHELD_EVERYWHERE = {
     "dim_public_organizations": {"latest_is_delinquent", "latest_observed_revision_fingerprint"},
     "fct_public_status_observations": {"is_delinquent", "revision_fingerprint"},
+}
+
+#: Columns a relation documents and deliberately does not export because another
+#: approved export already carries them. These are different in kind from the
+#: withheld fields above: they are approved public fields, so they are omitted
+#: per relation rather than forbidden outright. dim_public_organizations carries
+#: organization name, city and state once per organization; repeating them on
+#: every observation row more than doubled the published byte size for no
+#: additional published fact (publication-exports-v2). Unioning these into the
+#: structural check would reject dim_public_organizations for exporting exactly
+#: the fields it exists to publish.
+REDUNDANT_OMISSIONS = {
+    "fct_public_status_observations": {"organization_name", "city", "state"},
+}
+
+#: The complete documented-but-not-exported gap per relation, which is what the
+#: documentation agreement check subtracts (D-27 strict projection).
+NAMED_OMISSIONS = {
+    name: WITHHELD_EVERYWHERE.get(name, set()) | REDUNDANT_OMISSIONS.get(name, set())
+    for name in set(WITHHELD_EVERYWHERE) | set(REDUNDANT_OMISSIONS)
 }
 
 
@@ -83,7 +107,7 @@ class AllowlistTests(unittest.TestCase):
                 self.assertFalse(set(entry.columns) & module.AGGREGATE_PROHIBITED_COLUMNS)
             else:
                 self.assertFalse(entry.measures)
-                self.assertFalse(set(entry.columns) & set.union(*NAMED_OMISSIONS.values()))
+                self.assertFalse(set(entry.columns) & set.union(*WITHHELD_EVERYWHERE.values()))
         self.assertLess(len(CONTRACT.read_text(encoding="utf-8").splitlines()), 250)
 
     def test_documented_columns_agree_in_both_directions(self):
@@ -151,7 +175,7 @@ class AllowlistTests(unittest.TestCase):
         self.rejects("allowlist.invalid_schema", changed)
 
         schema = json.loads(
-            (ROOT / "contracts/publication-exports-v1.schema.json").read_text(
+            (ROOT / "contracts/publication-exports-v2.schema.json").read_text(
                 encoding="utf-8"
             )
         )

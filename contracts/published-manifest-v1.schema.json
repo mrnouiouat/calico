@@ -5,56 +5,190 @@
   "description": "Closed, row-free positive projection of accepted releases, source hashes/sizes/row counts, parser and allowlist versions, toolchain pins, eligible key count, and export provenance (D-10). Every field is explicitly assigned from validated safe input. Contains no local paths, credentials, exception text, excluded values, organization-level row content, or wall-clock field. The document validator additionally enforces distinct sorted identities and export name/file/grain agreement with the publication allowlist. Integer fields must decode to Python integers, never booleans or floating-point values.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "allowlist_version", "parser_contract_version", "toolchain", "accepted_releases", "eligible_key_count", "exports"],
+  "required": [
+    "schema_version",
+    "allowlist_version",
+    "parser_contract_version",
+    "toolchain",
+    "accepted_releases",
+    "eligible_key_count",
+    "exports"
+  ],
   "properties": {
-    "schema_version": {"type": "integer", "const": 1},
-    "allowlist_version": {"const": "publication-exports-v1"},
-    "parser_contract_version": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*-v[1-9][0-9]*$", "description": "Versioned parser contract identifier; no path or free text."},
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "allowlist_version": {
+      "enum": [
+        "publication-exports-v1",
+        "publication-exports-v2"
+      ],
+      "description": "The publication authority that produced this document. Widened from a v1 const when publication-exports-v2 superseded v1: no field of this document changed shape, and every manifest already published under v1 stays valid under this schema."
+    },
+    "parser_contract_version": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*-v[1-9][0-9]*$",
+      "description": "Versioned parser contract identifier; no path or free text."
+    },
     "toolchain": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["python", "dbt_core", "dbt_duckdb", "duckdb"],
+      "required": [
+        "python",
+        "dbt_core",
+        "dbt_duckdb",
+        "duckdb"
+      ],
       "properties": {
-        "python": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Exact three-part Python version pin."},
-        "dbt_core": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Exact three-part dbt Core version pin."},
-        "dbt_duckdb": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Exact three-part dbt-duckdb version pin."},
-        "duckdb": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Exact three-part DuckDB version pin."}
+        "python": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Exact three-part Python version pin."
+        },
+        "dbt_core": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Exact three-part dbt Core version pin."
+        },
+        "dbt_duckdb": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Exact three-part dbt-duckdb version pin."
+        },
+        "duckdb": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Exact three-part DuckDB version pin."
+        }
       }
     },
-    "accepted_releases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/accepted_release"}, "description": "Distinct accepted date/revision pairs sorted by date then revision."},
-    "eligible_key_count": {"type": "integer", "minimum": 0, "description": "Zero explicitly records the valid empty named-history state (D-23)."},
-    "exports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/export_record"}, "description": "Distinct approved exports sorted by export name; zero-row files remain present."}
+    "accepted_releases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/accepted_release"
+      },
+      "description": "Distinct accepted date/revision pairs sorted by date then revision."
+    },
+    "eligible_key_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero explicitly records the valid empty named-history state (D-23)."
+    },
+    "exports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/export_record"
+      },
+      "description": "Distinct approved exports sorted by export name; zero-row files remain present."
+    }
   },
   "$defs": {
     "accepted_release": {
-      "type": "object", "additionalProperties": false,
-      "required": ["as_of_date", "release_revision", "revision_fingerprint", "source_objects"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "as_of_date",
+        "release_revision",
+        "revision_fingerprint",
+        "source_objects"
+      ],
       "properties": {
-        "as_of_date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
-        "release_revision": {"type": "integer", "minimum": 1},
-        "revision_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "source_objects": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/source_object"}, "description": "The complete four-object canonical source-list set, sorted by source list."}
+        "as_of_date": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "release_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_objects": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/source_object"
+          },
+          "description": "The complete four-object canonical source-list set, sorted by source list."
+        }
       }
     },
     "source_object": {
-      "type": "object", "additionalProperties": false,
-      "required": ["source_list", "sha256", "byte_size", "row_count"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_list",
+        "sha256",
+        "byte_size",
+        "row_count"
+      ],
       "properties": {
-        "source_list": {"enum": ["charities-may-operate", "charities-not-operating", "charities-undetermined-status", "charities-may-not-operate"]},
-        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "byte_size": {"type": "integer", "minimum": 0},
-        "row_count": {"type": "integer", "minimum": 0}
+        "source_list": {
+          "enum": [
+            "charities-may-operate",
+            "charities-not-operating",
+            "charities-undetermined-status",
+            "charities-may-not-operate"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "export_record": {
-      "type": "object", "additionalProperties": false,
-      "required": ["export_name", "file_name", "sha256", "row_count", "grain"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "export_name",
+        "file_name",
+        "sha256",
+        "row_count",
+        "grain"
+      ],
       "properties": {
-        "export_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
-        "file_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*\\.csv$", "description": "Must equal export_name plus .csv and the approved file identity."},
-        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "row_count": {"type": "integer", "minimum": 0},
-        "grain": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "description": "Exact ordered grain from the approved export entry."}
+        "export_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "file_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.csv$",
+          "description": "Must equal export_name plus .csv and the approved file identity."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "grain": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": "Exact ordered grain from the approved export entry."
+        }
       }
     }
   }
