@@ -354,5 +354,47 @@ class SerializationTests(unittest.TestCase):
         validate_capture_status_document(json.loads(status.to_json()))
 
 
+
+class SuccessorDisplayProjectionTests(unittest.TestCase):
+    def test_five_outcome_replays_use_one_upstream_projection(self):
+        from calico_capture.status import project_publication_status
+        for outcome, reason, published, warning in (
+            ("accepted", "none", True, False),
+            ("no_new_release", "source_not_advanced", False, False),
+            ("rejected", "structural_rejection", False, True),
+            ("operational_error", "warehouse_build_error", False, True),
+            ("accepted", "none", False, True),
+        ):
+            with self.subTest(outcome=outcome, published=published):
+                status = project_safe_status(trigger="local", outcome=outcome,
+                    reason_category=reason, started_at_utc=_STARTED, ended_at_utc=_ENDED)
+                result = project_publication_status(status.to_dict(), publication_succeeded=published)
+                self.assertEqual(result.schema_version, 3)
+                self.assertEqual(result.newer_attempt_not_accepted, warning)
+                self.assertEqual(result.ended_at_utc, _ENDED)
+                self.assertEqual(result.source_publication_state, "retired")
+                self.assertEqual(result.source_publication_retired_on, "2026-09-02")
+                self.assertIsNone(result.last_accepted_as_of_date)
+                self.assertIsNone(result.last_accepted_release_revision)
+                validate_capture_status_document(result.to_dict())
+
+    def test_accepted_capture_is_pending_until_publication_succeeds(self):
+        status = project_safe_status(trigger="local", outcome="accepted", reason_category="none",
+                                   started_at_utc=_STARTED, ended_at_utc=_ENDED)
+        self.assertTrue(status.newer_attempt_not_accepted)
+
+    def test_display_fields_reject_extra_and_malformed_values(self):
+        status = project_safe_status(trigger="local", outcome="rejected", reason_category="structural_rejection",
+                                   started_at_utc=_STARTED, ended_at_utc=_ENDED)
+        for key, value in (("newer_attempt_not_accepted", "false"),
+                           ("source_publication_state", "unknown"),
+                           ("source_publication_retired_on", None)):
+            with self.subTest(key=key):
+                document = status.to_dict()
+                document[key] = value
+                with self.assertRaises(StatusError):
+                    validate_capture_status_document(document)
+
+
 if __name__ == "__main__":
     unittest.main()
