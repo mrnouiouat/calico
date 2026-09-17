@@ -34,6 +34,7 @@ class PublicationFixture:
         self.staging.mkdir()
         _git(self.remote, "init", "--bare")
         _git(self.repo, "init", "--initial-branch=main")
+        _git(self.repo, "config", "core.autocrlf", "false")
         _git(self.repo, "config", "user.name", "Synthetic Publisher")
         _git(self.repo, "config", "user.email", _email("synthetic"))
         _git(self.repo, "remote", "add", "origin", str(self.remote))

@@ -278,6 +278,7 @@ jobs:
           python -m pip install --requirement requirements-capture.txt
 
       - name: Restore verified history, build once, gate, and publish
+        id: publication
         env:
           CALICO_B2_PUBLISH_KEY_ID: ${{ secrets.CALICO_B2_PUBLISH_KEY_ID }}
           CALICO_B2_PUBLISH_KEY: ${{ secrets.CALICO_B2_PUBLISH_KEY }}
@@ -286,6 +287,27 @@ jobs:
           trap 'rm -rf "$PUBLISH_ROOT"' EXIT
           mkdir -p "$PUBLISH_ROOT/store" "$PUBLISH_ROOT/staging"
           python -m calico_publish publish --mode real --store "$PUBLISH_ROOT/store" --staging "$PUBLISH_ROOT/staging" --remote origin --target-ref published-data
+
+      - name: Finish the independent safe status after publication
+        if: ${{ always() && !cancelled() && needs.calendar-gate.outputs.mode == 'capture' }}
+        env:
+          CAPTURE_STATUS_JSON: ${{ needs.capture.outputs.status_json }}
+          PUBLICATION_SUCCEEDED: ${{ steps.publication.outcome == 'success' }}
+        run: |
+          python -m calico_capture.runner
+          BOT_EMAIL_USER="calico-capture-bot"
+          BOT_EMAIL_HOST="users.noreply.github.com"
+          BOT_EMAIL="${BOT_EMAIL_USER}@${BOT_EMAIL_HOST}"
+          git fetch origin published-data
+          git checkout -B published-data origin/published-data
+          cp capture-status-validated.json capture-status.json
+          git add capture-status.json
+          if git diff --cached --quiet; then
+            echo "capture-status.json unchanged"
+          else
+            git -c user.name="calico-capture-bot" -c user.email="$BOT_EMAIL" commit -m "Record the safe publication result for the capture attempt"
+            git push origin HEAD:published-data
+          fi
 
   authorization-probe:
     # Plan 07: proves the *effective* server-side ref boundary (not just YAML

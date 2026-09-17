@@ -159,7 +159,7 @@ class PublicationCliTests(unittest.TestCase):
             allowlist_loader=loader,
         )
         self.assertEqual(code, 1)
-        self.assertEqual(observed, ["publication-exports-v2.json"])
+        self.assertEqual(observed, ["publication-exports-v3.json"])
 
     def test_violation_returns_one_and_value_free_rendered_lines(self) -> None:
         with extra_unapproved_column() as publication:
@@ -295,6 +295,50 @@ class PublicationCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(calls, [])
         self.assertEqual(stderr, "gate.violations_found\n")
+
+    def test_complete_successor_publish_validates_control_and_excludes_it_from_hash_paths(self) -> None:
+        import duckdb
+        from calico_capture.status import project_safe_status
+        authority = load_allowlist(REPO_ROOT / "contracts/publication-exports-v3.json")
+        for malformed in (False, True):
+            with self.subTest(malformed=malformed), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                database = root / "synthetic.duckdb"
+                with duckdb.connect(str(database)) as connection:
+                    for entry in authority.exports:
+                        columns = ", ".join('"' + column + '" VARCHAR' for column in entry.columns)
+                        connection.execute('CREATE TABLE "' + entry.source_relation + '" (' + columns + ')')
+                    connection.execute("CREATE TABLE int_promoted_releases(as_of_date DATE, release_revision INTEGER)")
+                    connection.execute("INSERT INTO int_promoted_releases VALUES ('2032-01-01', 2)")
+                def build_runner(**kwargs):
+                    kwargs["export"](database)
+                    return BuildOutcome(status="success", category=None, proof=None)
+                status = project_safe_status(trigger="local", outcome="no_new_release",
+                    reason_category="source_not_advanced", started_at_utc="2032-01-01T00:00:00Z",
+                    ended_at_utc="2032-01-01T00:00:01Z").to_dict()
+                calls = []
+                def publisher(**kwargs):
+                    calls.append(kwargs)
+                    return SimpleNamespace(status="published")
+                code, stdout, stderr = _invoke(
+                    ["publish", "--mode", "fixture", "--staging", str(root / "staging"),
+                     "--remote", "origin", "--target-ref", "published-data"],
+                    build_runner=build_runner, transaction_publisher=publisher,
+                    control_loader=lambda **kwargs: {} if malformed else status)
+                if malformed:
+                    self.assertEqual(code, 1)
+                    self.assertEqual(calls, [])
+                    self.assertEqual(json.loads(stdout), {"category": "gate.control_source_invalid"})
+                else:
+                    self.assertEqual(code, 0, stderr)
+                    self.assertEqual(len(calls), 1)
+                    self.assertEqual(len(calls[0]["staged_files"]), 13)
+                    self.assertNotIn("capture-status.json", calls[0]["staged_files"])
+                    self.assertNotIn("capture-status.json", calls[0]["expected_sha256"])
+                    self.assertEqual(calls[0]["allowlist"].allowlist_version, "publication-exports-v3")
+                    manifest = json.loads((root / "staging/manifest/published-manifest-v1.json").read_text())
+                    self.assertEqual(manifest["accepted_releases"][0]["as_of_date"], "2032-01-01")
+                    self.assertEqual(manifest["accepted_releases"][0]["release_revision"], 2)
 
     def test_publish_rejects_nonliteral_target_before_build(self) -> None:
         calls: list[str] = []

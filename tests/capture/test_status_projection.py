@@ -1,5 +1,5 @@
 """Closed positive status-projection schema enforcement tests (06-02-PLAN.md
-Task 2; `contracts/capture-status-v2.schema.json`).
+Task 2; `contracts/capture-status-v3.schema.json`).
 
 Proves `calico_capture.status`'s exact closed key set and enums permit only
 the schema version, UTC attempt bounds, the closed outcome/reason/trigger
@@ -29,7 +29,7 @@ from calico_capture.status import (
 )
 
 _SCHEMA_PATH = (
-    Path(__file__).resolve().parents[2] / "contracts" / "capture-status-v2.schema.json"
+    Path(__file__).resolve().parents[2] / "contracts" / "capture-status-v3.schema.json"
 )
 
 _STARTED = "2026-09-02T17:17:00.000Z"
@@ -42,7 +42,7 @@ def _load_schema() -> dict:
 
 def _valid_accepted_document() -> dict:
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "trigger": "local",
         "outcome": "accepted",
         "reason_category": "none",
@@ -50,6 +50,9 @@ def _valid_accepted_document() -> dict:
         "ended_at_utc": _ENDED,
         "last_accepted_as_of_date": "2020-01-15",
         "last_accepted_release_revision": 1,
+        "newer_attempt_not_accepted": True,
+        "source_publication_state": "retired",
+        "source_publication_retired_on": "2026-09-02",
     }
 
 
@@ -70,7 +73,7 @@ class SchemaFileCrossCheckTests(unittest.TestCase):
 
     def test_schema_version_is_a_fixed_const(self) -> None:
         schema = _load_schema()
-        self.assertEqual(schema["properties"]["schema_version"], {"const": 2})
+        self.assertEqual(schema["properties"]["schema_version"], {"const": 3})
 
     def test_schema_trigger_enum_matches_the_python_closed_vocabulary(self) -> None:
         schema = _load_schema()
@@ -342,7 +345,7 @@ class SerializationTests(unittest.TestCase):
         # own explicit validate_capture_status_document call does not
         # itself reject a document its own constructor already accepted.
         status = CaptureStatus(
-            schema_version=2,
+            schema_version=3,
             trigger="workflow_dispatch",
             outcome="no_new_release",
             reason_category="source_not_advanced",
@@ -350,6 +353,9 @@ class SerializationTests(unittest.TestCase):
             ended_at_utc=_ENDED,
             last_accepted_as_of_date="2020-01-15",
             last_accepted_release_revision=1,
+            newer_attempt_not_accepted=False,
+            source_publication_state="retired",
+            source_publication_retired_on="2026-09-02",
         )
         validate_capture_status_document(json.loads(status.to_json()))
 
@@ -382,6 +388,33 @@ class SuccessorDisplayProjectionTests(unittest.TestCase):
         status = project_safe_status(trigger="local", outcome="accepted", reason_category="none",
                                    started_at_utc=_STARTED, ended_at_utc=_ENDED)
         self.assertTrue(status.newer_attempt_not_accepted)
+
+    def test_safe_writer_changes_only_its_status_file(self):
+        import tempfile
+        from calico_capture.runner import write_publication_status
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            analytical = root / "synthetic.csv"
+            analytical.write_bytes(b"field\nsynthetic\n")
+            document = project_safe_status(trigger="local", outcome="accepted", reason_category="none",
+                                          started_at_utc=_STARTED, ended_at_utc=_ENDED).to_dict()
+            destination = root / "capture-status.json"
+            write_publication_status(destination, document, publication_succeeded=True)
+            self.assertFalse(json.loads(destination.read_text())["newer_attempt_not_accepted"])
+            self.assertEqual(analytical.read_bytes(), b"field\nsynthetic\n")
+            with self.assertRaises(FileExistsError):
+                write_publication_status(destination, document, publication_succeeded=False)
+            self.assertFalse(json.loads(destination.read_text())["newer_attempt_not_accepted"])
+
+    def test_public_control_rejects_malformed_timestamps_and_retirement_dates(self):
+        for key, value in (("ended_at_utc", "arbitrary timestamp-shaped private text"),
+                           ("ended_at_utc", "2032-02-30T00:00:00Z"),
+                           ("source_publication_retired_on", "2032-02-30")):
+            with self.subTest(key=key, value=value):
+                document = _valid_accepted_document()
+                document[key] = value
+                with self.assertRaises(StatusError):
+                    validate_capture_status_document(document)
 
     def test_display_fields_reject_extra_and_malformed_values(self):
         status = project_safe_status(trigger="local", outcome="rejected", reason_category="structural_rejection",

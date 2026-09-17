@@ -7,8 +7,11 @@ import hashlib
 import json
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable
+
+import duckdb
 
 from calico_capture.archive import Archive, ArchiveError
 from calico_capture.b2 import B2ReadOnlyArchive
@@ -25,7 +28,7 @@ from calico_publish.export import (
     prepare_staging_subdirectory,
     write_staged_text,
 )
-from calico_publish.gate import GateError, verify
+from calico_publish.gate import GateError, verify, verify_control_document
 from calico_publish.inventory import InventoryError, check_inventory, load_inventory_document
 from calico_publish.manifest import (
     AcceptedRelease,
@@ -34,12 +37,12 @@ from calico_publish.manifest import (
     compute_revision_fingerprint,
     project_published_manifest,
 )
-from calico_publish.transaction import TransactionError, publish_tree
+from calico_publish.transaction import TransactionError, publish_tree, load_published_control
 from tools.privacy_scan.policy import PolicyError, load_policy
 from tools.privacy_scan.scanner import ScanPathError, scan_paths
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_REAL_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v2.json"
+_REAL_ALLOWLIST_PATH = _REPO_ROOT / "contracts" / "publication-exports-v3.json"
 _REAL_CATALOG_PATH = _REPO_ROOT / "contracts" / "dbt-input-catalog-v1.json"
 _POLICY_PATH = _REPO_ROOT / "policies" / "publishable-tree.json"
 _MANIFEST_RELATIVE_PATH = Path("manifest") / "published-manifest-v1.json"
@@ -64,7 +67,7 @@ def _dict_json(document: dict[str, object]) -> str:
 def _allowlist_path(args: argparse.Namespace) -> Path:
     if getattr(args, "mode", "real") == "real":
         return _REAL_ALLOWLIST_PATH
-    for filename in ("publication-exports-v2.json", "publication-exports-v1.json"):
+    for filename in ("publication-exports-v3.json", "publication-exports-v2.json", "publication-exports-v1.json"):
         fixture_path = Path(args.staging) / filename
         if fixture_path.is_symlink() or (fixture_path.exists() and not fixture_path.is_file()):
             raise AllowlistError("allowlist.invalid_schema")
@@ -82,7 +85,8 @@ def _default_publication_archive_factory() -> Archive:
 
 
 def _accepted_releases(
-    mode: str, store: Path, catalog_loader: Callable[[], InputCatalog]
+    mode: str, store: Path, catalog_loader: Callable[[], InputCatalog],
+    fixture_identities: tuple[tuple[str, int], ...] | None = None,
 ) -> tuple[tuple[AcceptedRelease, ...], str]:
     if mode == "fixture":
         fixture_hashes = {"synthetic_source": "0" * 64}
@@ -102,7 +106,9 @@ def _accepted_releases(
                 ),
             ),
         )
-        return (release,), "registry-csv-contract-v1"
+        releases = tuple(replace(release, as_of_date=date, release_revision=revision)
+                         for date, revision in fixture_identities) if fixture_identities is not None else (release,)
+        return releases, "registry-csv-contract-v1"
     catalog = catalog_loader()
     releases: list[AcceptedRelease] = []
     parser_versions: set[int] = set()
@@ -135,11 +141,17 @@ def _prepare_publication(
     staging = prepare_staging_directory(args.staging)
     allowlist = allowlist_loader(_allowlist_path(args))
     staged: tuple[StagedExport, ...] = ()
+    fixture_identities = None
 
     def final_build(store: Path | None = None) -> BuildOutcome:
         def export_hook(database: Path) -> None:
-            nonlocal staged
+            nonlocal staged, fixture_identities
             staged = exporter(database, allowlist, staging)
+            if args.mode == "fixture" and allowlist.control_sources:
+                with duckdb.connect(str(database), read_only=True) as connection:
+                    fixture_identities = tuple((str(date), revision) for date, revision in connection.execute(
+                        "select as_of_date, release_revision from int_promoted_releases order by as_of_date"
+                    ).fetchall())
         return build_runner(
             mode=args.mode, store=store if args.mode == "real" else None,
             select=None, export=export_hook,
@@ -165,7 +177,8 @@ def _prepare_publication(
     if not staged:
         raise ManifestError("manifest.empty_exports")
 
-    releases, parser_version = _accepted_releases(args.mode, Path(args.store or staging), catalog_loader)
+    releases, parser_version = _accepted_releases(args.mode, Path(args.store or staging), catalog_loader,
+                                                  fixture_identities=fixture_identities)
     eligible_export = next(
         (item for item in staged if item.export_name == "dim_public_organizations"),
         staged[0] if args.mode == "fixture" else None,
@@ -197,6 +210,7 @@ def _run_verify(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
         staging / _MANIFEST_RELATIVE_PATH,
         source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
         eligible_export_name=None if args.mode == "fixture" else "dim_public_organizations",
+        verify_controls=bool(allowlist.control_sources),
     )
     if result.passed:
         print(_dict_json({"category": "gate.verified", "violation_count": 0}))
@@ -217,6 +231,13 @@ def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int
     if args.target_ref != _TARGET_REF:
         raise TransactionError("transaction.parent_not_found")
     staging, allowlist, staged, paths = _prepare_publication(args, **runtime["prepare_kwargs"])
+    if allowlist.control_sources:
+        loader = runtime["control_loader"]
+        assert callable(loader)
+        control = loader(repo_dir=_REPO_ROOT, remote=args.remote,
+                         target_ref=args.target_ref, allowlist=allowlist)
+        verify_control_document(control, allowlist)
+        write_staged_text(staging / "capture-status.json", _dict_json(control) + "\n")
     before_scan = _hash_explicit_files(staging, paths)
     result = verify(
         staging,
@@ -224,6 +245,7 @@ def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int
         staging / _MANIFEST_RELATIVE_PATH,
         source_lists=_FIXTURE_SOURCE_LISTS if args.mode == "fixture" else LOGICAL_LIST_ORDER,
         eligible_export_name=None if args.mode == "fixture" else "dim_public_organizations",
+        verify_controls=bool(allowlist.control_sources),
     )
     if not result.passed:
         for finding in result.violations:
@@ -251,6 +273,7 @@ def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int
         author_name="Calico Publication Bot",
         author_email="calico-publish-bot" + "@" + "users.noreply.github.com",
         expected_sha256=after_scan,
+        allowlist=allowlist,
     )
     print(_dict_json({"category": f"publish.{published.status}"}))
     return 0
@@ -323,11 +346,13 @@ def main(
     archive_factory: Callable[[], Archive] | None = None,
     catalog_loader: Callable[[], InputCatalog] = lambda: load_input_catalog(_REAL_CATALOG_PATH),
     transaction_publisher: Callable[..., object] = publish_tree,
+    control_loader: Callable[..., dict[str, object]] = load_published_control,
 ) -> int:
     args = _build_parser().parse_args(argv)
     runtime = {
         "allowlist_loader": allowlist_loader,
         "transaction_publisher": transaction_publisher,
+        "control_loader": control_loader,
         "prepare_kwargs": {
             "allowlist_loader": allowlist_loader, "build_runner": build_runner, "exporter": exporter,
             "archive_factory": archive_factory, "catalog_loader": catalog_loader,

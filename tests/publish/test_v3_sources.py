@@ -94,6 +94,98 @@ class SuccessorSourceTests(unittest.TestCase):
                     load_allowlist(path)
                 self.assertEqual(str(caught.exception), "allowlist.invalid_schema")
 
+    def test_fixture_publisher_controls_status_only_updates_and_interruptions(self):
+        import hashlib
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        from calico_capture.status import project_safe_status, project_publication_status
+        from calico_publish.cli import main
+        from calico_publish.gate import GateError, verify
+        from calico_publish.transaction import TransactionError
+        from tests.publish.test_transaction import PublicationFixture, _git
+        authority = load_allowlist(CONTRACT)
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = PublicationFixture(Path(temp))
+            (fixture.staging / "exports/public.csv").unlink()
+            (fixture.staging / "manifest/published-manifest-v1.json").unlink()
+            def fixture_build(**kwargs):
+                return runner.build(fixture_store_factory=_public_models_fixture_store, **kwargs)
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                code = main(["export", "--mode", "fixture", "--staging", str(fixture.staging)],
+                            build_runner=fixture_build)
+            self.assertEqual(code, 0)
+            manifest_path = fixture.staging / "manifest/published-manifest-v1.json"
+            document = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(document["allowlist_version"], "publication-exports-v3")
+            self.assertEqual(len(document["exports"]), 12)
+            self.assertNotIn("capture_status", {item["export_name"] for item in document["exports"]})
+            def status_for(outcome, reason, published=False, index=0):
+                status = project_safe_status(trigger="local", outcome=outcome, reason_category=reason,
+                    started_at_utc="2032-01-01T00:00:00Z", ended_at_utc=f"2032-01-01T00:00:{index:02d}Z")
+                return project_publication_status(status.to_dict(), publication_succeeded=published).to_json()
+            status_path = fixture.staging / "capture-status.json"
+            with self.assertRaises(GateError) as caught:
+                verify(fixture.staging, authority, manifest_path,
+                       source_lists=("synthetic_source",), verify_controls=True)
+            self.assertEqual(caught.exception.category, "gate.control_source_missing")
+            status_path.write_text("{}", encoding="utf-8")
+            with self.assertRaises(GateError) as caught:
+                verify(fixture.staging, authority, manifest_path,
+                       source_lists=("synthetic_source",), verify_controls=True)
+            self.assertEqual(caught.exception.category, "gate.control_source_invalid")
+            status_path.write_text(status_for("accepted", "none"), encoding="utf-8")
+            self.assertTrue(verify(fixture.staging, authority, manifest_path,
+                                  source_lists=("synthetic_source",), verify_controls=True).passed)
+            paths = tuple(sorted(["exports/" + item.file_name for item in authority.exports] +
+                                 ["manifest/published-manifest-v1.json"]))
+            # The fetched parent must carry a complete v3 control; malformed
+            # controls fail before any publication object can be written.
+            from calico_publish.transaction import publish_tree
+            def publish(**kwargs):
+                return publish_tree(repo_dir=fixture.repo, staging_dir=fixture.staging,
+                    staged_files=paths, remote="origin", target_ref="published-data",
+                    commit_subject="Publish synthetic governed successor", author_name="Synthetic Publisher",
+                    author_email="synthetic" + "@" + "example.invalid", allowlist=authority, **kwargs)
+            with self.assertRaises(TransactionError) as caught:
+                publish()
+            self.assertEqual(caught.exception.category, "transaction.control_source_invalid")
+            (fixture.repo / "capture-status.json").write_bytes(status_path.read_bytes())
+            _git(fixture.repo, "add", "capture-status.json")
+            _git(fixture.repo, "commit", "-m", "Stage the synthetic pending attempt")
+            _git(fixture.repo, "push", "origin", "HEAD:published-data")
+            before = _git(fixture.repo, "ls-remote", "origin", "refs/heads/published-data").split()[0]
+            for interruption in ("before_write_tree", "before_commit_tree", "after_commit_tree", "before_push"):
+                with self.subTest(interruption=interruption):
+                    def stop(stage):
+                        if stage == interruption:
+                            raise RuntimeError("synthetic interruption")
+                    with self.assertRaises(RuntimeError):
+                        publish(failure_hook=stop)
+                    self.assertEqual(_git(fixture.repo, "ls-remote", "origin", "refs/heads/published-data").split()[0], before)
+            result = publish()
+            self.assertEqual(result.status, "published")
+            _git(fixture.repo, "fetch", "origin", "published-data")
+            _git(fixture.repo, "checkout", "-B", "published-data", "FETCH_HEAD")
+            hashes = {path: hashlib.sha256((fixture.repo / path).read_bytes()).hexdigest() for path in paths}
+            control_oid = _git(fixture.repo, "rev-parse", "HEAD:capture-status.json")
+            self.assertEqual(control_oid, _git(fixture.repo, "rev-parse", f"{before}:capture-status.json"))
+            replays = (("accepted", "none", True), ("no_new_release", "source_not_advanced", False),
+                       ("rejected", "structural_rejection", False),
+                       ("operational_error", "warehouse_build_error", False), ("accepted", "none", False))
+            for index, (outcome, reason, published) in enumerate(replays, 1):
+                prior = _git(fixture.repo, "rev-parse", "HEAD")
+                payload = status_for(outcome, reason, published, index)
+                (fixture.repo / "capture-status.json").write_text(payload, encoding="utf-8")
+                status_path.write_text(payload, encoding="utf-8")
+                _git(fixture.repo, "add", "capture-status.json")
+                _git(fixture.repo, "commit", "-m", "Update the synthetic safe attempt status")
+                _git(fixture.repo, "push", "origin", "HEAD:published-data")
+                self.assertEqual(_git(fixture.repo, "diff", "--name-only", prior, "HEAD"), "capture-status.json")
+                self.assertEqual(hashes, {path: hashlib.sha256((fixture.repo / path).read_bytes()).hexdigest() for path in paths})
+                self.assertTrue(verify(fixture.repo, authority,
+                    fixture.repo / "manifest/published-manifest-v1.json",
+                    source_lists=("synthetic_source",), verify_controls=True).passed)
+
     def test_fixture_sql_sources_and_promoted_identity(self):
         authority = load_allowlist(CONTRACT)
         def inspect(path):

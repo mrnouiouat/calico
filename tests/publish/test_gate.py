@@ -161,6 +161,8 @@ class PublicationGateContentTests(unittest.TestCase):
                     "gate.export_carriage_return",
                     "gate.manifest_invalid_schema",
                     "gate.manifest_not_found",
+                    "gate.control_source_missing",
+                    "gate.control_source_invalid",
                 }
             ),
         )

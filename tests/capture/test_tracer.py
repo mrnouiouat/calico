@@ -151,6 +151,9 @@ class TracerAcceptedPathTests(unittest.TestCase):
                 "ended_at_utc",
                 "last_accepted_as_of_date",
                 "last_accepted_release_revision",
+                "newer_attempt_not_accepted",
+                "source_publication_state",
+                "source_publication_retired_on",
             },
         )
         serialized = status.to_json()
@@ -262,6 +265,9 @@ class TracerClosedFailurePathTests(unittest.TestCase):
                 "ended_at_utc",
                 "last_accepted_as_of_date",
                 "last_accepted_release_revision",
+                "newer_attempt_not_accepted",
+                "source_publication_state",
+                "source_publication_retired_on",
             },
         )
         self.assertIsNone(status.last_accepted_as_of_date)

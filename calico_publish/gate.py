@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from calico_landing.contracts import LOGICAL_LIST_ORDER
+from calico_capture.status import StatusError, validate_capture_status_document
 from calico_publish.allowlist import AGGREGATE_PROHIBITED_COLUMNS, Allowlist
 from calico_publish.manifest import ManifestError, validate_published_manifest_document
 
@@ -37,6 +38,8 @@ GATE_ERROR_CATEGORIES = frozenset(
         "gate.export_carriage_return",
         "gate.manifest_invalid_schema",
         "gate.manifest_not_found",
+        "gate.control_source_missing",
+        "gate.control_source_invalid",
     }
 )
 
@@ -186,6 +189,28 @@ def _check_export_directory(export_dir: Path, expected_files: set[str]) -> None:
             raise GateError("gate.unexpected_export_file")
 
 
+def verify_control_document(document: object, allowlist: Allowlist) -> None:
+    """Validate the independently mutable control without analytical hash records."""
+    if len(allowlist.control_sources) != 1:
+        raise GateError("gate.control_source_invalid")
+    try:
+        validate_capture_status_document(document)
+    except (StatusError, TypeError, ValueError) as exc:
+        raise GateError("gate.control_source_invalid") from exc
+
+
+def verify_control_sources(root: Path, allowlist: Allowlist) -> None:
+    for source in allowlist.control_sources:
+        path = root / source.fixed_path
+        if path.is_symlink() or not path.is_file():
+            raise GateError("gate.control_source_missing")
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise GateError("gate.control_source_invalid") from exc
+        verify_control_document(document, allowlist)
+
+
 def verify(
     staging_dir: str | Path,
     allowlist: Allowlist,
@@ -193,12 +218,17 @@ def verify(
     *,
     source_lists: tuple[str, ...] = LOGICAL_LIST_ORDER,
     eligible_export_name: str | None = "dim_public_organizations",
+    verify_controls: bool | None = None,
 ) -> GateResult:
     """Verify exact fields, order, grain, encoding, and optional provenance."""
 
     root = Path(staging_dir)
     if root.is_symlink() or not root.is_dir():
         raise GateError("gate.export_file_missing")
+    if verify_controls is None:
+        verify_controls = bool(allowlist.control_sources)
+    if verify_controls:
+        verify_control_sources(root, allowlist)
     export_dir = root / "exports"
     expected_files = {entry.file_name for entry in allowlist.exports}
     _check_export_directory(export_dir, expected_files)
@@ -292,4 +322,6 @@ __all__ = [
     "GateResult",
     "GateViolation",
     "verify",
+    "verify_control_document",
+    "verify_control_sources",
 ]

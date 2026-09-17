@@ -245,6 +245,16 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         for token in ("--force", "--delete", "push -f", "upload-artifact", "cache@", "continue-on-error", "set -x"):
             self.assertNotIn(token, block)
 
+    def test_publication_result_finishes_status_even_when_publication_failed(self) -> None:
+        block = _job_block(self._workflow(), "publish")
+        final = block.split("- name: Finish the independent safe status after publication", 1)[1]
+        self.assertIn("always() && !cancelled()", final)
+        self.assertIn("steps.publication.outcome == 'success'", final)
+        self.assertIn("python -m calico_capture.runner", final)
+        self.assertIn("git add capture-status.json", final)
+        self.assertNotIn("secrets.", final)
+        self.assertNotIn("--force", final)
+
     def test_publish_b2_secrets_are_step_scoped_and_exact(self) -> None:
         block = _job_block(self._workflow(), "publish")
         env_position = block.index("        env:")

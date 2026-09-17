@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 import hashlib
 import re
 import stat
@@ -11,6 +12,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence
+
+from calico_publish.allowlist import Allowlist
+from calico_publish.gate import GateError, verify_control_document
 
 PUBLISHED_EXPORT_DIR = "exports"
 PUBLISHED_MANIFEST_PATH = "manifest/published-manifest-v1.json"
@@ -28,6 +32,8 @@ TRANSACTION_ERROR_CATEGORIES = frozenset(
         "transaction.commit_tree_failed",
         "transaction.push_failed",
         "transaction.push_rejected_after_retries",
+        "transaction.control_source_invalid",
+        "transaction.export_set_mismatch",
     }
 )
 
@@ -195,6 +201,31 @@ def _carried_blobs(repo_dir: Path, parent: str) -> dict[str, str]:
     return blobs
 
 
+def _read_control(repo: Path, parent: str, allowlist: Allowlist) -> dict[str, object]:
+    current = _git(repo, ["show", f"{parent}:capture-status.json"],
+                   category="transaction.control_source_invalid")
+    try:
+        if current.returncode != 0:
+            raise ValueError
+        document = json.loads(current.stdout)
+        verify_control_document(document, allowlist)
+    except (ValueError, GateError) as exc:
+        raise TransactionError("transaction.control_source_invalid") from exc
+    return document
+
+
+def load_published_control(*, repo_dir: str | Path, remote: str, target_ref: str,
+                           allowlist: Allowlist) -> dict[str, object]:
+    """Fetch and validate the independent status snapshot before analytical staging gates."""
+    if not isinstance(remote, str) or not remote or remote.startswith("-"):
+        raise TransactionError("transaction.fetch_failed")
+    if target_ref not in {"published-data", "refs/heads/published-data"}:
+        raise TransactionError("transaction.parent_not_found")
+    repo = Path(repo_dir)
+    parent = _tip(repo, remote, "refs/heads/published-data")
+    return _read_control(repo, parent, allowlist)
+
+
 def publish_tree(
     *,
     repo_dir: str | Path,
@@ -206,6 +237,7 @@ def publish_tree(
     author_name: str,
     author_email: str,
     expected_sha256: Mapping[str, str] | None = None,
+    allowlist: Allowlist | None = None,
     failure_hook: Callable[[str], None] = lambda _stage: None,
 ) -> TransactionResult:
     """Build and non-force push exactly one positively enumerated tree."""
@@ -213,6 +245,10 @@ def publish_tree(
     repo = Path(repo_dir)
     staging = Path(staging_dir)
     paths = _safe_staged_paths(staged_files)
+    if allowlist is not None:
+        expected_paths = {PUBLISHED_MANIFEST_PATH, *("exports/" + entry.file_name for entry in allowlist.exports)}
+        if set(paths) != expected_paths:
+            raise TransactionError("transaction.export_set_mismatch")
     if not isinstance(remote, str) or not remote or remote.startswith("-"):
         raise TransactionError("transaction.fetch_failed")
     if target_ref not in {"published-data", "refs/heads/published-data"}:
@@ -225,6 +261,10 @@ def publish_tree(
         for attempt in range(MAX_PUSH_ATTEMPTS):
             parent = _tip(repo, remote, push_ref)
             carried = _carried_blobs(repo, parent)
+            if allowlist is not None and allowlist.control_sources:
+                # Read and validate the exact fetched parent blob, then carry its
+                # existing OID unchanged. Each retry revalidates the current parent.
+                _read_control(repo, parent, allowlist)
             environment = os.environ.copy()
             environment["GIT_INDEX_FILE"] = str(cache_root / f"index-{attempt}")
             blobs: dict[str, str] = {}
@@ -322,4 +362,5 @@ __all__ = [
     "TransactionError",
     "TransactionResult",
     "publish_tree",
+    "load_published_control",
 ]
