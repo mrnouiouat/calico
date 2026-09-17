@@ -340,6 +340,30 @@ class PublicationCliTests(unittest.TestCase):
                     self.assertEqual(manifest["accepted_releases"][0]["as_of_date"], "2032-01-01")
                     self.assertEqual(manifest["accepted_releases"][0]["release_revision"], 2)
 
+    def test_missing_successor_control_blocks_before_any_archive_or_build_work(self) -> None:
+        from calico_publish.transaction import TransactionError
+        for mode in ("fixture", "real"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                calls = []
+                def control_loader(**kwargs):
+                    raise TransactionError("transaction.control_source_invalid")
+                def build_runner(**kwargs):
+                    calls.append("build")
+                    return BuildOutcome(status="failed", category="synthetic.failure", proof=None)
+                def archive_factory():
+                    calls.append("archive")
+                    raise AssertionError("archive must not be reached")
+                arguments = ["publish", "--mode", mode, "--staging", str(Path(temp) / "staging"),
+                             "--remote", "origin", "--target-ref", "published-data"]
+                if mode == "real":
+                    arguments.extend(["--store", str(Path(temp) / "synthetic-store")])
+                code, stdout, stderr = _invoke(arguments, build_runner=build_runner,
+                    archive_factory=archive_factory, control_loader=control_loader)
+                self.assertEqual(calls, [])
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(stdout), {"category": "transaction.control_source_invalid"})
+                self.assertEqual(stderr, "transaction.control_source_invalid\n")
+
     def test_publish_rejects_nonliteral_target_before_build(self) -> None:
         calls: list[str] = []
 

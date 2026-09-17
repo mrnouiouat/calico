@@ -137,9 +137,10 @@ def _prepare_publication(
     exporter: Callable[[str | Path, Allowlist, str | Path], tuple[StagedExport, ...]],
     archive_factory: Callable[[], Archive] | None,
     catalog_loader: Callable[[], InputCatalog],
+    resolved_allowlist: Allowlist | None = None,
 ) -> tuple[Path, Allowlist, tuple[StagedExport, ...], tuple[str, ...]]:
     staging = prepare_staging_directory(args.staging)
-    allowlist = allowlist_loader(_allowlist_path(args))
+    allowlist = resolved_allowlist if resolved_allowlist is not None else allowlist_loader(_allowlist_path(args))
     staged: tuple[StagedExport, ...] = ()
     fixture_identities = None
 
@@ -230,13 +231,21 @@ def _run_export(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
 def _run_publish(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
     if args.target_ref != _TARGET_REF:
         raise TransactionError("transaction.parent_not_found")
-    staging, allowlist, staged, paths = _prepare_publication(args, **runtime["prepare_kwargs"])
+    authority_loader = runtime["allowlist_loader"]
+    assert callable(authority_loader)
+    allowlist = authority_loader(_allowlist_path(args))
+    control = None
+    # Validate the independent source before any costly archive restore/build.
     if allowlist.control_sources:
         loader = runtime["control_loader"]
         assert callable(loader)
         control = loader(repo_dir=_REPO_ROOT, remote=args.remote,
                          target_ref=args.target_ref, allowlist=allowlist)
         verify_control_document(control, allowlist)
+    staging, allowlist, staged, paths = _prepare_publication(
+        args, **runtime["prepare_kwargs"], resolved_allowlist=allowlist
+    )
+    if control is not None:
         write_staged_text(staging / "capture-status.json", _dict_json(control) + "\n")
     before_scan = _hash_explicit_files(staging, paths)
     result = verify(
