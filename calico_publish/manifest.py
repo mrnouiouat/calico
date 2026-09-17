@@ -379,7 +379,10 @@ def validate_published_manifest_document(
         raise ManifestError("manifest.duplicate_export_name")
     if export_names != sorted(export_names):
         raise ManifestError("manifest.unsorted_exports")
-    entries = {entry.export_name: entry for entry in _authority(allowlist).exports}
+    authority = _authority(allowlist)
+    if document["allowlist_version"] != authority.allowlist_version:
+        raise ManifestError("manifest.invalid_schema")
+    entries = {entry.export_name: entry for entry in authority.exports}
     if set(export_names) != set(entries):
         raise ManifestError("manifest.invalid_schema")
     for export in exports:

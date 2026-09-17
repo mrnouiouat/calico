@@ -119,6 +119,24 @@ ineligible_key_published_failures as (
 
 )
 
+select 'latest_release_observation_state_mismatch' as failure_reason
+from {{ ref('dim_public_organizations') }} as published
+cross join {{ ref('mart_publication_status') }} as publication
+where published.latest_release_observation_state is distinct from case when exists (
+    select 1 from {{ ref('int_keyed_snapshots') }} as snapshot
+    where snapshot.state_charity_registration_number = published.state_charity_registration_number
+      and snapshot.as_of_date = publication.published_as_of_date
+      and snapshot.release_revision = publication.published_release_revision
+) then 'observed' else 'not_observed' end
+union all
+select 'publication_banner_identity_mismatch' as failure_reason
+where (select count(*) from {{ ref('mart_publication_status') }}) <> 1
+   or exists (
+       (select published_as_of_date, published_release_revision from {{ ref('mart_publication_status') }})
+       except
+       (select as_of_date, release_revision from {{ ref('int_promoted_releases') }} order by as_of_date desc limit 1)
+   )
+union all
 select failure_reason from completeness_failures
 union all
 select failure_reason from duplicate_key_failures

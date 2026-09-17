@@ -44,6 +44,19 @@ models:
         tests:
           - not_null
 
+  - name: mart_publication_status
+    description: "One latest promoted published release identity for the shared four-page banner."
+    columns:
+      - name: published_as_of_date
+        description: "Latest promoted accepted source as-of date; no wall-clock inference."
+        tests:
+          - not_null
+          - unique
+      - name: published_release_revision
+        description: "Promoted revision of that release, including same-date successors."
+        tests:
+          - not_null
+
   - name: dim_public_organizations
     description: >
       Grain: one row per explicit eligible exact registration key (D-16,
@@ -90,6 +103,15 @@ models:
         description: "Fixed, non-dynamic instructions pointing a reader to the official California Registry Search Tool for the current status of this exact registration number (D-019 substring-hazard/staleness context)."
         tests:
           - not_null
+
+      - name: latest_release_observation_state
+        description: "Organization lookup warning: observed or not_observed in the latest promoted published release, independently of the older latest observed status."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - observed
+                - not_observed
 
   - name: fct_public_status_observations
     description: >

@@ -84,7 +84,7 @@ _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "vali
 #: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
 #: mart_source_reported_status_age, mart_spell_censoring_summary,
 #: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support).
-_EXPECTED_TOTAL_MODEL_COUNT = 31
+_EXPECTED_TOTAL_MODEL_COUNT = 32
 
 #: Synthetic fixture v2 keys used to prove all three closed eligibility
 #: states plus the missing-match default (D-18). Chosen from the real

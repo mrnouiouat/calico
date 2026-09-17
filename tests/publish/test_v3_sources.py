@@ -20,6 +20,34 @@ CONTRACT = ROOT / "contracts/publication-exports-v3.json"
 
 
 class SuccessorSourceTests(unittest.TestCase):
+    def test_banner_uses_promoted_same_date_successor_revision(self):
+        # Execute the actual dbt SQL against a synthetic revision catalog.
+        promotion = (ROOT / "dbt/models/intermediate/int_promoted_releases.sql").read_text(encoding="utf-8")
+        banner = (ROOT / "dbt/models/marts/mart_publication_status.sql").read_text(encoding="utf-8")
+        import re
+        promotion = re.sub(r"\{\{.*?\}\}", lambda match: (
+            "runtime_input.revision_catalog" if "revision_catalog" in match[0]
+            else "runtime_input.promotion_catalog" if "promotion_catalog" in match[0]
+            else ""), promotion, flags=re.S)
+        banner = re.sub(r"\{\{.*?\}\}", lambda match: (
+            "int_promoted_releases" if "ref(" in match[0] else ""), banner, flags=re.S)
+        with duckdb.connect() as connection:
+            connection.execute("create schema runtime_input")
+            connection.execute("create table runtime_input.revision_catalog "
+                               "(as_of_date date, release_revision integer, revision_fingerprint varchar, parser_contract_version varchar)")
+            connection.execute("insert into runtime_input.revision_catalog values "
+                               "('2032-01-05', 1, 'synthetic-a', 'synthetic-v1'),"
+                               "('2032-02-16', 1, 'synthetic-b', 'synthetic-v1'),"
+                               "('2032-02-16', 2, 'synthetic-c', 'synthetic-v1')")
+            connection.execute("create table runtime_input.promotion_catalog as "
+                               "select as_of_date, release_revision, revision_fingerprint "
+                               "from runtime_input.revision_catalog where release_revision=2")
+            connection.execute("create view int_promoted_releases as " + promotion)
+            rows = connection.execute(banner).fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(str(rows[0][0]), "2032-02-16")
+            self.assertEqual(rows[0][1], 2)
+
     def test_complete_authority_and_explicit_manifest_round_trip(self):
         authority = load_allowlist(CONTRACT)
         self.assertEqual(authority.supersedes, "publication-exports-v2")

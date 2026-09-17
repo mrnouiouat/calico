@@ -44,6 +44,14 @@ def inputs():
 
 
 class ManifestTests(unittest.TestCase):
+    def test_document_version_must_match_explicit_authority(self):
+        arguments = inputs()
+        document = module.project_published_manifest(**arguments).to_dict()
+        document["allowlist_version"] = "publication-exports-v3"
+        with self.assertRaises(module.ManifestError) as caught:
+            module.validate_published_manifest_document(document, allowlist=arguments["allowlist"])
+        self.assertEqual(str(caught.exception), "manifest.invalid_schema")
+
     def setUp(self):
         self.arguments = inputs()
         self.manifest = module.project_published_manifest(**self.arguments)

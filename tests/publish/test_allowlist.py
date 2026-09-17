@@ -65,7 +65,10 @@ def assert_documentation(test: unittest.TestCase, document: dict) -> None:
     for entry in document["exports"]:
         name = entry["source_relation"]
         test.assertIn(name, models)
-        test.assertEqual(set(entry["columns"]), models[name] - NAMED_OMISSIONS.get(name, set()), name)
+        omissions = NAMED_OMISSIONS.get(name, set())
+        if name == "dim_public_organizations" and document["allowlist_version"] != "publication-exports-v3":
+            omissions = omissions | {"latest_release_observation_state"}
+        test.assertEqual(set(entry["columns"]), models[name] - omissions, name)
 
 
 class AllowlistTests(unittest.TestCase):

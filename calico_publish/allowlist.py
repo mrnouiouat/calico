@@ -62,6 +62,35 @@ class Allowlist:
     schema_version: int
     allowlist_version: str
     exports: tuple[ExportEntry, ...]
+    supersedes: str | None = None
+    control_sources: tuple[ControlSource, ...] = ()
+
+
+@dataclass(frozen=True)
+class ControlSource:
+    """Independent JSON source; never serialized as a dbt CSV export."""
+
+    export_name: str
+    export_class: str
+    fixed_path: str
+    format: str
+    source_contract: str
+    columns: tuple[str, ...]
+
+
+CONTROL_COLUMNS = (
+    "outcome", "reason_category", "ended_at_utc", "newer_attempt_not_accepted",
+    "source_publication_state", "source_publication_retired_on",
+)
+
+
+def _parse_controls(document: object) -> tuple[ControlSource, ...]:
+    expected = dict(export_name="capture_status", export_class="control",
+                    fixed_path="capture-status.json", format="json",
+                    source_contract="capture-status-v3", columns=list(CONTROL_COLUMNS))
+    if not isinstance(document, list) or document != [expected]:
+        raise AllowlistError("allowlist.invalid_schema")
+    return (ControlSource(**{**expected, "columns": CONTROL_COLUMNS}),)
 
 
 #: The closed set of publication authority identifiers this loader recognizes.
@@ -70,7 +99,7 @@ class Allowlist:
 #: already published on `published-data` cites, and because the committed
 #: publication fixtures carry it; a document naming anything else fails closed.
 KNOWN_ALLOWLIST_VERSIONS = frozenset(
-    {"publication-exports-v1", "publication-exports-v2"}
+    {"publication-exports-v1", "publication-exports-v2", "publication-exports-v3"}
 )
 
 
@@ -142,9 +171,11 @@ def load_allowlist(path: str | Path) -> Allowlist:
     except json.JSONDecodeError as exc:
         raise AllowlistError("allowlist.invalid_json") from exc
 
+    successor = isinstance(document, dict) and document.get("allowlist_version") == "publication-exports-v3"
+    expected_keys = _TOP_LEVEL_KEYS | {"supersedes", "control_sources", "addition_reasons"} if successor else _TOP_LEVEL_KEYS
     if (
         not isinstance(document, dict)
-        or set(document) != _TOP_LEVEL_KEYS
+        or set(document) != expected_keys
         or type(document.get("schema_version")) is not int
         or document.get("schema_version") != 1
         or document.get("allowlist_version") not in KNOWN_ALLOWLIST_VERSIONS
@@ -152,6 +183,19 @@ def load_allowlist(path: str | Path) -> Allowlist:
         or not document["exports"]
     ):
         raise AllowlistError("allowlist.invalid_schema")
+    controls = ()
+    if successor:
+        if document.get("supersedes") != "publication-exports-v2":
+            raise AllowlistError("allowlist.invalid_schema")
+        controls = _parse_controls(document["control_sources"])
+        reasons = document["addition_reasons"]
+        if (not isinstance(reasons, dict) or set(reasons) != {
+                "mart_publication_status.published_as_of_date",
+                "mart_publication_status.published_release_revision",
+                "dim_public_organizations.latest_release_observation_state",
+                *("capture_status." + column for column in CONTROL_COLUMNS)}
+                or not all(isinstance(reason, str) and reason.strip() for reason in reasons.values())):
+            raise AllowlistError("allowlist.invalid_schema")
     entries = [_parse_entry(item) for item in document["exports"]]
 
     for field, category in (
@@ -179,6 +223,8 @@ def load_allowlist(path: str | Path) -> Allowlist:
         schema_version=1,
         allowlist_version=document["allowlist_version"],
         exports=tuple(sorted(entries, key=lambda entry: entry.export_name)),
+        supersedes=document.get("supersedes"),
+        control_sources=controls,
     )
 
 

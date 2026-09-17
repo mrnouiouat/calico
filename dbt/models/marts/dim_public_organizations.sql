@@ -71,7 +71,15 @@ select
     release_revision as latest_observed_release_revision,
     revision_fingerprint as latest_observed_revision_fingerprint,
     'Verify this organization''s current status using the official California Registry Search Tool and the exact registration number above.'
-        as official_verification_instructions
+        as official_verification_instructions,
+    case when exists (
+        select 1
+        from {{ ref('int_keyed_snapshots') }} as latest_snapshot
+        cross join {{ ref('mart_publication_status') }} as publication
+        where latest_snapshot.state_charity_registration_number = ranked_snapshots.state_charity_registration_number
+          and latest_snapshot.as_of_date = publication.published_as_of_date
+          and latest_snapshot.release_revision = publication.published_release_revision
+    ) then 'observed' else 'not_observed' end as latest_release_observation_state
 
 from ranked_snapshots
 where observation_rank = 1

@@ -22,9 +22,10 @@
     "allowlist_version": {
       "enum": [
         "publication-exports-v1",
-        "publication-exports-v2"
+        "publication-exports-v2",
+        "publication-exports-v3"
       ],
-      "description": "The publication authority that produced this document. Widened from a v1 const when publication-exports-v2 superseded v1: no field of this document changed shape, and every manifest already published under v1 stays valid under this schema."
+      "description": "The explicit versioned publication authority; v1 and v2 manifests remain valid when v3 is added."
     },
     "parser_contract_version": {
       "type": "string",

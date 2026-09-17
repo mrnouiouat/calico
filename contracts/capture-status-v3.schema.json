@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calico.internal/contracts/capture-status-v3.schema.json",
+  "title": "Calico capture status (v3)",
+  "description": "Supersedes capture-status-v2. Positive safe projection adds the upstream publication warning and explicit source policy; retirement is independent of attempt reason and never inferred from a clock.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "trigger",
+    "outcome",
+    "reason_category",
+    "started_at_utc",
+    "ended_at_utc",
+    "last_accepted_as_of_date",
+    "last_accepted_release_revision",
+    "newer_attempt_not_accepted",
+    "source_publication_state",
+    "source_publication_retired_on"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "trigger": {
+      "enum": [
+        "schedule",
+        "workflow_dispatch",
+        "local"
+      ],
+      "description": "Which of the three closed entry points invoked this capture attempt (D-06). Safe workflow metadata -- never a job name, run id, or actor identity."
+    },
+    "outcome": {
+      "enum": [
+        "accepted",
+        "no_new_release",
+        "rejected",
+        "operational_error"
+      ],
+      "description": "The existing closed calico_landing.result.AdmissionResult outcome vocabulary, reused verbatim (D-07)."
+    },
+    "reason_category": {
+      "enum": [
+        "none",
+        "source_not_advanced",
+        "structural_rejection",
+        "source_contract_mismatch",
+        "source_transfer_error",
+        "archive_error",
+        "restore_error",
+        "warehouse_build_error"
+      ],
+      "description": "A fixed, provider-neutral reason category -- never a raw exception string, path, or credential fragment. structural_rejection is a data-level rejection inside a candidate that still matches the source contract; source_contract_mismatch means the source did not supply the contracted object set in its contracted shape at all."
+    },
+    "started_at_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+      "description": "Timezone-aware actual UTC timestamp captured once at the start of this capture() call."
+    },
+    "ended_at_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+      "description": "Timezone-aware actual UTC timestamp captured once this call's outcome was decided."
+    },
+    "last_accepted_as_of_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "The as-of date of the release this attempt confirms as accepted, populated only for the accepted/no_new_release outcomes; null for every rejected/operational_error outcome -- this attempt never advances or echoes a stale value on failure."
+    },
+    "last_accepted_release_revision": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "The release revision of the same accepted/no_new_release release identity; null for every rejected/operational_error outcome."
+    },
+    "newer_attempt_not_accepted": {
+      "type": "boolean"
+    },
+    "source_publication_state": {
+      "enum": [
+        "active",
+        "retired"
+      ]
+    },
+    "source_publication_retired_on": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source_publication_state": {
+            "const": "active"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_publication_retired_on": {
+            "const": null
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source_publication_retired_on": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}
