@@ -45,7 +45,7 @@ models:
           - not_null
 
   - name: mart_publication_status
-    description: "One latest promoted published release identity for the shared four-page banner."
+    description: "Grain: one row for the latest promoted published release identity, used by the shared four-page banner."
     columns:
       - name: published_as_of_date
         description: "Latest promoted accepted source as-of date; no wall-clock inference."

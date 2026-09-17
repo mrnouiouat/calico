@@ -28,7 +28,8 @@ class AdjacentPairMetricDbtTests(unittest.TestCase):
         )
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 31)
+        # Phase 8 adds the one authorized publication banner model: 31 -> 32.
+        self.assertEqual(outcome.proof.dbt_model_count, 32)
 
 
 class AdjacentPairMetricContractTests(unittest.TestCase):

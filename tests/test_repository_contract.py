@@ -225,6 +225,11 @@ PHASE_5_CURRENT_PRODUCTION_SQL_PATHS = frozenset(
 )
 
 
+PHASE_8_CURRENT_PRODUCTION_SQL_PATHS = frozenset(
+    PHASE_5_CURRENT_PRODUCTION_SQL_PATHS | {"dbt/models/marts/mart_publication_status.sql"}
+)
+
+
 def _discovered_production_sql_paths() -> set[str]:
     return {
         str(path.relative_to(REPO_ROOT)).replace("\\", "/")
@@ -602,7 +607,7 @@ class ToolchainFixtureContractTests(unittest.TestCase):
             )
             self.assertIn(
                 path,
-                    PHASE_5_CURRENT_PRODUCTION_SQL_PATHS,
+                    PHASE_8_CURRENT_PRODUCTION_SQL_PATHS,
                     f"production SQL path not in the closed cumulative allowlist: {path}",
             )
 
@@ -769,11 +774,11 @@ class Wave3DbtFoundationContractTests(unittest.TestCase):
         discovered = self._discovered_production_sql_paths()
         self.assertEqual(
             discovered,
-            PHASE_5_CURRENT_PRODUCTION_SQL_PATHS,
+            PHASE_8_CURRENT_PRODUCTION_SQL_PATHS,
             "discovered production SQL must exactly equal the closed "
             f"41-path Phase 3 + Phase 4 union: "
-            f"missing={sorted(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS - discovered)}, "
-            f"unexpected={sorted(discovered - PHASE_5_CURRENT_PRODUCTION_SQL_PATHS)}",
+            f"missing={sorted(PHASE_8_CURRENT_PRODUCTION_SQL_PATHS - discovered)}, "
+            f"unexpected={sorted(discovered - PHASE_8_CURRENT_PRODUCTION_SQL_PATHS)}",
         )
 
 
@@ -797,11 +802,13 @@ class Phase4CumulativeGateTests(unittest.TestCase):
         self.assertEqual(len(PHASE_3_FINAL_PRODUCTION_SQL_PATHS), 18)
         self.assertEqual(len(PHASE_4_ALL_SQL_PATHS), 23)
         self.assertEqual(len(PHASE_5_CURRENT_PRODUCTION_SQL_PATHS), 54)
+        # Phase 8 banner is the one additive authorized SQL path: 54 -> 55.
+        self.assertEqual(len(PHASE_8_CURRENT_PRODUCTION_SQL_PATHS), 55)
 
     def test_discovered_production_sql_exactly_equals_the_closed_union(self) -> None:
         discovered = self._discovered()
-        missing = PHASE_5_CURRENT_PRODUCTION_SQL_PATHS - discovered
-        unexpected = discovered - PHASE_5_CURRENT_PRODUCTION_SQL_PATHS
+        missing = PHASE_8_CURRENT_PRODUCTION_SQL_PATHS - discovered
+        unexpected = discovered - PHASE_8_CURRENT_PRODUCTION_SQL_PATHS
         self.assertEqual(
             (missing, unexpected),
             (set(), set()),

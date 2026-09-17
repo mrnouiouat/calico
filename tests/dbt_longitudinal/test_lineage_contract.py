@@ -159,6 +159,9 @@ _REQUIRED_LINEAGE_EDGES: tuple[tuple[str, str], ...] = (
     ("int_keyed_snapshots", "fct_public_status_observations"),
     ("stg_capture_attempts", "int_capture_runs"),
     ("int_capture_runs", "int_release_flags"),
+    # Phase 8's approved presentation source adds no analytical grain owner.
+    ("int_promoted_releases", "mart_publication_status"),
+    ("mart_publication_status", "dim_public_organizations"),
 )
 
 #: A model name looking like a competing owner for one of the five Phase 3
@@ -313,7 +316,8 @@ class GrainMapCompletenessTests(unittest.TestCase):
         # under dbt/models/ (forward-fixed at Phase 5 closure, 05-05-PLAN.md
         # Task 3, to also close over Phase 5's own eight new marts).
         self.assertEqual(
-            HELPER_MODEL_NAMES | set(REQUIRED_GRAIN_OWNERS.values()) | PHASE_5_METRIC_MODEL_NAMES,
+            HELPER_MODEL_NAMES | set(REQUIRED_GRAIN_OWNERS.values()) | PHASE_5_METRIC_MODEL_NAMES
+            | {"mart_publication_status"},
             _all_model_names(),
         )
 

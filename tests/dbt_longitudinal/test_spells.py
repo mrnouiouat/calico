@@ -65,7 +65,8 @@ _SPELLS_YML = _INTERMEDIATE_DIR / "intermediate_spells.yml"
 #: mart_source_reported_status_age, mart_spell_censoring_summary,
 #: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support),
 #: bringing the total from 23 to 31.
-_EXPECTED_TOTAL_MODEL_COUNT = 31
+# Phase 8 adds the one authorized publication banner model: 31 -> 32.
+_EXPECTED_TOTAL_MODEL_COUNT = 32
 
 
 class FullFixtureBuildWithLongitudinalPanelTests(unittest.TestCase):

@@ -80,7 +80,8 @@ _BASELINE_CANDIDATE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "landing" / "vali
 #: mart_adjacent_pair_metrics, mart_starting_cohort_persistence,
 #: mart_source_reported_status_age, mart_spell_censoring_summary,
 #: mart_release_quality, mart_last_renewal_diagnostic, mart_claim_support).
-_EXPECTED_TOTAL_MODEL_COUNT = 31
+# Phase 8 adds the one authorized publication banner model: 31 -> 32.
+_EXPECTED_TOTAL_MODEL_COUNT = 32
 
 _FABRICATED_RECOVERED_FINGERPRINT = "b" * 64
 

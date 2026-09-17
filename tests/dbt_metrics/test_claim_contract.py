@@ -24,7 +24,8 @@ class ClaimSupportDbtTests(unittest.TestCase):
         )
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 31)
+        # Phase 8 adds the one authorized publication banner model: 31 -> 32.
+        self.assertEqual(outcome.proof.dbt_model_count, 32)
 
     def test_support_relation_has_exact_identity_free_schema(self) -> None:
         expected = (

@@ -91,7 +91,8 @@ class RealProjectDocsProofTests(unittest.TestCase):
         # "model." node. 23 -> 31 at Phase 5 closure (05-05-PLAN.md Task 3),
         # the same forward-fix applied to test_transitions.py, test_spells.py,
         # test_capture_runs.py, and test_public_models.py.
-        self.assertEqual(proof.dbt_model_count, 31)
+        # Phase 8 adds the one authorized publication banner model: 31 -> 32.
+        self.assertEqual(proof.dbt_model_count, 32)
         self.assertGreaterEqual(proof.dbt_test_count, 18)
         self.assertGreater(proof.dbt_selected_node_count, 0)
         self.assertGreater(proof.docs_node_count, 0)

@@ -21,7 +21,8 @@ class LastRenewalDiagnosticTests(unittest.TestCase):
         outcome = runner.build(mode="fixture", fixture_store_factory=gate_b_fixture_store_v2)
         self.assertEqual(outcome.status, "success", outcome.category)
         self.assertIsNotNone(outcome.proof)
-        self.assertEqual(outcome.proof.dbt_model_count, 31)
+        # Phase 8 adds the one authorized publication banner model: 31 -> 32.
+        self.assertEqual(outcome.proof.dbt_model_count, 32)
 
     def test_exact_three_closed_measures_and_role(self) -> None:
         text = MODEL.read_text(encoding="utf-8")
