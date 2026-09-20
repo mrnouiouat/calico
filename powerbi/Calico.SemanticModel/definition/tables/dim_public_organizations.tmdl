@@ -1,0 +1,70 @@
+table dim_public_organizations
+
+	column state_charity_registration_number
+		dataType: string
+		summarizeBy: none
+		sourceColumn: state_charity_registration_number
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state_charity_registration_number"}]
+
+	column organization_name
+		dataType: string
+		summarizeBy: none
+		sourceColumn: organization_name
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"organization_name"}]
+
+	column city
+		dataType: string
+		summarizeBy: none
+		sourceColumn: city
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"city"}]
+
+	column state
+		dataType: string
+		summarizeBy: none
+		sourceColumn: state
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state"}]
+
+	column latest_source_reported_status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: latest_source_reported_status
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_source_reported_status"}]
+
+	column latest_observed_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: latest_observed_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_observed_as_of_date"}]
+
+	column latest_observed_release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: latest_observed_release_revision
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_observed_release_revision"}]
+
+	column official_verification_instructions
+		dataType: string
+		summarizeBy: none
+		sourceColumn: official_verification_instructions
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"official_verification_instructions"}]
+
+	column latest_release_observation_state
+		dataType: string
+		summarizeBy: none
+		sourceColumn: latest_release_observation_state
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_release_observation_state"}]
+
+	partition dim_public_organizations = m
+		mode: import
+		source =
+			let
+			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/dim_public_organizations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+			    Required = {"state_charity_registration_number", "organization_name", "city", "state", "latest_source_reported_status", "latest_observed_as_of_date", "latest_observed_release_revision", "official_verification_instructions", "latest_release_observation_state"},
+			    Shape = if Table.ColumnNames(Headers) <> Required then error "dim_public_organizations.source_shape" else Headers,
+			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+			    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"organization_name", type text}, {"city", type text}, {"state", type text}, {"latest_source_reported_status", type text}, {"latest_observed_as_of_date", type date}, {"latest_observed_release_revision", Int64.Type}, {"official_verification_instructions", type text}, {"latest_release_observation_state", type text}}, "en-US")
+			in
+			    Typed

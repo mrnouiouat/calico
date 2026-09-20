@@ -20,3 +20,10 @@ data/raw/
 data/registry-archive/
 data/generated-diffs/
 *.pdf
+
+# Power BI local import data and user state
+**/.pbi/cache.abf
+**/.pbi/localSettings.json
+**/.pbi/localsettings.json
+*.pbix
+*.PBIX

@@ -8,6 +8,11 @@
     {"kind": "exact", "value": "data/mitos.db", "category": "private_database"},
     {"kind": "suffix", "value": ".duckdb", "category": "database_file"},
     {"kind": "suffix", "value": ".db", "category": "database_file"},
-    {"kind": "suffix", "value": ".pdf", "category": "source_pdf"}
+    {"kind": "suffix", "value": ".pdf", "category": "source_pdf"},
+    {"kind": "suffix", "value": ".pbi/cache.abf", "category": "forbidden_path"},
+    {"kind": "suffix", "value": ".pbi/localSettings.json", "category": "forbidden_path"},
+    {"kind": "suffix", "value": ".pbi/localsettings.json", "category": "forbidden_path"},
+    {"kind": "suffix", "value": ".pbix", "category": "forbidden_path"},
+    {"kind": "suffix", "value": ".PBIX", "category": "forbidden_path"}
   ]
 }

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "release_identity",
+  "position": {"x": 24, "y": 80, "z": 1000, "height": 208, "width": 760, "tabOrder": 1000},
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {"queryState": {"Data": {"projections": [
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "mart_publication_status"}}, "Property": "Published as-of date"}}, "queryRef": "mart_publication_status.Published as-of date", "nativeQueryRef": "Published as-of date"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "mart_publication_status"}}, "Property": "Published release revision"}}, "queryRef": "mart_publication_status.Published release revision", "nativeQueryRef": "Published release revision"}
+    ]}}}
+  }
+}

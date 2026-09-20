@@ -1,0 +1,69 @@
+table capture_status
+
+	column outcome
+		dataType: string
+		summarizeBy: none
+		sourceColumn: outcome
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"outcome"}]
+
+	column reason_category
+		dataType: string
+		summarizeBy: none
+		sourceColumn: reason_category
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"reason_category"}]
+
+	column ended_at_utc
+		dataType: dateTime
+		formatString: yyyy-MM-dd HH:mm:ss
+		summarizeBy: none
+		sourceColumn: ended_at_utc
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"ended_at_utc"}]
+
+	column newer_attempt_not_accepted
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: newer_attempt_not_accepted
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"newer_attempt_not_accepted"}]
+
+	column source_publication_state
+		dataType: string
+		summarizeBy: none
+		sourceColumn: source_publication_state
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"source_publication_state"}]
+
+	column source_publication_retired_on
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: source_publication_retired_on
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"source_publication_retired_on"}]
+
+	measure 'Capture outcome' = SELECTEDVALUE(capture_status[outcome])
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"outcome"}]
+
+	measure 'Newer attempt not accepted' = SELECTEDVALUE(capture_status[newer_attempt_not_accepted])
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"newer_attempt_not_accepted"}]
+
+	measure 'Attempt ended at UTC' = SELECTEDVALUE(capture_status[ended_at_utc])
+		formatString: yyyy-MM-dd HH:mm:ss
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"ended_at_utc"}]
+
+	measure 'Source publication state' = SELECTEDVALUE(capture_status[source_publication_state])
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"source_publication_state"}]
+
+	measure 'Source publication retired on' = SELECTEDVALUE(capture_status[source_publication_retired_on])
+		formatString: yyyy-MM-dd
+		annotation CalicoBaseLineage = [{"table_name":"capture_status","column_name":"source_publication_retired_on"}]
+
+	partition capture_status = m
+		mode: import
+		source =
+			let
+			    Source = Json.Document(Web.Contents(PublishedBaseUrl, [RelativePath="capture-status.json"])),
+			    Required = {"outcome", "reason_category", "ended_at_utc", "newer_attempt_not_accepted", "source_publication_state", "source_publication_retired_on"},
+			    Shape = if not Value.Is(Source, type record) then error "capture_status.source_shape" else Source,
+			    Selected = Record.SelectFields(Shape, Required, MissingField.Error),
+			    Rows = Table.FromRecords({Selected}, Required),
+			    Typed = Table.TransformColumnTypes(Rows, {{"outcome", type text}, {"reason_category", type text}, {"ended_at_utc", type datetimezone}, {"newer_attempt_not_accepted", type logical}, {"source_publication_state", type text}, {"source_publication_retired_on", type date}}, "en-US")
+			in
+			    Typed
