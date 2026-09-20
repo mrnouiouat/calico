@@ -30,6 +30,7 @@ from calico_publish.export import (
 )
 from calico_publish.gate import GateError, verify, verify_control_document
 from calico_publish.inventory import InventoryError, check_inventory, load_inventory_document
+from calico_publish.tmdl_inventory import TmdlInventoryError, generate_inventory
 from calico_publish.manifest import (
     AcceptedRelease,
     ManifestError,
@@ -320,6 +321,18 @@ def _run_inventory(args: argparse.Namespace, *, runtime: dict[str, object]) -> i
     return 0
 
 
+def _run_generate_inventory(args: argparse.Namespace, *, runtime: dict[str, object]) -> int:
+    del runtime
+    record = generate_inventory(Path(args.model))
+    output = Path(args.output)
+    try:
+        output.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except OSError:
+        raise TmdlInventoryError("tmdl.unreadable_metadata") from None
+    print(_dict_json({"category": "inventory.generated"}))
+    return 0
+
+
 def _add_build_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--mode", required=True, choices=_MODES)
     parser.add_argument("--store")
@@ -340,10 +353,14 @@ def _build_parser() -> argparse.ArgumentParser:
     publish.add_argument("--dry-run", action="store_true")
     inventory = subparsers.add_parser("check-inventory")
     inventory.add_argument("--inventory", required=True)
+    generator = subparsers.add_parser("generate-inventory")
+    generator.add_argument("--model", required=True)
+    generator.add_argument("--output", required=True)
     return parser
 
 
-_COMMANDS = {"check-inventory": _run_inventory, "export": _run_export, "publish": _run_publish, "verify": _run_verify}
+_COMMANDS = {"check-inventory": _run_inventory, "generate-inventory": _run_generate_inventory,
+             "export": _run_export, "publish": _run_publish, "verify": _run_verify}
 
 
 def main(
@@ -369,7 +386,7 @@ def main(
     }
     try:
         return _COMMANDS[args.command](args, runtime=runtime)
-    except (GateError, AllowlistError, ExportError, ManifestError, InventoryError, TransactionError,
+    except (GateError, AllowlistError, ExportError, ManifestError, InventoryError, TmdlInventoryError, TransactionError,
             PolicyError, ScanPathError, ArchiveError) as exc:
         print(_dict_json({"category": exc.category}))
         print(exc.category, file=sys.stderr)

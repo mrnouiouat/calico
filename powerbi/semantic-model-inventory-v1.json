@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "model_name": "registry_monitor",
+  "inventory_source": "machine_readable_metadata",
+  "tables": [
+    {
+      "table_name": "capture_status",
+      "fields": [
+        {
+          "field_name": "outcome",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "outcome"
+            }
+          ]
+        },
+        {
+          "field_name": "reason_category",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "reason_category"
+            }
+          ]
+        },
+        {
+          "field_name": "ended_at_utc",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "ended_at_utc"
+            }
+          ]
+        },
+        {
+          "field_name": "newer_attempt_not_accepted",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "newer_attempt_not_accepted"
+            }
+          ]
+        },
+        {
+          "field_name": "source_publication_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_state"
+            }
+          ]
+        },
+        {
+          "field_name": "source_publication_retired_on",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_retired_on"
+            }
+          ]
+        },
+        {
+          "field_name": "Capture outcome",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "outcome"
+            }
+          ]
+        },
+        {
+          "field_name": "Newer attempt not accepted",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "newer_attempt_not_accepted"
+            }
+          ]
+        },
+        {
+          "field_name": "Attempt ended at UTC",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "ended_at_utc"
+            }
+          ]
+        },
+        {
+          "field_name": "Source publication state",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_state"
+            }
+          ]
+        },
+        {
+          "field_name": "Source publication retired on",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_retired_on"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "dim_public_organizations",
+      "fields": [
+        {
+          "field_name": "state_charity_registration_number",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "state_charity_registration_number"
+            }
+          ]
+        },
+        {
+          "field_name": "organization_name",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "organization_name"
+            }
+          ]
+        },
+        {
+          "field_name": "city",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "city"
+            }
+          ]
+        },
+        {
+          "field_name": "state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "state"
+            }
+          ]
+        },
+        {
+          "field_name": "latest_source_reported_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "latest_source_reported_status"
+            }
+          ]
+        },
+        {
+          "field_name": "latest_observed_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "latest_observed_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "latest_observed_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "latest_observed_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "official_verification_instructions",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "official_verification_instructions"
+            }
+          ]
+        },
+        {
+          "field_name": "latest_release_observation_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "latest_release_observation_state"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_publication_status",
+      "fields": [
+        {
+          "field_name": "published_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "published_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "Published as-of date",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "Published release revision",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_release_revision"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}

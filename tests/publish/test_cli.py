@@ -137,7 +137,7 @@ class PublicationCliTests(unittest.TestCase):
     def test_command_table_contains_complete_publication_surface(self) -> None:
         from calico_publish.cli import _COMMANDS
 
-        self.assertEqual(sorted(_COMMANDS), ["check-inventory", "export", "publish", "verify"])
+        self.assertEqual(sorted(_COMMANDS), ["check-inventory", "export", "generate-inventory", "publish", "verify"])
 
     def test_fixture_baseline_returns_zero_with_one_json_document(self) -> None:
         code, stdout, stderr = _invoke(

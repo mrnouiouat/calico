@@ -24,13 +24,13 @@ INVENTORY_ERROR_CATEGORIES = frozenset({
 _FINDING_CATEGORIES = frozenset({
     "inventory.unapproved_table", "inventory.unapproved_column",
     "inventory.unapproved_hidden_column", "inventory.unapproved_relationship",
-    "inventory.unapproved_calculated_source",
+    "inventory.unapproved_calculated_source", "inventory.cross_class_relationship",
 })
 _TOP_KEYS = frozenset({"schema_version", "model_name", "inventory_source", "tables", "relationships"})
 _FIELD_KEYS = frozenset({"field_name", "visibility", "origin", "lineage_complete", "source_columns"})
 _RELATIONSHIP_KEYS = frozenset({"from_table", "from_column", "to_table", "to_column", "cardinality", "cross_filter_direction"})
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
-_LABEL = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?: [A-Za-z][A-Za-z0-9_]*)*$")
+_LABEL = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*(?: [A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*)*$")
 
 
 class InventoryError(Exception):
@@ -149,6 +149,10 @@ def check_inventory(document: object, allowlist: Allowlist) -> tuple[InventoryFi
     """Check every field and relationship, irrespective of field visibility."""
     _validate(document)
     approved = {entry.export_name: set(entry.columns) for entry in allowlist.exports}
+    classes = {entry.export_name: entry.export_class for entry in allowlist.exports}
+    for control in allowlist.control_sources:
+        approved[control.export_name] = set(control.columns)
+        classes[control.export_name] = control.export_class
 
     def approved_pair(table: str, column: str) -> bool:
         return table in approved and column in approved[table]
@@ -174,6 +178,9 @@ def check_inventory(document: object, allowlist: Allowlist) -> tuple[InventoryFi
                 or not approved_pair(relation["to_table"], relation["to_column"])):
             findings.append(InventoryFinding(relation["from_table"], relation["from_column"],
                                             "inventory.unapproved_relationship"))
+        elif classes[relation["from_table"]] != classes[relation["to_table"]]:
+            findings.append(InventoryFinding(relation["from_table"], relation["from_column"],
+                                            "inventory.cross_class_relationship"))
     return tuple(sorted(findings, key=lambda f: (f.table_name, f.field_name, f.category)))
 
 

@@ -199,6 +199,39 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaises(module.InventoryError):
             self.check(data)
 
+    def test_v3_control_source_and_each_cross_class_relationship(self):
+        allowlist = load_allowlist(ROOT / "contracts/publication-exports-v3.json")
+        representatives = {
+            "named_history": ("dim_public_organizations", "organization_name"),
+            "aggregate": ("mart_publication_status", "published_as_of_date"),
+            "control": ("capture_status", "outcome"),
+        }
+        data = document()
+        data["tables"] = [dict(table_name=table, fields=[field(column, source=[
+            dict(table_name=table, column_name=column)])]) for table, column in representatives.values()]
+        self.assertEqual(module.check_inventory(data, allowlist), ())
+        for left, right in (("named_history", "aggregate"), ("named_history", "control"),
+                            ("aggregate", "control")):
+            with self.subTest(left=left, right=right):
+                left_table, left_column = representatives[left]
+                right_table, right_column = representatives[right]
+                changed = copy.deepcopy(data)
+                changed["relationships"] = [dict(from_table=left_table, from_column=left_column,
+                    to_table=right_table, to_column=right_column, cardinality="one_to_many",
+                    cross_filter_direction="single")]
+                self.assertEqual([f.category for f in module.check_inventory(changed, allowlist)],
+                                 ["inventory.cross_class_relationship"])
+
+    def test_hyphenated_measure_label_is_safe_but_numeric_token_is_not(self):
+        data = document()
+        data["tables"][0]["fields"].append(field("Published as-of date", origin="measure",
+                                                 source=[dict(table_name=TABLE, column_name=COLUMN)]))
+        self.assertEqual(self.check(data), ())
+        for unsafe in ("Published - date", "Published as-123 date", "Published 123-date"):
+            data["tables"][0]["fields"][-1]["field_name"] = unsafe
+            with self.assertRaises(module.InventoryError):
+                self.check(data)
+
     def test_duplicate_json_keys_fail_closed(self):
         with tempfile.TemporaryDirectory(prefix="calico-inventory-") as temp:
             path = Path(temp) / "inventory.json"

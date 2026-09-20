@@ -7,7 +7,7 @@
   "required": ["schema_version", "model_name", "inventory_source", "tables", "relationships"],
   "properties": {
     "schema_version": {"type": "integer", "const": 1, "description": "Fixed version of the exposure record."},
-    "model_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?: [A-Za-z][A-Za-z0-9_]*)*$", "description": "Safe model label; every space-separated word begins with a letter, excluding standalone numeric value tokens."},
+    "model_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*(?: [A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*)*$", "description": "Safe model label; every space-separated or hyphenated word begins with a letter, excluding standalone numeric value tokens."},
     "inventory_source": {"enum": ["machine_readable_metadata", "manual_inspection_record"], "description": "Retain either machine metadata or the owner's complete manual attestation."},
     "tables": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/table"}, "description": "Every model table, including tables absent from visible report pages."},
     "relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}, "description": "Every exposed model relationship, even when no chart uses it."}
@@ -24,7 +24,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["field_name", "visibility", "origin", "lineage_complete", "source_columns"],
       "properties": {
-        "field_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?: [A-Za-z][A-Za-z0-9_]*)*$", "description": "Safe unique field label; each space-separated word begins with a letter so findings cannot echo standalone numeric value tokens."},
+        "field_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*(?: [A-Za-z][A-Za-z0-9_]*(?:-[A-Za-z][A-Za-z0-9_]*)*)*$", "description": "Safe unique field label; each space-separated or hyphenated word begins with a letter so findings cannot echo standalone numeric value tokens."},
         "visibility": {"enum": ["visible", "hidden"], "description": "Hidden fields remain exposed by Publish to web and are always checked."},
         "origin": {"enum": ["source_column", "calculated_column", "measure"], "description": "Source fields require their exact self-pair; derived fields require transitive base lineage."},
         "lineage_complete": {"const": true, "description": "Producer attests the complete transitive source set; absent or false fails closed."},
