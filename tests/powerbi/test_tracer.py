@@ -134,6 +134,8 @@ class GovernedTracerTests(unittest.TestCase):
 
     def test_one_real_banner_page_has_both_source_groups(self):
         report = PROJECT / "Calico.Report" / "definition"
+        report_definition = json.loads((report / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(report_definition["themeCollection"], {})
         pages = json.loads((report / "pages" / "pages.json").read_text(encoding="utf-8"))
         self.assertEqual(pages["pageOrder"], ["published_registry_change"])
         self.assertTrue((report / "version.json").is_file())
