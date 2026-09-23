@@ -15,8 +15,9 @@ Every report page must retain this exact disclosure:
 
 The fixed source is `https://raw.githubusercontent.com/mrnouiouat/calico/published-data/` and the
 model imports the thirteen governed v3 tables declared by the committed TMDL. The sole relationship
-is the single-direction, one-to-many registration-key edge from `dim_public_organizations` to
-`fct_public_status_observations`. Registration keys are text. Do not edit the semantic model in the
+is the single-direction, many-to-one registration-key edge serialized from
+`fct_public_status_observations` to `dim_public_organizations` (logically, the organization
+dimension filters its observation rows). Registration keys are text. Do not edit the semantic model in the
 Service. Make PBIP-only edits locally, save through Desktop when required, inspect the textual diff,
 regenerate the inventory, test, scan, and commit before deployment.
 

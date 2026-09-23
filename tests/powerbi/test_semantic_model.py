@@ -44,11 +44,11 @@ class SemanticModelContractTests(unittest.TestCase):
     def test_actual_metadata_has_only_the_named_single_direction_edge(self):
         inventory = generate_inventory(MODEL)
         self.assertEqual(inventory["relationships"], [{
-            "from_table": "dim_public_organizations",
+            "from_table": "fct_public_status_observations",
             "from_column": "state_charity_registration_number",
-            "to_table": "fct_public_status_observations",
+            "to_table": "dim_public_organizations",
             "to_column": "state_charity_registration_number",
-            "cardinality": "one_to_many",
+            "cardinality": "many_to_one",
             "cross_filter_direction": "single",
         }])
         self.assertEqual(check_inventory(inventory, AUTHORITY), ())

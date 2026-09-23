@@ -31,11 +31,11 @@ class TmdlInventoryTests(unittest.TestCase):
                          {entry.export_name for entry in ALLOWLIST.exports}
                          | {entry.export_name for entry in ALLOWLIST.control_sources})
         self.assertEqual(record["relationships"], [{
-            "from_table": "dim_public_organizations",
+            "from_table": "fct_public_status_observations",
             "from_column": "state_charity_registration_number",
-            "to_table": "fct_public_status_observations",
+            "to_table": "dim_public_organizations",
             "to_column": "state_charity_registration_number",
-            "cardinality": "one_to_many",
+            "cardinality": "many_to_one",
             "cross_filter_direction": "single",
         }])
         self.assertEqual(check_inventory(record, ALLOWLIST), ())
