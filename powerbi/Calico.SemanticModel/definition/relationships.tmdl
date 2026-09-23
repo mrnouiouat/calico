@@ -1,0 +1,7 @@
+relationship organization_observations
+	fromColumn: dim_public_organizations.state_charity_registration_number
+	toColumn: fct_public_status_observations.state_charity_registration_number
+	fromCardinality: one
+	toCardinality: many
+	crossFilteringBehavior: oneDirection
+	isActive: true

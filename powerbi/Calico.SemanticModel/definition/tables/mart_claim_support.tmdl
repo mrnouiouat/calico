@@ -1,0 +1,193 @@
+table mart_claim_support
+
+	column claim_support_version
+		dataType: string
+		summarizeBy: none
+		sourceColumn: claim_support_version
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"claim_support_version"}]
+
+	column from_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: from_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"from_as_of_date"}]
+
+	column from_release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: from_release_revision
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"from_release_revision"}]
+
+	column from_revision_fingerprint
+		dataType: string
+		summarizeBy: none
+		sourceColumn: from_revision_fingerprint
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"from_revision_fingerprint"}]
+
+	column to_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: to_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"to_as_of_date"}]
+
+	column to_release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: to_release_revision
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"to_release_revision"}]
+
+	column to_revision_fingerprint
+		dataType: string
+		summarizeBy: none
+		sourceColumn: to_revision_fingerprint
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"to_revision_fingerprint"}]
+
+	column gap_days
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: gap_days
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"gap_days"}]
+
+	column matched_start_status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: matched_start_status
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"matched_start_status"}]
+
+	column matched_end_population
+		dataType: string
+		summarizeBy: none
+		sourceColumn: matched_end_population
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"matched_end_population"}]
+
+	column support_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: support_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"support_count"}]
+
+	column support_denominator_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: support_denominator_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"support_denominator_count"}]
+
+	column support_denominator_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: support_denominator_id
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"support_denominator_id"}]
+
+	column support_share_of_matched_entries
+		dataType: string
+		summarizeBy: none
+		sourceColumn: support_share_of_matched_entries
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"support_share_of_matched_entries"}]
+
+	column total_matched_entry_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: total_matched_entry_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"total_matched_entry_count"}]
+
+	column matched_entry_denominator_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: matched_entry_denominator_id
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"matched_entry_denominator_id"}]
+
+	column total_entrant_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: total_entrant_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"total_entrant_count"}]
+
+	column total_entrant_denominator_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: total_entrant_denominator_id
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"total_entrant_denominator_id"}]
+
+	column dominant_source_reported_status_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: dominant_source_reported_status_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"dominant_source_reported_status_date"}]
+
+	column dominant_status_date_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: dominant_status_date_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"dominant_status_date_count"}]
+
+	column dominant_status_date_denominator_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: dominant_status_date_denominator_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"dominant_status_date_denominator_count"}]
+
+	column dominant_status_date_denominator_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: dominant_status_date_denominator_id
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"dominant_status_date_denominator_id"}]
+
+	column dominant_status_date_share
+		dataType: double
+		formatString: 0.0000
+		summarizeBy: none
+		sourceColumn: dominant_status_date_share
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"dominant_status_date_share"}]
+
+	column next_from_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: next_from_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"next_from_as_of_date"}]
+
+	column next_to_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: next_to_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"next_to_as_of_date"}]
+
+	column next_gap_days
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: next_gap_days
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"next_gap_days"}]
+
+	column next_total_matched_entry_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: next_total_matched_entry_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_claim_support","column_name":"next_total_matched_entry_count"}]
+
+	partition mart_claim_support = m
+		mode: import
+		source =
+			let
+			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_claim_support.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+			    Required = {"claim_support_version", "from_as_of_date", "from_release_revision", "from_revision_fingerprint", "to_as_of_date", "to_release_revision", "to_revision_fingerprint", "gap_days", "matched_start_status", "matched_end_population", "support_count", "support_denominator_count", "support_denominator_id", "support_share_of_matched_entries", "total_matched_entry_count", "matched_entry_denominator_id", "total_entrant_count", "total_entrant_denominator_id", "dominant_source_reported_status_date", "dominant_status_date_count", "dominant_status_date_denominator_count", "dominant_status_date_denominator_id", "dominant_status_date_share", "next_from_as_of_date", "next_to_as_of_date", "next_gap_days", "next_total_matched_entry_count"},
+			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_claim_support.source_shape" else Headers,
+			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+			    Typed = Table.TransformColumnTypes(Selected, {{"claim_support_version", type text}, {"from_as_of_date", type date}, {"from_release_revision", Int64.Type}, {"from_revision_fingerprint", type text}, {"to_as_of_date", type date}, {"to_release_revision", Int64.Type}, {"to_revision_fingerprint", type text}, {"gap_days", Int64.Type}, {"matched_start_status", type text}, {"matched_end_population", type text}, {"support_count", Int64.Type}, {"support_denominator_count", Int64.Type}, {"support_denominator_id", type text}, {"support_share_of_matched_entries", type text}, {"total_matched_entry_count", Int64.Type}, {"matched_entry_denominator_id", type text}, {"total_entrant_count", Int64.Type}, {"total_entrant_denominator_id", type text}, {"dominant_source_reported_status_date", type date}, {"dominant_status_date_count", Int64.Type}, {"dominant_status_date_denominator_count", Int64.Type}, {"dominant_status_date_denominator_id", type text}, {"dominant_status_date_share", type number}, {"next_from_as_of_date", type date}, {"next_to_as_of_date", type date}, {"next_gap_days", Int64.Type}, {"next_total_matched_entry_count", Int64.Type}}, "en-US")
+			in
+			    Typed

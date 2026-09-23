@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "capture_outcome",
+  "position": {
+    "x": 328,
+    "y": 80,
+    "z": 120,
+    "height": 96,
+    "width": 240,
+    "tabOrder": 120
+  },
+  "parentGroupName": "release_status_banner",
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "capture_status"
+                    }
+                  },
+                  "Property": "Capture outcome"
+                }
+              },
+              "queryRef": "capture_status.Capture outcome",
+              "nativeQueryRef": "Capture outcome"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

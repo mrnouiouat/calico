@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "attempt_time",
+  "position": {
+    "x": 584,
+    "y": 80,
+    "z": 130,
+    "height": 96,
+    "width": 288,
+    "tabOrder": 130
+  },
+  "parentGroupName": "release_status_banner",
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "capture_status"
+                    }
+                  },
+                  "Property": "Attempt ended at UTC"
+                }
+              },
+              "queryRef": "capture_status.Attempt ended at UTC",
+              "nativeQueryRef": "Attempt ended at UTC"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

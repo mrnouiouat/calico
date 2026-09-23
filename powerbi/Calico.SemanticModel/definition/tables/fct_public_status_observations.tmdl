@@ -1,0 +1,46 @@
+table fct_public_status_observations
+
+	column state_charity_registration_number
+		dataType: string
+		summarizeBy: none
+		sourceColumn: state_charity_registration_number
+		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"state_charity_registration_number"}]
+
+	column as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"as_of_date"}]
+
+	column release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: release_revision
+		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"release_revision"}]
+
+	column observation_state
+		dataType: string
+		summarizeBy: none
+		sourceColumn: observation_state
+		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"observation_state"}]
+
+	column source_reported_status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: source_reported_status
+		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"source_reported_status"}]
+
+	partition fct_public_status_observations = m
+		mode: import
+		source =
+			let
+			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/fct_public_status_observations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+			    Required = {"state_charity_registration_number", "as_of_date", "release_revision", "observation_state", "source_reported_status"},
+			    Shape = if Table.ColumnNames(Headers) <> Required then error "fct_public_status_observations.source_shape" else Headers,
+			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+			    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"as_of_date", type date}, {"release_revision", Int64.Type}, {"observation_state", type text}, {"source_reported_status", type text}}, "en-US")
+			in
+			    Typed

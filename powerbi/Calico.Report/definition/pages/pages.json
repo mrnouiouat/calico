@@ -1,5 +1,10 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/pagesMetadata/1.0.0/schema.json",
-  "pageOrder": ["published_registry_change"],
+  "pageOrder": [
+    "published_registry_change",
+    "cohort_persistence",
+    "release_quality",
+    "organization_lookup"
+  ],
   "activePageName": "published_registry_change"
 }

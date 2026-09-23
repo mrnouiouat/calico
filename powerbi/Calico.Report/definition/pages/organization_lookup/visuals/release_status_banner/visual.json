@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "release_status_banner",
+  "position": {
+    "x": 24,
+    "y": 80,
+    "z": 100,
+    "height": 208,
+    "width": 1552,
+    "tabOrder": 100
+  },
+  "visualGroup": {
+    "displayName": "Release and source status",
+    "groupMode": "ScaleMode"
+  }
+}

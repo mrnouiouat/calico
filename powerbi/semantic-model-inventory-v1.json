@@ -254,6 +254,902 @@
       ]
     },
     {
+      "table_name": "fct_public_status_observations",
+      "fields": [
+        {
+          "field_name": "state_charity_registration_number",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "fct_public_status_observations",
+              "column_name": "state_charity_registration_number"
+            }
+          ]
+        },
+        {
+          "field_name": "as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "fct_public_status_observations",
+              "column_name": "as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "fct_public_status_observations",
+              "column_name": "release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "observation_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "fct_public_status_observations",
+              "column_name": "observation_state"
+            }
+          ]
+        },
+        {
+          "field_name": "source_reported_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "fct_public_status_observations",
+              "column_name": "source_reported_status"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_adjacent_pair_metrics",
+      "fields": [
+        {
+          "field_name": "from_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "from_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "from_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "from_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "from_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "from_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "to_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "to_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "to_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "to_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "to_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "to_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "gap_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "gap_days"
+            }
+          ]
+        },
+        {
+          "field_name": "starting_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "starting_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "ending_published_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "ending_published_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "observed_exit_count"
+            }
+          ]
+        },
+        {
+          "field_name": "still_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "still_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "not_observed_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "not_observed_count"
+            }
+          ]
+        },
+        {
+          "field_name": "matched_observed_entry_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "matched_observed_entry_count"
+            }
+          ]
+        },
+        {
+          "field_name": "newly_observed_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "newly_observed_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "total_entrant_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "total_entrant_count"
+            }
+          ]
+        },
+        {
+          "field_name": "net_delinquent_movement",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "net_delinquent_movement"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "observed_exit_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_proportion",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "observed_exit_proportion"
+            }
+          ]
+        },
+        {
+          "field_name": "largest_transition_from_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "largest_transition_from_status"
+            }
+          ]
+        },
+        {
+          "field_name": "largest_transition_to_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "largest_transition_to_status"
+            }
+          ]
+        },
+        {
+          "field_name": "largest_transition_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "largest_transition_count"
+            }
+          ]
+        },
+        {
+          "field_name": "matched_entry_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "matched_entry_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "total_entrant_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "total_entrant_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_wilson_95_lower",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "observed_exit_wilson_95_lower"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_wilson_95_upper",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_adjacent_pair_metrics",
+              "column_name": "observed_exit_wilson_95_upper"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_claim_support",
+      "fields": [
+        {
+          "field_name": "claim_support_version",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "claim_support_version"
+            }
+          ]
+        },
+        {
+          "field_name": "from_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "from_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "from_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "from_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "from_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "from_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "to_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "to_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "to_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "to_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "to_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "to_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "gap_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "gap_days"
+            }
+          ]
+        },
+        {
+          "field_name": "matched_start_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "matched_start_status"
+            }
+          ]
+        },
+        {
+          "field_name": "matched_end_population",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "matched_end_population"
+            }
+          ]
+        },
+        {
+          "field_name": "support_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "support_count"
+            }
+          ]
+        },
+        {
+          "field_name": "support_denominator_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "support_denominator_count"
+            }
+          ]
+        },
+        {
+          "field_name": "support_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "support_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "support_share_of_matched_entries",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "support_share_of_matched_entries"
+            }
+          ]
+        },
+        {
+          "field_name": "total_matched_entry_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "total_matched_entry_count"
+            }
+          ]
+        },
+        {
+          "field_name": "matched_entry_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "matched_entry_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "total_entrant_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "total_entrant_count"
+            }
+          ]
+        },
+        {
+          "field_name": "total_entrant_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "total_entrant_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "dominant_source_reported_status_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "dominant_source_reported_status_date"
+            }
+          ]
+        },
+        {
+          "field_name": "dominant_status_date_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "dominant_status_date_count"
+            }
+          ]
+        },
+        {
+          "field_name": "dominant_status_date_denominator_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "dominant_status_date_denominator_count"
+            }
+          ]
+        },
+        {
+          "field_name": "dominant_status_date_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "dominant_status_date_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "dominant_status_date_share",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "dominant_status_date_share"
+            }
+          ]
+        },
+        {
+          "field_name": "next_from_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "next_from_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "next_to_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "next_to_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "next_gap_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "next_gap_days"
+            }
+          ]
+        },
+        {
+          "field_name": "next_total_matched_entry_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_claim_support",
+              "column_name": "next_total_matched_entry_count"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_last_renewal_diagnostic",
+      "fields": [
+        {
+          "field_name": "from_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "from_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "from_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "from_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "from_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "from_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "to_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "to_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "to_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "to_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "to_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "to_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "gap_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "gap_days"
+            }
+          ]
+        },
+        {
+          "field_name": "diagnostic_role",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "diagnostic_role"
+            }
+          ]
+        },
+        {
+          "field_name": "measure_name",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "measure_name"
+            }
+          ]
+        },
+        {
+          "field_name": "denominator_definition_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "denominator_definition_id"
+            }
+          ]
+        },
+        {
+          "field_name": "diagnostic_eligible_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "diagnostic_eligible_count"
+            }
+          ]
+        },
+        {
+          "field_name": "numerator_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "numerator_count"
+            }
+          ]
+        },
+        {
+          "field_name": "denominator_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "denominator_count"
+            }
+          ]
+        },
+        {
+          "field_name": "measure_value",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "measure_value"
+            }
+          ]
+        },
+        {
+          "field_name": "wilson_95_lower",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "wilson_95_lower"
+            }
+          ]
+        },
+        {
+          "field_name": "wilson_95_upper",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_last_renewal_diagnostic",
+              "column_name": "wilson_95_upper"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "table_name": "mart_publication_status",
       "fields": [
         {
@@ -305,7 +1201,790 @@
           ]
         }
       ]
+    },
+    {
+      "table_name": "mart_registry_population_coverage",
+      "fields": [
+        {
+          "field_name": "as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "source_list",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "source_list"
+            }
+          ]
+        },
+        {
+          "field_name": "source_reported_registry_status",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "source_reported_registry_status"
+            }
+          ]
+        },
+        {
+          "field_name": "coverage_class",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "coverage_class"
+            }
+          ]
+        },
+        {
+          "field_name": "record_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_registry_population_coverage",
+              "column_name": "record_count"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_release_quality",
+      "fields": [
+        {
+          "field_name": "as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "parser_contract_version",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "parser_contract_version"
+            }
+          ]
+        },
+        {
+          "field_name": "release_health_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_health_state"
+            }
+          ]
+        },
+        {
+          "field_name": "release_flag_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_flag_count"
+            }
+          ]
+        },
+        {
+          "field_name": "release_flag_pass_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_flag_pass_count"
+            }
+          ]
+        },
+        {
+          "field_name": "release_flag_review_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_flag_review_count"
+            }
+          ]
+        },
+        {
+          "field_name": "release_flag_rule_versions",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "release_flag_rule_versions"
+            }
+          ]
+        },
+        {
+          "field_name": "schema_added_column_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "schema_added_column_count"
+            }
+          ]
+        },
+        {
+          "field_name": "schema_removed_column_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "schema_removed_column_count"
+            }
+          ]
+        },
+        {
+          "field_name": "schema_type_changed_column_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "schema_type_changed_column_count"
+            }
+          ]
+        },
+        {
+          "field_name": "schema_contract_version",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "schema_contract_version"
+            }
+          ]
+        },
+        {
+          "field_name": "capture_attempted_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "capture_attempted_count"
+            }
+          ]
+        },
+        {
+          "field_name": "capture_succeeded_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "capture_succeeded_count"
+            }
+          ]
+        },
+        {
+          "field_name": "capture_failed_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "capture_failed_count"
+            }
+          ]
+        },
+        {
+          "field_name": "capture_unavailable_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_quality",
+              "column_name": "capture_unavailable_count"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_release_snapshot_metrics",
+      "fields": [
+        {
+          "field_name": "as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "parser_contract_version",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "parser_contract_version"
+            }
+          ]
+        },
+        {
+          "field_name": "published_delinquent_category",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "published_delinquent_category"
+            }
+          ]
+        },
+        {
+          "field_name": "published_delinquent_category_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "published_delinquent_category_count"
+            }
+          ]
+        },
+        {
+          "field_name": "keyed_record_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "keyed_record_count"
+            }
+          ]
+        },
+        {
+          "field_name": "unkeyed_record_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "unkeyed_record_count"
+            }
+          ]
+        },
+        {
+          "field_name": "raw_total_record_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "raw_total_record_count"
+            }
+          ]
+        },
+        {
+          "field_name": "keyed_coverage_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "keyed_coverage_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "unkeyed_coverage_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "unkeyed_coverage_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "keyed_coverage_proportion",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "keyed_coverage_proportion"
+            }
+          ]
+        },
+        {
+          "field_name": "keyed_coverage_wilson_95_lower",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "keyed_coverage_wilson_95_lower"
+            }
+          ]
+        },
+        {
+          "field_name": "keyed_coverage_wilson_95_upper",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "keyed_coverage_wilson_95_upper"
+            }
+          ]
+        },
+        {
+          "field_name": "unkeyed_coverage_proportion",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "unkeyed_coverage_proportion"
+            }
+          ]
+        },
+        {
+          "field_name": "unkeyed_coverage_wilson_95_lower",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "unkeyed_coverage_wilson_95_lower"
+            }
+          ]
+        },
+        {
+          "field_name": "unkeyed_coverage_wilson_95_upper",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_release_snapshot_metrics",
+              "column_name": "unkeyed_coverage_wilson_95_upper"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_source_reported_status_age",
+      "fields": [
+        {
+          "field_name": "as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "source_reported_status_age_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "source_reported_status_age_state"
+            }
+          ]
+        },
+        {
+          "field_name": "source_reported_status_age_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "source_reported_status_age_days"
+            }
+          ]
+        },
+        {
+          "field_name": "record_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_source_reported_status_age",
+              "column_name": "record_count"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_spell_censoring_summary",
+      "fields": [
+        {
+          "field_name": "terminal_state",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_spell_censoring_summary",
+              "column_name": "terminal_state"
+            }
+          ]
+        },
+        {
+          "field_name": "spell_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_spell_censoring_summary",
+              "column_name": "spell_count"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "table_name": "mart_starting_cohort_persistence",
+      "fields": [
+        {
+          "field_name": "from_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "from_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "from_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "from_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "from_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "from_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "to_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "to_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "to_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "to_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "to_revision_fingerprint",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "to_revision_fingerprint"
+            }
+          ]
+        },
+        {
+          "field_name": "gap_days",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "gap_days"
+            }
+          ]
+        },
+        {
+          "field_name": "starting_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "starting_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "still_delinquent_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "still_delinquent_count"
+            }
+          ]
+        },
+        {
+          "field_name": "observed_exit_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "observed_exit_count"
+            }
+          ]
+        },
+        {
+          "field_name": "not_observed_count",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "not_observed_count"
+            }
+          ]
+        },
+        {
+          "field_name": "persistence_denominator_id",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "persistence_denominator_id"
+            }
+          ]
+        },
+        {
+          "field_name": "persistence_proportion",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_starting_cohort_persistence",
+              "column_name": "persistence_proportion"
+            }
+          ]
+        }
+      ]
     }
   ],
-  "relationships": []
+  "relationships": [
+    {
+      "from_table": "dim_public_organizations",
+      "from_column": "state_charity_registration_number",
+      "to_table": "fct_public_status_observations",
+      "to_column": "state_charity_registration_number",
+      "cardinality": "one_to_many",
+      "cross_filter_direction": "single"
+    }
+  ]
 }

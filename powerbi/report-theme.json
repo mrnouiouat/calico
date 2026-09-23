@@ -1,0 +1,50 @@
+{
+  "name": "Calico report theme",
+  "dataColors": [
+    "#2457A7",
+    "#6B4C9A",
+    "#2F6977",
+    "#5D6675"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#172B4D",
+  "tableAccent": "#2457A7",
+  "textClasses": {
+    "title": {
+      "fontFace": "Segoe UI",
+      "fontSize": 24,
+      "color": "#172B4D"
+    },
+    "header": {
+      "fontFace": "Segoe UI",
+      "fontSize": 18,
+      "color": "#172B4D"
+    },
+    "label": {
+      "fontFace": "Segoe UI",
+      "fontSize": 11,
+      "color": "#42526E"
+    },
+    "callout": {
+      "fontFace": "Segoe UI",
+      "fontSize": 12,
+      "color": "#172B4D"
+    }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "color": {
+              "solid": {
+                "color": "#F1F4F8"
+              }
+            },
+            "transparency": 0
+          }
+        ]
+      }
+    }
+  }
+}

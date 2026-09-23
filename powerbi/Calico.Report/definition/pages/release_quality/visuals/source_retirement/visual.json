@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "source_retirement",
+  "position": {
+    "x": 1184,
+    "y": 80,
+    "z": 150,
+    "height": 96,
+    "width": 392,
+    "tabOrder": 150
+  },
+  "parentGroupName": "release_status_banner",
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "capture_status"
+                    }
+                  },
+                  "Property": "Source publication state"
+                }
+              },
+              "queryRef": "capture_status.Source publication state",
+              "nativeQueryRef": "Source publication state"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

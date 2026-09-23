@@ -49,7 +49,7 @@ def _git(cwd: Path, *args: str) -> str:
 
 
 class GovernedTracerTests(unittest.TestCase):
-    def test_native_project_has_three_governed_imports(self):
+    def test_native_project_retains_the_governed_tracer_sources_in_final_model(self):
         project = json.loads((PROJECT / "Calico.pbip").read_text(encoding="utf-8"))
         self.assertEqual(project["artifacts"][0]["report"]["path"], "Calico.Report")
         expressions = (DEFINITIONS / "expressions.tmdl").read_text(encoding="utf-8")
@@ -66,8 +66,8 @@ class GovernedTracerTests(unittest.TestCase):
                 self.assertIn("Web.Contents(PublishedBaseUrl", definition)
                 self.assertNotIn("Table.FirstN", definition)
                 self.assertNotIn("File.Contents", definition)
-        self.assertEqual(len(list((DEFINITIONS / "tables").glob("*.tmdl"))), 3)
-        self.assertEqual(len(list((DEFINITIONS).glob("relationships.tmdl"))), 0)
+        self.assertEqual(len(list((DEFINITIONS / "tables").glob("*.tmdl"))), 13)
+        self.assertTrue((DEFINITIONS / "relationships.tmdl").is_file())
         self.assertIn("annotation __PBI_TimeIntelligenceEnabled = 0",
                       (DEFINITIONS / "model.tmdl").read_text(encoding="utf-8"))
 
@@ -132,26 +132,26 @@ class GovernedTracerTests(unittest.TestCase):
                 findings = scan(treeish=tree, history_all=False, repo_dir=repo, policy=policy)
                 self.assertEqual([finding.category for finding in findings], ["forbidden_path"])
 
-    def test_one_real_banner_page_has_both_source_groups(self):
+    def test_first_real_banner_page_retains_both_source_groups(self):
         report = PROJECT / "Calico.Report" / "definition"
         report_definition = json.loads((report / "report.json").read_text(encoding="utf-8"))
         self.assertEqual(report_definition["themeCollection"], {})
         pages = json.loads((report / "pages" / "pages.json").read_text(encoding="utf-8"))
-        self.assertEqual(pages["pageOrder"], ["published_registry_change"])
+        self.assertEqual(pages["pageOrder"], [
+            "published_registry_change", "cohort_persistence", "release_quality", "organization_lookup"
+        ])
         self.assertTrue((report / "version.json").is_file())
         page = json.loads((report / "pages" / "published_registry_change" / "page.json").read_text(encoding="utf-8"))
         self.assertEqual(page["displayName"], "Published registry change")
         visuals = report / "pages" / "published_registry_change" / "visuals"
-        for name in ("release_identity", "attempt_status"):
+        for name in ("release_identity", "capture_outcome", "attempt_time", "newer_attempt_warning", "source_retirement"):
             with self.subTest(name=name):
                 visual = json.loads((visuals / name / "visual.json").read_text(encoding="utf-8"))
                 self.assertEqual(visual["name"], name)
                 self.assertTrue(visual["visual"]["query"]["queryState"]["Data"]["projections"])
                 self.assertEqual(visual["visual"]["visualType"], "cardVisual")
         release = json.loads((visuals / "release_identity" / "visual.json").read_text(encoding="utf-8"))
-        attempt = json.loads((visuals / "attempt_status" / "visual.json").read_text(encoding="utf-8"))
         self.assertEqual(len(release["visual"]["query"]["queryState"]["Data"]["projections"]), 2)
-        self.assertEqual(len(attempt["visual"]["query"]["queryState"]["Data"]["projections"]), 5)
 
 
 if __name__ == "__main__":

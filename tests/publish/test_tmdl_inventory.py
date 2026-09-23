@@ -28,8 +28,16 @@ class TmdlInventoryTests(unittest.TestCase):
         record = generate_inventory(MODEL)
         self.assertEqual(record["inventory_source"], "machine_readable_metadata")
         self.assertEqual({table["table_name"] for table in record["tables"]},
-                         {"dim_public_organizations", "mart_publication_status", "capture_status"})
-        self.assertEqual(sum(len(table["fields"]) for table in record["tables"]), 24)
+                         {entry.export_name for entry in ALLOWLIST.exports}
+                         | {entry.export_name for entry in ALLOWLIST.control_sources})
+        self.assertEqual(record["relationships"], [{
+            "from_table": "dim_public_organizations",
+            "from_column": "state_charity_registration_number",
+            "to_table": "fct_public_status_observations",
+            "to_column": "state_charity_registration_number",
+            "cardinality": "one_to_many",
+            "cross_filter_direction": "single",
+        }])
         self.assertEqual(check_inventory(record, ALLOWLIST), ())
 
     def test_added_objects_and_unknown_grammar_fail_closed(self):

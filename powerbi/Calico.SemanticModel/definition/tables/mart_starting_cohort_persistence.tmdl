@@ -1,0 +1,102 @@
+table mart_starting_cohort_persistence
+
+	column from_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: from_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"from_as_of_date"}]
+
+	column from_release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: from_release_revision
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"from_release_revision"}]
+
+	column from_revision_fingerprint
+		dataType: string
+		summarizeBy: none
+		sourceColumn: from_revision_fingerprint
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"from_revision_fingerprint"}]
+
+	column to_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		summarizeBy: none
+		sourceColumn: to_as_of_date
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"to_as_of_date"}]
+
+	column to_release_revision
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: to_release_revision
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"to_release_revision"}]
+
+	column to_revision_fingerprint
+		dataType: string
+		summarizeBy: none
+		sourceColumn: to_revision_fingerprint
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"to_revision_fingerprint"}]
+
+	column gap_days
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: gap_days
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"gap_days"}]
+
+	column starting_delinquent_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: starting_delinquent_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"starting_delinquent_count"}]
+
+	column still_delinquent_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: still_delinquent_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"still_delinquent_count"}]
+
+	column observed_exit_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: observed_exit_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"observed_exit_count"}]
+
+	column not_observed_count
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: not_observed_count
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"not_observed_count"}]
+
+	column persistence_denominator_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: persistence_denominator_id
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"persistence_denominator_id"}]
+
+	column persistence_proportion
+		dataType: double
+		formatString: 0.0000
+		summarizeBy: none
+		sourceColumn: persistence_proportion
+		annotation CalicoBaseLineage = [{"table_name":"mart_starting_cohort_persistence","column_name":"persistence_proportion"}]
+
+	partition mart_starting_cohort_persistence = m
+		mode: import
+		source =
+			let
+			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_starting_cohort_persistence.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+			    Required = {"from_as_of_date", "from_release_revision", "from_revision_fingerprint", "to_as_of_date", "to_release_revision", "to_revision_fingerprint", "gap_days", "starting_delinquent_count", "still_delinquent_count", "observed_exit_count", "not_observed_count", "persistence_denominator_id", "persistence_proportion"},
+			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_starting_cohort_persistence.source_shape" else Headers,
+			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+			    Typed = Table.TransformColumnTypes(Selected, {{"from_as_of_date", type date}, {"from_release_revision", Int64.Type}, {"from_revision_fingerprint", type text}, {"to_as_of_date", type date}, {"to_release_revision", Int64.Type}, {"to_revision_fingerprint", type text}, {"gap_days", Int64.Type}, {"starting_delinquent_count", Int64.Type}, {"still_delinquent_count", Int64.Type}, {"observed_exit_count", Int64.Type}, {"not_observed_count", Int64.Type}, {"persistence_denominator_id", type text}, {"persistence_proportion", type number}}, "en-US")
+			in
+			    Typed

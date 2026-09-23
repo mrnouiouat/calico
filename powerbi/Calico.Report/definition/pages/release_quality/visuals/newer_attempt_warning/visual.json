@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "newer_attempt_warning",
+  "position": {
+    "x": 888,
+    "y": 80,
+    "z": 140,
+    "height": 96,
+    "width": 280,
+    "tabOrder": 140
+  },
+  "parentGroupName": "release_status_banner",
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "capture_status"
+                    }
+                  },
+                  "Property": "Newer attempt not accepted"
+                }
+              },
+              "queryRef": "capture_status.Newer attempt not accepted",
+              "nativeQueryRef": "Newer attempt not accepted"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

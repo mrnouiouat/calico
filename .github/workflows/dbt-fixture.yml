@@ -35,6 +35,12 @@ jobs:
       - name: Run full unittest discovery
         run: python -m unittest discover -s tests -t . -v
 
+      - name: Generate and verify the governed semantic-model inventory
+        run: |
+          python -m calico_publish generate-inventory --model powerbi/Calico.SemanticModel --output powerbi/semantic-model-inventory-v1.json
+          python -m calico_publish check-inventory --inventory powerbi/semantic-model-inventory-v1.json
+          git diff --exit-code -- powerbi/semantic-model-inventory-v1.json
+
       - name: Run the complete fixture-mode dbt build
         run: python -m calico_dbt build --mode fixture
 

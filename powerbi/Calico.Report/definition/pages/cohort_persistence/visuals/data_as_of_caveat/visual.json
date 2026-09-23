@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "data_as_of_caveat",
+  "position": {
+    "x": 24,
+    "y": 184,
+    "z": 160,
+    "height": 104,
+    "width": 1552,
+    "tabOrder": 160
+  },
+  "visual": {
+    "visualType": "textbox",
+    "objects": {
+      "general": [
+        {
+          "properties": {
+            "paragraphs": [
+              {
+                "textRuns": [
+                  {
+                    "value": "These values describe accepted published releases, not a real-time record. Check the latest official record using the Registry Search Tool. Report updates use a documented manual Power BI Refresh now step. The report is not fully automatic.",
+                    "textStyle": {
+                      "fontFamily": "Segoe UI",
+                      "fontSize": "14px",
+                      "color": "#172B4D"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "parentGroupName": "release_status_banner"
+}
