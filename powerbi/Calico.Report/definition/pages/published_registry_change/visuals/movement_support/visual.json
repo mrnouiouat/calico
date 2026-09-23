@@ -1,0 +1,22 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "movement_support",
+  "position": {"x": 808, "y": 408, "z": 320, "height": 224, "width": 768, "tabOrder": 320},
+  "visual": {"visualType": "tableEx", "query": {"queryState": {"Values": {"projections": [
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"from_as_of_date"}},"queryRef":"mart_adjacent_pair_metrics.from_as_of_date"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"from_release_revision"}},"queryRef":"mart_adjacent_pair_metrics.from_release_revision"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"to_as_of_date"}},"queryRef":"mart_adjacent_pair_metrics.to_as_of_date"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"to_release_revision"}},"queryRef":"mart_adjacent_pair_metrics.to_release_revision"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"gap_days"}},"queryRef":"mart_adjacent_pair_metrics.gap_days"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"total_entrant_count"}},"queryRef":"mart_adjacent_pair_metrics.total_entrant_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"matched_observed_entry_count"}},"queryRef":"mart_adjacent_pair_metrics.matched_observed_entry_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"newly_observed_delinquent_count"}},"queryRef":"mart_adjacent_pair_metrics.newly_observed_delinquent_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"observed_exit_count"}},"queryRef":"mart_adjacent_pair_metrics.observed_exit_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"still_delinquent_count"}},"queryRef":"mart_adjacent_pair_metrics.still_delinquent_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"not_observed_count"}},"queryRef":"mart_adjacent_pair_metrics.not_observed_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"net_delinquent_movement"}},"queryRef":"mart_adjacent_pair_metrics.net_delinquent_movement"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"largest_transition_from_status"}},"queryRef":"mart_adjacent_pair_metrics.largest_transition_from_status"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"largest_transition_to_status"}},"queryRef":"mart_adjacent_pair_metrics.largest_transition_to_status"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"largest_transition_count"}},"queryRef":"mart_adjacent_pair_metrics.largest_transition_count"}
+  ]}}}, "visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Exact movement support — matched entries and newly observed delinquent remain distinct'"}}}}}]}}
+}

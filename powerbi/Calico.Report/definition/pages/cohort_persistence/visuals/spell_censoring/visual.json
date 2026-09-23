@@ -1,0 +1,8 @@
+{
+  "$schema":"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json","name":"spell_censoring",
+  "position":{"x":24,"y":872,"z":330,"height":208,"width":1552,"tabOrder":330},
+  "visual":{"visualType":"tableEx","query":{"queryState":{"Values":{"projections":[
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_spell_censoring_summary"}},"Property":"terminal_state"}},"queryRef":"mart_spell_censoring_summary.terminal_state"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_spell_censoring_summary"}},"Property":"spell_count"}},"queryRef":"mart_spell_censoring_summary.spell_count"}
+  ]}}},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Spell censoring summary'"}}}}}],"subTitle":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Disappearance is separate from an observed exit. Interval bounds and censoring do not establish an exact onset or exit date. No published values are available for this release or interval; clear the visual’s release filter to see the admitted panel.'"}}}}}]}}
+}

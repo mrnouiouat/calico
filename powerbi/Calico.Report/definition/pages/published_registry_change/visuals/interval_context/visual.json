@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "interval_context",
+  "position": {"x": 24, "y": 648, "z": 330, "height": 208, "width": 1552, "tabOrder": 330},
+  "visual": {"visualType": "tableEx", "query":{"queryState":{"Values":{"projections":[
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"from_as_of_date"}},"queryRef":"mart_adjacent_pair_metrics.from_as_of_date"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"from_release_revision"}},"queryRef":"mart_adjacent_pair_metrics.from_release_revision"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"to_as_of_date"}},"queryRef":"mart_adjacent_pair_metrics.to_as_of_date"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"to_release_revision"}},"queryRef":"mart_adjacent_pair_metrics.to_release_revision"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"gap_days"}},"queryRef":"mart_adjacent_pair_metrics.gap_days"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"observed_exit_count"}},"queryRef":"mart_adjacent_pair_metrics.observed_exit_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"starting_delinquent_count"}},"queryRef":"mart_adjacent_pair_metrics.starting_delinquent_count"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"observed_exit_proportion"}},"queryRef":"mart_adjacent_pair_metrics.observed_exit_proportion"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"observed_exit_wilson_95_lower"}},"queryRef":"mart_adjacent_pair_metrics.observed_exit_wilson_95_lower"},
+    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_adjacent_pair_metrics"}},"Property":"observed_exit_wilson_95_upper"}},"queryRef":"mart_adjacent_pair_metrics.observed_exit_wilson_95_upper"}
+  ]}}},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Exact interval support — percentage is not available when its exported denominator is zero'"}}}}}]}}
+}

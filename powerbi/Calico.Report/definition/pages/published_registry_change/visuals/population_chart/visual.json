@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "population_chart",
+  "position": {"x": 24, "y": 408, "z": 310, "height": 224, "width": 768, "tabOrder": 310},
+  "visual": {
+    "visualType": "columnChart",
+    "query": {"queryState": {"Category": {"projections": [
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_release_snapshot_metrics"}}, "Property": "as_of_date"}}, "queryRef": "mart_release_snapshot_metrics.as_of_date", "nativeQueryRef": "Accepted release"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_release_snapshot_metrics"}}, "Property": "published_delinquent_category"}}, "queryRef": "mart_release_snapshot_metrics.published_delinquent_category", "nativeQueryRef": "Published delinquent category"}
+    ]}, "Y": {"projections": [
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_release_snapshot_metrics"}}, "Property": "published_delinquent_category_count"}}, "queryRef": "mart_release_snapshot_metrics.published_delinquent_category_count", "nativeQueryRef": "Published delinquent category count"}
+    ]}}},
+    "visualContainerObjects": {"title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Published delinquent population by accepted release and category'"}}}}}], "altText": [{"properties": {"altText": {"expr": {"Literal": {"Value": "'Published delinquent population category counts for each accepted release; exact values are shown in the adjacent support table.'"}}}}}]}
+  }
+}
