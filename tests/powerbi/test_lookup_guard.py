@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TABLE = ROOT / "powerbi/Calico.SemanticModel/definition/tables/dim_public_organizations.tmdl"
 VIS = ROOT / "powerbi/Calico.Report/definition/pages/organization_lookup/visuals"
+PAGE = ROOT / "powerbi/Calico.Report/definition/pages/organization_lookup/page.json"
 
 def load(name):
     return json.loads((VIS / name / "visual.json").read_text(encoding="utf-8"))
@@ -37,10 +38,12 @@ class LookupGuardTests(unittest.TestCase):
         refs = json.dumps(candidates)
         for field in ("organization_name", "state_charity_registration_number", "city", "state"):
             self.assertIn(field, refs)
-        self.assertEqual(candidates["visualInteractions"], [
-            {"target":"latest_observed","mode":"None"},
-            {"target":"missing_warning","mode":"None"},
-            {"target":"dated_history","mode":"None"},
+        self.assertNotIn("visualInteractions", candidates)
+        page = json.loads(PAGE.read_text(encoding="utf-8"))
+        self.assertEqual(page["visualInteractions"], [
+            {"source":"candidate_table","target":"latest_observed","type":"NoFilter"},
+            {"source":"candidate_table","target":"missing_warning","type":"NoFilter"},
+            {"source":"candidate_table","target":"dated_history","type":"NoFilter"},
         ])
 
     def test_structural_adversarial_matrix_is_explicitly_locked(self):

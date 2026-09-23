@@ -5,5 +5,10 @@
   "displayOption": "FitToPage",
   "height": 1440,
   "width": 1600,
-  "visibility": "AlwaysVisible"
+  "visibility": "AlwaysVisible",
+  "visualInteractions": [
+    {"source": "candidate_table", "target": "latest_observed", "type": "NoFilter"},
+    {"source": "candidate_table", "target": "missing_warning", "type": "NoFilter"},
+    {"source": "candidate_table", "target": "dated_history", "type": "NoFilter"}
+  ]
 }
