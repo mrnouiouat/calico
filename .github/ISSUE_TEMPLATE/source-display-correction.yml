@@ -1,0 +1,34 @@
+name: Source or display correction
+description: Report a possible mismatch between a published source observation and its display.
+title: "Source/display correction: "
+labels: ["source-display-correction"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        This monitor reproduces published source observations. Do not post excluded identifiers,
+        street addresses, contact details, personal information, raw rows, or screenshots containing them.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Correction category
+      options:
+        - Source observation
+        - Display or formatting
+        - Release lineage
+    validations:
+      required: true
+  - type: input
+    id: release
+    attributes:
+      label: Published release date and revision
+      placeholder: YYYY-MM-DD, revision number
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the mismatch without including excluded or personal information.
+    validations:
+      required: true

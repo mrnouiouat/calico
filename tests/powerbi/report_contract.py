@@ -52,7 +52,8 @@ def validate_report(report: Path, allowlist: Path, claims: Path) -> None:
             list(_walk(payload, f"{page_id}.{visual_path.parent.name}"))
             def check_columns(value):
                 if isinstance(value, dict):
-                    column = value.get("field", {}).get("Column")
+                    field = value.get("field", {})
+                    column = field.get("Column") if isinstance(field, dict) else None
                     if isinstance(column, dict):
                         table = column.get("Expression", {}).get("SourceRef", {}).get("Entity")
                         name = column.get("Property")

@@ -250,6 +250,22 @@
               "column_name": "latest_release_observation_state"
             }
           ]
+        },
+        {
+          "field_name": "Exact Registration Selection Guard",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "state_charity_registration_number"
+            },
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "organization_name"
+            }
+          ]
         }
       ]
     },

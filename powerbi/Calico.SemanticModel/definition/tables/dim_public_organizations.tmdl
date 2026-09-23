@@ -56,6 +56,26 @@ table dim_public_organizations
 		sourceColumn: latest_release_observation_state
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_release_observation_state"}]
 
+	measure 'Exact Registration Selection Guard' =
+		VAR DirectKeyCount = COUNTROWS(FILTERS(dim_public_organizations[state_charity_registration_number]))
+		VAR SelectedKey = SELECTEDVALUE(dim_public_organizations[state_charity_registration_number])
+		VAR KeyIsInDisplayedCandidateScope =
+			CALCULATE(
+				COUNTROWS(dim_public_organizations),
+				REMOVEFILTERS(dim_public_organizations[state_charity_registration_number]),
+				TREATAS({SelectedKey}, dim_public_organizations[state_charity_registration_number])
+			) = 1
+		RETURN IF(
+			HASONEFILTER(dim_public_organizations[state_charity_registration_number])
+				&& DirectKeyCount = 1
+				&& NOT ISINSCOPE(dim_public_organizations[state_charity_registration_number])
+				&& KeyIsInDisplayedCandidateScope,
+			1,
+			0
+		)
+		formatString: 0
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state_charity_registration_number"},{"table_name":"dim_public_organizations","column_name":"organization_name"}]
+
 	partition dim_public_organizations = m
 		mode: import
 		source =
