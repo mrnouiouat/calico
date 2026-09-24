@@ -1,59 +1,79 @@
 table mart_registry_population_coverage
+	lineageTag: b7fd7c14-32f6-403c-9141-0032ccfd0f8c
 
 	column as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: b89b6917-d7c1-4e44-99cb-e90733128444
 		summarizeBy: none
 		sourceColumn: as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: cc4e00ac-baf6-46f6-b494-d08ce4209866
 		summarizeBy: none
 		sourceColumn: release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"release_revision"}]
 
 	column revision_fingerprint
 		dataType: string
+		lineageTag: 74c8a843-8941-4aa7-b373-11497dbb5fc3
 		summarizeBy: none
 		sourceColumn: revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"revision_fingerprint"}]
 
 	column source_list
 		dataType: string
+		lineageTag: 898de2bc-3c3f-44c8-902f-ddaf3b3ae4c3
 		summarizeBy: none
 		sourceColumn: source_list
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"source_list"}]
 
 	column source_reported_registry_status
 		dataType: string
+		lineageTag: f5daccca-99e9-4a51-a237-5a8ed614585f
 		summarizeBy: none
 		sourceColumn: source_reported_registry_status
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"source_reported_registry_status"}]
 
 	column coverage_class
 		dataType: string
+		lineageTag: dc46ab70-a78c-4b2d-9e19-98918e65b0c5
 		summarizeBy: none
 		sourceColumn: coverage_class
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"coverage_class"}]
 
 	column record_count
 		dataType: int64
 		formatString: 0
+		lineageTag: c67d8aea-aa53-4d34-bd7a-d43eca12df2a
 		summarizeBy: none
 		sourceColumn: record_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_registry_population_coverage","column_name":"record_count"}]
 
 	partition mart_registry_population_coverage = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_registry_population_coverage.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"as_of_date", "release_revision", "revision_fingerprint", "source_list", "source_reported_registry_status", "coverage_class", "record_count"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_registry_population_coverage.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"source_list", type text}, {"source_reported_registry_status", type text}, {"coverage_class", type text}, {"record_count", Int64.Type}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_registry_population_coverage.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"as_of_date", "release_revision", "revision_fingerprint", "source_list", "source_reported_registry_status", "coverage_class", "record_count"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_registry_population_coverage.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"source_list", type text}, {"source_reported_registry_status", type text}, {"coverage_class", type text}, {"record_count", Int64.Type}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table
+

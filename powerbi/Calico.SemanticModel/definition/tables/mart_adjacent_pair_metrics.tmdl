@@ -1,181 +1,237 @@
 table mart_adjacent_pair_metrics
+	lineageTag: 6c8c178d-c96e-41d6-b501-967f0beee2ad
 
 	column from_as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: d2fb34bd-7e6d-489a-a1b7-451d3371e55e
 		summarizeBy: none
 		sourceColumn: from_as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"from_as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column from_release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 17df594a-4f15-47a9-a7bb-f286fdf2997e
 		summarizeBy: none
 		sourceColumn: from_release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"from_release_revision"}]
 
 	column from_revision_fingerprint
 		dataType: string
+		lineageTag: 26c6b750-1721-4d09-b722-fbbc8deaa9fe
 		summarizeBy: none
 		sourceColumn: from_revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"from_revision_fingerprint"}]
 
 	column to_as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: af70719e-16e2-4b93-afad-7cff02134fb1
 		summarizeBy: none
 		sourceColumn: to_as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"to_as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column to_release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: c1d6fc4e-df59-4c90-9674-6a5594901cdb
 		summarizeBy: none
 		sourceColumn: to_release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"to_release_revision"}]
 
 	column to_revision_fingerprint
 		dataType: string
+		lineageTag: 1b3aa13e-9922-4343-84ff-1d3eeb04bc37
 		summarizeBy: none
 		sourceColumn: to_revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"to_revision_fingerprint"}]
 
 	column gap_days
 		dataType: int64
 		formatString: 0
+		lineageTag: aaea4aba-4731-4ad7-b964-82c8b31b459d
 		summarizeBy: none
 		sourceColumn: gap_days
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"gap_days"}]
 
 	column starting_delinquent_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 15f9f904-9732-4d05-a29d-4c57b90c834e
 		summarizeBy: none
 		sourceColumn: starting_delinquent_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"starting_delinquent_count"}]
 
 	column ending_published_delinquent_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 18832151-73be-4a9f-8801-8d7302cf97fe
 		summarizeBy: none
 		sourceColumn: ending_published_delinquent_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"ending_published_delinquent_count"}]
 
 	column observed_exit_count
 		dataType: int64
 		formatString: 0
+		lineageTag: ed7ab67b-fb8b-4cf9-b1b8-95315dd1c2ec
 		summarizeBy: none
 		sourceColumn: observed_exit_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"observed_exit_count"}]
 
 	column still_delinquent_count
 		dataType: int64
 		formatString: 0
+		lineageTag: decc31ae-0e96-42f9-a220-85e3fa0e16fe
 		summarizeBy: none
 		sourceColumn: still_delinquent_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"still_delinquent_count"}]
 
 	column not_observed_count
 		dataType: int64
 		formatString: 0
+		lineageTag: f4fff55d-a9df-4098-afbd-73c6c9113992
 		summarizeBy: none
 		sourceColumn: not_observed_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"not_observed_count"}]
 
 	column matched_observed_entry_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 16b6e994-7b39-436e-9eba-733401005d41
 		summarizeBy: none
 		sourceColumn: matched_observed_entry_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"matched_observed_entry_count"}]
 
 	column newly_observed_delinquent_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 19ad241e-153a-47d7-9269-38ef8b063cc4
 		summarizeBy: none
 		sourceColumn: newly_observed_delinquent_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"newly_observed_delinquent_count"}]
 
 	column total_entrant_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 926fccdd-15a4-442d-acf9-dc4b8328c973
 		summarizeBy: none
 		sourceColumn: total_entrant_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"total_entrant_count"}]
 
 	column net_delinquent_movement
 		dataType: string
+		lineageTag: 43624221-198e-4985-9940-bee0465aba1b
 		summarizeBy: none
 		sourceColumn: net_delinquent_movement
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"net_delinquent_movement"}]
 
 	column observed_exit_denominator_id
 		dataType: string
+		lineageTag: e494f177-f1ba-4340-b05d-ca8907f9edf7
 		summarizeBy: none
 		sourceColumn: observed_exit_denominator_id
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"observed_exit_denominator_id"}]
 
 	column observed_exit_proportion
 		dataType: double
 		formatString: 0.0000
+		lineageTag: ba8d3110-77ce-49e6-b6d4-0018597371b7
 		summarizeBy: none
 		sourceColumn: observed_exit_proportion
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"observed_exit_proportion"}]
 
 	column largest_transition_from_status
 		dataType: string
+		lineageTag: ec617806-30f7-4583-8afb-a306ee817329
 		summarizeBy: none
 		sourceColumn: largest_transition_from_status
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"largest_transition_from_status"}]
 
 	column largest_transition_to_status
 		dataType: string
+		lineageTag: 792998c3-d91f-46a7-bb36-89eb18cb5b0b
 		summarizeBy: none
 		sourceColumn: largest_transition_to_status
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"largest_transition_to_status"}]
 
 	column largest_transition_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 491cb592-a740-4d3f-867a-8161ed595145
 		summarizeBy: none
 		sourceColumn: largest_transition_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"largest_transition_count"}]
 
 	column matched_entry_denominator_id
 		dataType: string
+		lineageTag: 33e2bad1-1796-4b6c-bfd4-aa088c879b30
 		summarizeBy: none
 		sourceColumn: matched_entry_denominator_id
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"matched_entry_denominator_id"}]
 
 	column total_entrant_denominator_id
 		dataType: string
+		lineageTag: a193b8a6-a02d-40d2-8f12-04cb2965e38b
 		summarizeBy: none
 		sourceColumn: total_entrant_denominator_id
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"total_entrant_denominator_id"}]
 
 	column observed_exit_wilson_95_lower
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 92e1f98c-10f4-428a-93f5-c2b90f88a02a
 		summarizeBy: none
 		sourceColumn: observed_exit_wilson_95_lower
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"observed_exit_wilson_95_lower"}]
 
 	column observed_exit_wilson_95_upper
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 0a786e7a-85fc-4a58-9e4a-8e2a6d50ebce
 		summarizeBy: none
 		sourceColumn: observed_exit_wilson_95_upper
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_adjacent_pair_metrics","column_name":"observed_exit_wilson_95_upper"}]
 
 	partition mart_adjacent_pair_metrics = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_adjacent_pair_metrics.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"from_as_of_date", "from_release_revision", "from_revision_fingerprint", "to_as_of_date", "to_release_revision", "to_revision_fingerprint", "gap_days", "starting_delinquent_count", "ending_published_delinquent_count", "observed_exit_count", "still_delinquent_count", "not_observed_count", "matched_observed_entry_count", "newly_observed_delinquent_count", "total_entrant_count", "net_delinquent_movement", "observed_exit_denominator_id", "observed_exit_proportion", "largest_transition_from_status", "largest_transition_to_status", "largest_transition_count", "matched_entry_denominator_id", "total_entrant_denominator_id", "observed_exit_wilson_95_lower", "observed_exit_wilson_95_upper"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_adjacent_pair_metrics.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"from_as_of_date", type date}, {"from_release_revision", Int64.Type}, {"from_revision_fingerprint", type text}, {"to_as_of_date", type date}, {"to_release_revision", Int64.Type}, {"to_revision_fingerprint", type text}, {"gap_days", Int64.Type}, {"starting_delinquent_count", Int64.Type}, {"ending_published_delinquent_count", Int64.Type}, {"observed_exit_count", Int64.Type}, {"still_delinquent_count", Int64.Type}, {"not_observed_count", Int64.Type}, {"matched_observed_entry_count", Int64.Type}, {"newly_observed_delinquent_count", Int64.Type}, {"total_entrant_count", Int64.Type}, {"net_delinquent_movement", type text}, {"observed_exit_denominator_id", type text}, {"observed_exit_proportion", type number}, {"largest_transition_from_status", type text}, {"largest_transition_to_status", type text}, {"largest_transition_count", Int64.Type}, {"matched_entry_denominator_id", type text}, {"total_entrant_denominator_id", type text}, {"observed_exit_wilson_95_lower", type number}, {"observed_exit_wilson_95_upper", type number}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_adjacent_pair_metrics.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"from_as_of_date", "from_release_revision", "from_revision_fingerprint", "to_as_of_date", "to_release_revision", "to_revision_fingerprint", "gap_days", "starting_delinquent_count", "ending_published_delinquent_count", "observed_exit_count", "still_delinquent_count", "not_observed_count", "matched_observed_entry_count", "newly_observed_delinquent_count", "total_entrant_count", "net_delinquent_movement", "observed_exit_denominator_id", "observed_exit_proportion", "largest_transition_from_status", "largest_transition_to_status", "largest_transition_count", "matched_entry_denominator_id", "total_entrant_denominator_id", "observed_exit_wilson_95_lower", "observed_exit_wilson_95_upper"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_adjacent_pair_metrics.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"from_as_of_date", type date}, {"from_release_revision", Int64.Type}, {"from_revision_fingerprint", type text}, {"to_as_of_date", type date}, {"to_release_revision", Int64.Type}, {"to_revision_fingerprint", type text}, {"gap_days", Int64.Type}, {"starting_delinquent_count", Int64.Type}, {"ending_published_delinquent_count", Int64.Type}, {"observed_exit_count", Int64.Type}, {"still_delinquent_count", Int64.Type}, {"not_observed_count", Int64.Type}, {"matched_observed_entry_count", Int64.Type}, {"newly_observed_delinquent_count", Int64.Type}, {"total_entrant_count", Int64.Type}, {"net_delinquent_movement", type text}, {"observed_exit_denominator_id", type text}, {"observed_exit_proportion", type number}, {"largest_transition_from_status", type text}, {"largest_transition_to_status", type text}, {"largest_transition_count", Int64.Type}, {"matched_entry_denominator_id", type text}, {"total_entrant_denominator_id", type text}, {"observed_exit_wilson_95_lower", type number}, {"observed_exit_wilson_95_upper", type number}}, "en-US")
+				in
+				    Typed
+

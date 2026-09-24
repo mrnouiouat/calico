@@ -1,7 +1,29 @@
 model Model
 	culture: en-US
 	defaultPowerBIDataSourceVersion: powerBI_V3
-	sourceQueryCulture: en-US
 	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
 
-	annotation __PBI_TimeIntelligenceEnabled = 0
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["capture_status","dim_public_organizations","fct_public_status_observations","mart_adjacent_pair_metrics","mart_claim_support","mart_last_renewal_diagnostic","mart_publication_status","mart_registry_population_coverage","mart_release_quality","mart_release_snapshot_metrics","mart_source_reported_status_age","mart_spell_censoring_summary","mart_starting_cohort_persistence","PublishedBaseUrl"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table capture_status
+ref table dim_public_organizations
+ref table fct_public_status_observations
+ref table mart_adjacent_pair_metrics
+ref table mart_claim_support
+ref table mart_last_renewal_diagnostic
+ref table mart_publication_status
+ref table mart_registry_population_coverage
+ref table mart_release_quality
+ref table mart_release_snapshot_metrics
+ref table mart_source_reported_status_age
+ref table mart_spell_censoring_summary
+ref table mart_starting_cohort_persistence
+

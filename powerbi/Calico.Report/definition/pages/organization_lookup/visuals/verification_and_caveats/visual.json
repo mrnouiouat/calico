@@ -1,7 +1,14 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
   "name": "verification_and_caveats",
-  "position": {"x": 552, "y": 840, "z": 323, "height": 480, "width": 1024, "tabOrder": 323},
+  "position": {
+    "x": 552,
+    "y": 840,
+    "z": 323,
+    "height": 480,
+    "width": 1024,
+    "tabOrder": 323
+  },
   "visual": {
     "visualType": "textbox",
     "query": {
@@ -9,11 +16,29 @@
         "Values": {
           "projections": [
             {
-              "field": {"Column": {"Expression": {"SourceRef": {"Entity": "dim_public_organizations"}}, "Property": "official_verification_instructions"}},
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_public_organizations"
+                    }
+                  },
+                  "Property": "official_verification_instructions"
+                }
+              },
               "queryRef": "dim_public_organizations.official_verification_instructions"
             },
             {
-              "field": {"Measure": {"Expression": {"SourceRef": {"Entity": "dim_public_organizations"}}, "Property": "Exact Registration Selection Guard"}},
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_public_organizations"
+                    }
+                  },
+                  "Property": "Exact Registration Selection Guard"
+                }
+              },
               "queryRef": "dim_public_organizations.Exact Registration Selection Guard"
             }
           ]
@@ -21,20 +46,82 @@
       }
     },
     "visualContainerObjects": {
-      "title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Check the latest official record — California Registry Search Tool'"}}}}}],
-      "subTitle": [{"properties": {"text": {"expr": {"Literal": {"Value": "'https://oag.ca.gov/charities/reports | https://ca-rcf.evokeplatform.com/app/publicPortal/verification | Report a source or display correction: https://github.com/mrnouiouat/calico/issues/new?template=source-display-correction.yml\nThe frozen final panel ends 2026-08-19; the four-file source publication retired on 2026-09-02. In the historical semi-monthly source, a cured organization could remain absent from good-standing status until the next publication, up to approximately 15 days; this frozen panel can be stale indefinitely. The Attorney General currently describes the Registry Search Tool as real-time. This report does not independently establish its population coverage or matching behavior.\nSource files → accepted release → tested dbt models → published export. See published-manifest-v1.json for source hashes and parser-contract provenance. Each row is an accepted-release observation; Not observed does not mean cured or current. Registry compliance history is one due-diligence input. It does not establish an organization’s trustworthiness, effectiveness, financial soundness or suitability as a partner.'"}}}}}]
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Check the latest official record — California Registry Search Tool'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'https://oag.ca.gov/charities/reports | https://ca-rcf.evokeplatform.com/app/publicPortal/verification | Report a source or display correction: https://github.com/mrnouiouat/calico/issues/new?template=source-display-correction.yml\nThe frozen final panel ends 2026-08-19; the four-file source publication retired on 2026-09-02. In the historical semi-monthly source, a cured organization could remain absent from good-standing status until the next publication, up to approximately 15 days; this frozen panel can be stale indefinitely. The Attorney General currently describes the Registry Search Tool as real-time. This report does not independently establish its population coverage or matching behavior.\nSource files → accepted release → tested dbt models → published export. See published-manifest-v1.json for source hashes and parser-contract provenance. Each row is an accepted-release observation; Not observed does not mean cured or current. Registry compliance history is one due-diligence input. It does not establish an organization’s trustworthiness, effectiveness, financial soundness or suitability as a partner.'"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "filterConfig": {
     "filters": [
       {
         "name": "exact_registration_guard_verification",
-        "field": {"Measure": {"Expression": {"SourceRef": {"Entity": "dim_public_organizations"}}, "Property": "Exact Registration Selection Guard"}},
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "dim_public_organizations"
+              }
+            },
+            "Property": "Exact Registration Selection Guard"
+          }
+        },
         "type": "Advanced",
         "filter": {
           "Version": 2,
-          "From": [{"Name": "d", "Entity": "dim_public_organizations", "Type": 0}],
-          "Where": [{"Condition": {"Comparison": {"ComparisonKind": 0, "Left": {"Measure": {"Expression": {"SourceRef": {"Source": "d"}}, "Property": "Exact Registration Selection Guard"}}, "Right": {"Literal": {"Value": "1L"}}}}}]
+          "From": [
+            {
+              "Name": "d",
+              "Entity": "dim_public_organizations",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "Comparison": {
+                  "ComparisonKind": 0,
+                  "Left": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Source": "d"
+                        }
+                      },
+                      "Property": "Exact Registration Selection Guard"
+                    }
+                  },
+                  "Right": {
+                    "Literal": {
+                      "Value": "1L"
+                    }
+                  }
+                }
+              }
+            }
+          ]
         },
         "howCreated": "User",
         "isLockedInViewMode": true,

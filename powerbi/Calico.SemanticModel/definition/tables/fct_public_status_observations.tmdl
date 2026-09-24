@@ -1,46 +1,60 @@
 table fct_public_status_observations
+	lineageTag: ff5d43b3-f066-481f-9de6-99b89ae182df
 
 	column state_charity_registration_number
 		dataType: string
+		lineageTag: c7b0cf4e-1958-4cb9-98a0-1c4b7a29141c
 		summarizeBy: none
 		sourceColumn: state_charity_registration_number
+
 		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"state_charity_registration_number"}]
 
 	column as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: b5971515-7907-4315-9958-d97180ea1ad4
 		summarizeBy: none
 		sourceColumn: as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 53e2f342-ee9e-403d-94ad-5ba18a08b8b7
 		summarizeBy: none
 		sourceColumn: release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"release_revision"}]
 
 	column observation_state
 		dataType: string
+		lineageTag: 9cf67b01-3f5d-4843-961b-31a16c91cd0e
 		summarizeBy: none
 		sourceColumn: observation_state
+
 		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"observation_state"}]
 
 	column source_reported_status
 		dataType: string
+		lineageTag: 395295ce-1262-42a1-884c-75b94960b969
 		summarizeBy: none
 		sourceColumn: source_reported_status
+
 		annotation CalicoBaseLineage = [{"table_name":"fct_public_status_observations","column_name":"source_reported_status"}]
 
 	partition fct_public_status_observations = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/fct_public_status_observations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"state_charity_registration_number", "as_of_date", "release_revision", "observation_state", "source_reported_status"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "fct_public_status_observations.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"as_of_date", type date}, {"release_revision", Int64.Type}, {"observation_state", type text}, {"source_reported_status", type text}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/fct_public_status_observations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"state_charity_registration_number", "as_of_date", "release_revision", "observation_state", "source_reported_status"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "fct_public_status_observations.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"as_of_date", type date}, {"release_revision", Int64.Type}, {"observation_state", type text}, {"source_reported_status", type text}}, "en-US")
+				in
+				    Typed
+

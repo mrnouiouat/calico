@@ -1,1 +1,5 @@
 expression PublishedBaseUrl = "https://raw.githubusercontent.com/mrnouiouat/calico/published-data/" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 1ab5c7ed-bedd-45a4-ad26-7712374a0be3
+
+	annotation PBI_ResultType = Text
+

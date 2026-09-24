@@ -1,128 +1,166 @@
 table mart_release_quality
+	lineageTag: 13766770-b545-4950-9d87-1c3aa51bd16d
 
 	column as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: 3c87f056-5f8f-4fe7-a839-4deca3aa322a
 		summarizeBy: none
 		sourceColumn: as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 2e2c4b68-a18a-43c2-be4d-8bd8c1021599
 		summarizeBy: none
 		sourceColumn: release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_revision"}]
 
 	column revision_fingerprint
 		dataType: string
+		lineageTag: 6093aaf8-3f84-4117-bf73-5f42cb53023d
 		summarizeBy: none
 		sourceColumn: revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"revision_fingerprint"}]
 
 	column parser_contract_version
 		dataType: string
+		lineageTag: f94966e0-b20c-4565-b389-d2fe5812d0d9
 		summarizeBy: none
 		sourceColumn: parser_contract_version
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"parser_contract_version"}]
 
 	column release_health_state
 		dataType: string
+		lineageTag: d0903189-e22c-4e3e-bab2-6c4920472eb9
 		summarizeBy: none
 		sourceColumn: release_health_state
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_health_state"}]
 
 	column release_flag_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 1a5c3655-e744-493d-8144-d8fb611607ae
 		summarizeBy: none
 		sourceColumn: release_flag_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_flag_count"}]
 
 	column release_flag_pass_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 501d8c43-d264-4431-b5bc-f4c8ff4045ac
 		summarizeBy: none
 		sourceColumn: release_flag_pass_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_flag_pass_count"}]
 
 	column release_flag_review_count
 		dataType: int64
 		formatString: 0
+		lineageTag: d1987c3f-2bb0-4a75-8f82-6594bf2c4349
 		summarizeBy: none
 		sourceColumn: release_flag_review_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_flag_review_count"}]
 
 	column release_flag_rule_versions
 		dataType: string
+		lineageTag: 285b1638-11e2-45e3-a02b-e8f7c3fcde7f
 		summarizeBy: none
 		sourceColumn: release_flag_rule_versions
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"release_flag_rule_versions"}]
 
 	column schema_added_column_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 34296afc-83d2-4f79-8177-4c8cd60c9db8
 		summarizeBy: none
 		sourceColumn: schema_added_column_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"schema_added_column_count"}]
 
 	column schema_removed_column_count
 		dataType: int64
 		formatString: 0
+		lineageTag: e7d913ab-1ca5-4fb4-b41f-c73beea2abf3
 		summarizeBy: none
 		sourceColumn: schema_removed_column_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"schema_removed_column_count"}]
 
 	column schema_type_changed_column_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 1aec1824-8fa0-4db1-a3d6-49fade38e6dc
 		summarizeBy: none
 		sourceColumn: schema_type_changed_column_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"schema_type_changed_column_count"}]
 
 	column schema_contract_version
 		dataType: string
+		lineageTag: 96818039-09e2-47be-8309-333678c05df5
 		summarizeBy: none
 		sourceColumn: schema_contract_version
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"schema_contract_version"}]
 
 	column capture_attempted_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 0b259664-600d-4408-b5d6-4456516fbbdc
 		summarizeBy: none
 		sourceColumn: capture_attempted_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"capture_attempted_count"}]
 
 	column capture_succeeded_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 39107c48-acca-4d1c-8c1b-80cc3e438cc0
 		summarizeBy: none
 		sourceColumn: capture_succeeded_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"capture_succeeded_count"}]
 
 	column capture_failed_count
 		dataType: int64
 		formatString: 0
+		lineageTag: e82a15da-4ee1-4df7-ac64-83e143eb58cf
 		summarizeBy: none
 		sourceColumn: capture_failed_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"capture_failed_count"}]
 
 	column capture_unavailable_count
 		dataType: int64
 		formatString: 0
+		lineageTag: ec442788-beaf-45f8-b563-f81b0427cf3b
 		summarizeBy: none
 		sourceColumn: capture_unavailable_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_quality","column_name":"capture_unavailable_count"}]
 
 	partition mart_release_quality = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_release_quality.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"as_of_date", "release_revision", "revision_fingerprint", "parser_contract_version", "release_health_state", "release_flag_count", "release_flag_pass_count", "release_flag_review_count", "release_flag_rule_versions", "schema_added_column_count", "schema_removed_column_count", "schema_type_changed_column_count", "schema_contract_version", "capture_attempted_count", "capture_succeeded_count", "capture_failed_count", "capture_unavailable_count"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_release_quality.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"parser_contract_version", type text}, {"release_health_state", type text}, {"release_flag_count", Int64.Type}, {"release_flag_pass_count", Int64.Type}, {"release_flag_review_count", Int64.Type}, {"release_flag_rule_versions", type text}, {"schema_added_column_count", Int64.Type}, {"schema_removed_column_count", Int64.Type}, {"schema_type_changed_column_count", Int64.Type}, {"schema_contract_version", type text}, {"capture_attempted_count", Int64.Type}, {"capture_succeeded_count", Int64.Type}, {"capture_failed_count", Int64.Type}, {"capture_unavailable_count", Int64.Type}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_release_quality.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"as_of_date", "release_revision", "revision_fingerprint", "parser_contract_version", "release_health_state", "release_flag_count", "release_flag_pass_count", "release_flag_review_count", "release_flag_rule_versions", "schema_added_column_count", "schema_removed_column_count", "schema_type_changed_column_count", "schema_contract_version", "capture_attempted_count", "capture_succeeded_count", "capture_failed_count", "capture_unavailable_count"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_release_quality.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"parser_contract_version", type text}, {"release_health_state", type text}, {"release_flag_count", Int64.Type}, {"release_flag_pass_count", Int64.Type}, {"release_flag_review_count", Int64.Type}, {"release_flag_rule_versions", type text}, {"schema_added_column_count", Int64.Type}, {"schema_removed_column_count", Int64.Type}, {"schema_type_changed_column_count", Int64.Type}, {"schema_contract_version", type text}, {"capture_attempted_count", Int64.Type}, {"capture_succeeded_count", Int64.Type}, {"capture_failed_count", Int64.Type}, {"capture_unavailable_count", Int64.Type}}, "en-US")
+				in
+				    Typed
+

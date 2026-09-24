@@ -25,5 +25,6 @@ data/generated-diffs/
 **/.pbi/cache.abf
 **/.pbi/localSettings.json
 **/.pbi/localsettings.json
+**/.pbi/editorSettings.json
 *.pbix
 *.PBIX

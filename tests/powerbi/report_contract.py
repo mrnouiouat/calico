@@ -42,7 +42,7 @@ def validate_report(report: Path, allowlist: Path, claims: Path) -> None:
         raise ReportContractError("report.page_order")
     for page_id, display_name in zip(PAGES, PAGE_NAMES, strict=True):
         page = json.loads((report / f"pages/{page_id}/page.json").read_text(encoding="utf-8"))
-        if page.get("displayName") != display_name or page.get("visibility") != "AlwaysVisible":
+        if page.get("displayName") != display_name or page.get("visibility", "AlwaysVisible") != "AlwaysVisible":
             raise ReportContractError(f"report.page_contract:{page_id}")
         visuals = report / "pages" / page_id / "visuals"
         if not (visuals / "release_status_banner/visual.json").is_file():

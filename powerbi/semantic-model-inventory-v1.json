@@ -7,6 +7,66 @@
       "table_name": "capture_status",
       "fields": [
         {
+          "field_name": "Capture outcome",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "outcome"
+            }
+          ]
+        },
+        {
+          "field_name": "Newer attempt not accepted",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "newer_attempt_not_accepted"
+            }
+          ]
+        },
+        {
+          "field_name": "Attempt ended at UTC",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "ended_at_utc"
+            }
+          ]
+        },
+        {
+          "field_name": "Source publication state",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_state"
+            }
+          ]
+        },
+        {
+          "field_name": "Source publication retired on",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "capture_status",
+              "column_name": "source_publication_retired_on"
+            }
+          ]
+        },
+        {
           "field_name": "outcome",
           "visibility": "visible",
           "origin": "source_column",
@@ -77,72 +137,28 @@
               "column_name": "source_publication_retired_on"
             }
           ]
-        },
-        {
-          "field_name": "Capture outcome",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "capture_status",
-              "column_name": "outcome"
-            }
-          ]
-        },
-        {
-          "field_name": "Newer attempt not accepted",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "capture_status",
-              "column_name": "newer_attempt_not_accepted"
-            }
-          ]
-        },
-        {
-          "field_name": "Attempt ended at UTC",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "capture_status",
-              "column_name": "ended_at_utc"
-            }
-          ]
-        },
-        {
-          "field_name": "Source publication state",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "capture_status",
-              "column_name": "source_publication_state"
-            }
-          ]
-        },
-        {
-          "field_name": "Source publication retired on",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "capture_status",
-              "column_name": "source_publication_retired_on"
-            }
-          ]
         }
       ]
     },
     {
       "table_name": "dim_public_organizations",
       "fields": [
+        {
+          "field_name": "Exact Registration Selection Guard",
+          "visibility": "visible",
+          "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "state_charity_registration_number"
+            },
+            {
+              "table_name": "dim_public_organizations",
+              "column_name": "organization_name"
+            }
+          ]
+        },
         {
           "field_name": "state_charity_registration_number",
           "visibility": "visible",
@@ -248,22 +264,6 @@
             {
               "table_name": "dim_public_organizations",
               "column_name": "latest_release_observation_state"
-            }
-          ]
-        },
-        {
-          "field_name": "Exact Registration Selection Guard",
-          "visibility": "visible",
-          "origin": "measure",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "dim_public_organizations",
-              "column_name": "state_charity_registration_number"
-            },
-            {
-              "table_name": "dim_public_organizations",
-              "column_name": "organization_name"
             }
           ]
         }
@@ -1169,30 +1169,6 @@
       "table_name": "mart_publication_status",
       "fields": [
         {
-          "field_name": "published_as_of_date",
-          "visibility": "visible",
-          "origin": "source_column",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "mart_publication_status",
-              "column_name": "published_as_of_date"
-            }
-          ]
-        },
-        {
-          "field_name": "published_release_revision",
-          "visibility": "visible",
-          "origin": "source_column",
-          "lineage_complete": true,
-          "source_columns": [
-            {
-              "table_name": "mart_publication_status",
-              "column_name": "published_release_revision"
-            }
-          ]
-        },
-        {
           "field_name": "Published as-of date",
           "visibility": "visible",
           "origin": "measure",
@@ -1208,6 +1184,30 @@
           "field_name": "Published release revision",
           "visibility": "visible",
           "origin": "measure",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_release_revision"
+            }
+          ]
+        },
+        {
+          "field_name": "published_as_of_date",
+          "visibility": "visible",
+          "origin": "source_column",
+          "lineage_complete": true,
+          "source_columns": [
+            {
+              "table_name": "mart_publication_status",
+              "column_name": "published_as_of_date"
+            }
+          ]
+        },
+        {
+          "field_name": "published_release_revision",
+          "visibility": "visible",
+          "origin": "source_column",
           "lineage_complete": true,
           "source_columns": [
             {

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Calico"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "1ed6d2b5-be8b-4aed-bd5a-9df00c4ed1a5"
+  }
+}

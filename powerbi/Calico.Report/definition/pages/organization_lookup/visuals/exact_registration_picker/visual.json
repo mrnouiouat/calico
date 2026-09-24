@@ -1,1 +1,87 @@
-{"$schema":"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json","name":"exact_registration_picker","position":{"x":24,"y":856,"z":312,"height":224,"width":512,"tabOrder":312},"visual":{"visualType":"slicer","query":{"queryState":{"Values":{"projections":[{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"dim_public_organizations"}},"Property":"state_charity_registration_number"}},"queryRef":"dim_public_organizations.state_charity_registration_number"}]}}},"objects":{"selection":[{"properties":{"singleSelect":{"expr":{"Literal":{"Value":"true"}}},"selectAllCheckboxEnabled":{"expr":{"Literal":{"Value":"false"}}},"defaultSelection":{"expr":{"Literal":{"Value":"null"}}}}}]},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'State Charity Reg# â€” select one exact value'"}}}}}],"subTitle":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Select exact registration number. Clear this selection before changing the name search.'"}}}}}]}}}
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "exact_registration_picker",
+  "position": {
+    "x": 24,
+    "y": 856,
+    "z": 312,
+    "height": 224,
+    "width": 512,
+    "tabOrder": 312
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_public_organizations"
+                    }
+                  },
+                  "Property": "state_charity_registration_number"
+                }
+              },
+              "queryRef": "dim_public_organizations.state_charity_registration_number",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "selection": [
+        {
+          "properties": {
+            "singleSelect": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "selectAllCheckboxEnabled": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'State Charity Reg# â€” select one exact value'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Select exact registration number. Clear this selection before changing the name search.'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

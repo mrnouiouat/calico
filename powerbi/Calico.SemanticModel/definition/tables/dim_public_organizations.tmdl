@@ -1,90 +1,113 @@
 table dim_public_organizations
+	lineageTag: 42b63f27-67f9-4609-85d6-76591fb86198
+
+	measure 'Exact Registration Selection Guard' =
+			VAR DirectKeyCount = COUNTROWS(FILTERS(dim_public_organizations[state_charity_registration_number]))
+			VAR SelectedKey = SELECTEDVALUE(dim_public_organizations[state_charity_registration_number])
+			VAR KeyIsInDisplayedCandidateScope =
+				CALCULATE(
+					COUNTROWS(dim_public_organizations),
+					REMOVEFILTERS(dim_public_organizations[state_charity_registration_number]),
+					TREATAS({SelectedKey}, dim_public_organizations[state_charity_registration_number])
+				) = 1
+			RETURN IF(
+				HASONEFILTER(dim_public_organizations[state_charity_registration_number])
+					&& DirectKeyCount = 1
+					&& NOT ISINSCOPE(dim_public_organizations[state_charity_registration_number])
+					&& KeyIsInDisplayedCandidateScope,
+				1,
+				0
+			)
+			formatString: 0
+			annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state_charity_registration_number"},{"table_name":"dim_public_organizations","column_name":"organization_name"}]
+		lineageTag: 832baa07-ed55-41eb-9a4a-e22fa973fcb5
 
 	column state_charity_registration_number
 		dataType: string
+		lineageTag: 20332651-f492-4d66-b916-964671cfb9b8
 		summarizeBy: none
 		sourceColumn: state_charity_registration_number
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state_charity_registration_number"}]
 
 	column organization_name
 		dataType: string
+		lineageTag: 79ebd530-49ea-4338-b540-f10bfb23e218
 		summarizeBy: none
 		sourceColumn: organization_name
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"organization_name"}]
 
 	column city
 		dataType: string
+		lineageTag: 7d93740c-9598-46d7-ba19-72fc178009c6
 		summarizeBy: none
 		sourceColumn: city
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"city"}]
 
 	column state
 		dataType: string
+		lineageTag: e7d9f272-a268-4ce8-a66a-0d3d9ecf0aae
 		summarizeBy: none
 		sourceColumn: state
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state"}]
 
 	column latest_source_reported_status
 		dataType: string
+		lineageTag: e2ef72b3-59d3-41d8-ab8e-51349877aea0
 		summarizeBy: none
 		sourceColumn: latest_source_reported_status
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_source_reported_status"}]
 
 	column latest_observed_as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: 9564dfd1-9a24-4261-a9af-bb89eebbcffd
 		summarizeBy: none
 		sourceColumn: latest_observed_as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_observed_as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column latest_observed_release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 99b39eda-6c6c-4ace-863d-2a001988ee29
 		summarizeBy: none
 		sourceColumn: latest_observed_release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_observed_release_revision"}]
 
 	column official_verification_instructions
 		dataType: string
+		lineageTag: 0089b18d-dc2f-4cfc-b909-83ff37e51f1c
 		summarizeBy: none
 		sourceColumn: official_verification_instructions
+
 		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"official_verification_instructions"}]
 
 	column latest_release_observation_state
 		dataType: string
+		lineageTag: 0102e6f3-7d7d-46cf-a94a-6495b8081afe
 		summarizeBy: none
 		sourceColumn: latest_release_observation_state
-		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_release_observation_state"}]
 
-	measure 'Exact Registration Selection Guard' =
-		VAR DirectKeyCount = COUNTROWS(FILTERS(dim_public_organizations[state_charity_registration_number]))
-		VAR SelectedKey = SELECTEDVALUE(dim_public_organizations[state_charity_registration_number])
-		VAR KeyIsInDisplayedCandidateScope =
-			CALCULATE(
-				COUNTROWS(dim_public_organizations),
-				REMOVEFILTERS(dim_public_organizations[state_charity_registration_number]),
-				TREATAS({SelectedKey}, dim_public_organizations[state_charity_registration_number])
-			) = 1
-		RETURN IF(
-			HASONEFILTER(dim_public_organizations[state_charity_registration_number])
-				&& DirectKeyCount = 1
-				&& NOT ISINSCOPE(dim_public_organizations[state_charity_registration_number])
-				&& KeyIsInDisplayedCandidateScope,
-			1,
-			0
-		)
-		formatString: 0
-		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"state_charity_registration_number"},{"table_name":"dim_public_organizations","column_name":"organization_name"}]
+		annotation CalicoBaseLineage = [{"table_name":"dim_public_organizations","column_name":"latest_release_observation_state"}]
 
 	partition dim_public_organizations = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/dim_public_organizations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"state_charity_registration_number", "organization_name", "city", "state", "latest_source_reported_status", "latest_observed_as_of_date", "latest_observed_release_revision", "official_verification_instructions", "latest_release_observation_state"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "dim_public_organizations.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"organization_name", type text}, {"city", type text}, {"state", type text}, {"latest_source_reported_status", type text}, {"latest_observed_as_of_date", type date}, {"latest_observed_release_revision", Int64.Type}, {"official_verification_instructions", type text}, {"latest_release_observation_state", type text}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/dim_public_organizations.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"state_charity_registration_number", "organization_name", "city", "state", "latest_source_reported_status", "latest_observed_as_of_date", "latest_observed_release_revision", "official_verification_instructions", "latest_release_observation_state"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "dim_public_organizations.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"state_charity_registration_number", type text}, {"organization_name", type text}, {"city", type text}, {"state", type text}, {"latest_source_reported_status", type text}, {"latest_observed_as_of_date", type date}, {"latest_observed_release_revision", Int64.Type}, {"official_verification_instructions", type text}, {"latest_release_observation_state", type text}}, "en-US")
+				in
+				    Typed
+

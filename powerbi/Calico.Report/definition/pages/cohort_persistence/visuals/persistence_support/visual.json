@@ -1,16 +1,181 @@
 {
-  "$schema":"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json","name":"persistence_support",
-  "position":{"x":24,"y":312,"z":310,"height":304,"width":1552,"tabOrder":310},
-  "visual":{"visualType":"tableEx","query":{"queryState":{"Values":{"projections":[
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"from_as_of_date"}},"queryRef":"mart_starting_cohort_persistence.from_as_of_date"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"from_release_revision"}},"queryRef":"mart_starting_cohort_persistence.from_release_revision"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"to_as_of_date"}},"queryRef":"mart_starting_cohort_persistence.to_as_of_date"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"to_release_revision"}},"queryRef":"mart_starting_cohort_persistence.to_release_revision"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"gap_days"}},"queryRef":"mart_starting_cohort_persistence.gap_days"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"starting_delinquent_count"}},"queryRef":"mart_starting_cohort_persistence.starting_delinquent_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"still_delinquent_count"}},"queryRef":"mart_starting_cohort_persistence.still_delinquent_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"observed_exit_count"}},"queryRef":"mart_starting_cohort_persistence.observed_exit_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"not_observed_count"}},"queryRef":"mart_starting_cohort_persistence.not_observed_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_starting_cohort_persistence"}},"Property":"persistence_proportion"}},"queryRef":"mart_starting_cohort_persistence.persistence_proportion"}
-  ]}}},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Published delinquent population persistence — still delinquent, observed exit and not observed'"}}}}}],"subTitle":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Only exported horizons are shown. Proportions are not available when the exported denominator is zero.'"}}}}}]}}
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "persistence_support",
+  "position": {
+    "x": 24,
+    "y": 312,
+    "z": 310,
+    "height": 304,
+    "width": 1552,
+    "tabOrder": 310
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "from_as_of_date"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.from_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "from_release_revision"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.from_release_revision"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "to_as_of_date"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.to_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "to_release_revision"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.to_release_revision"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "gap_days"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.gap_days"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "starting_delinquent_count"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.starting_delinquent_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "still_delinquent_count"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.still_delinquent_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "observed_exit_count"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.observed_exit_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "not_observed_count"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.not_observed_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_starting_cohort_persistence"
+                    }
+                  },
+                  "Property": "persistence_proportion"
+                }
+              },
+              "queryRef": "mart_starting_cohort_persistence.persistence_proportion"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Published delinquent population persistence — still delinquent, observed exit and not observed'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Only exported horizons are shown. Proportions are not available when the exported denominator is zero.'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
 }

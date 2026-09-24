@@ -1,18 +1,194 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
   "name": "approved_finding",
-  "position": {"x": 24, "y": 872, "z": 340, "height": 208, "width": 1552, "tabOrder": 340},
-  "visual": {"visualType":"tableEx","query":{"queryState":{"Values":{"projections":[
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"support_count"}},"queryRef":"mart_claim_support.support_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"support_denominator_count"}},"queryRef":"mart_claim_support.support_denominator_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"from_as_of_date"}},"queryRef":"mart_claim_support.from_as_of_date"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"to_as_of_date"}},"queryRef":"mart_claim_support.to_as_of_date"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"gap_days"}},"queryRef":"mart_claim_support.gap_days"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"total_matched_entry_count"}},"queryRef":"mart_claim_support.total_matched_entry_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"total_entrant_count"}},"queryRef":"mart_claim_support.total_entrant_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"dominant_source_reported_status_date"}},"queryRef":"mart_claim_support.dominant_source_reported_status_date"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"dominant_status_date_count"}},"queryRef":"mart_claim_support.dominant_status_date_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"dominant_status_date_denominator_count"}},"queryRef":"mart_claim_support.dominant_status_date_denominator_count"},
-    {"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_claim_support"}},"Property":"dominant_status_date_share"}},"queryRef":"mart_claim_support.dominant_status_date_share"}
-  ]}}},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Between the July 15 and August 5 releases, 7,737 matched organizations were observed moving from `Current - Reporting Incomplete` into a delinquent category; most of the entry cohort carries a source-reported July 17 status date; the public files do not establish internal cause, exact processing time, or workflow. Across the next pair, total delinquency entries fell from 7,750 to 2, supporting a descriptive claim of a discrete bulk publication event rather than a steady flow.'"}}}}}],"subTitle":[{"properties":{"text":{"expr":{"Literal":{"Value":"'No published values are available for this release or interval. Clear the visual’s release filter to see the admitted panel. This visual could not load: reload the report or use the correction channel.'"}}}}}]}}
+  "position": {
+    "x": 24,
+    "y": 872,
+    "z": 340,
+    "height": 208,
+    "width": 1552,
+    "tabOrder": 340
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "support_count"
+                }
+              },
+              "queryRef": "mart_claim_support.support_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "support_denominator_count"
+                }
+              },
+              "queryRef": "mart_claim_support.support_denominator_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "from_as_of_date"
+                }
+              },
+              "queryRef": "mart_claim_support.from_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "to_as_of_date"
+                }
+              },
+              "queryRef": "mart_claim_support.to_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "gap_days"
+                }
+              },
+              "queryRef": "mart_claim_support.gap_days"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "total_matched_entry_count"
+                }
+              },
+              "queryRef": "mart_claim_support.total_matched_entry_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "total_entrant_count"
+                }
+              },
+              "queryRef": "mart_claim_support.total_entrant_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "dominant_source_reported_status_date"
+                }
+              },
+              "queryRef": "mart_claim_support.dominant_source_reported_status_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "dominant_status_date_count"
+                }
+              },
+              "queryRef": "mart_claim_support.dominant_status_date_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "dominant_status_date_denominator_count"
+                }
+              },
+              "queryRef": "mart_claim_support.dominant_status_date_denominator_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_claim_support"
+                    }
+                  },
+                  "Property": "dominant_status_date_share"
+                }
+              },
+              "queryRef": "mart_claim_support.dominant_status_date_share"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Between the July 15 and August 5 releases, 7,737 matched organizations were observed moving from `Current - Reporting Incomplete` into a delinquent category; most of the entry cohort carries a source-reported July 17 status date; the public files do not establish internal cause, exact processing time, or workflow. Across the next pair, total delinquency entries fell from 7,750 to 2, supporting a descriptive claim of a discrete bulk publication event rather than a steady flow.'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'No published values are available for this release or interval. Clear the visual’s release filter to see the admitted panel. This visual could not load: reload the report or use the correction channel.'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
 }

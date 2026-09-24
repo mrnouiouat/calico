@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "Calico"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "2d2ccf99-b302-46f1-a02e-26d88f370634"
+  }
+}

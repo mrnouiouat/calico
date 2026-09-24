@@ -1,54 +1,70 @@
 table mart_source_reported_status_age
+	lineageTag: b77b55c8-8107-4174-88c2-9dc525f7f6ec
 
 	column as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: 58f758d5-fee7-4dda-a4e3-a2aa0b6b5606
 		summarizeBy: none
 		sourceColumn: as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 1c74f2e2-3603-4c69-9069-02101e8dd0de
 		summarizeBy: none
 		sourceColumn: release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"release_revision"}]
 
 	column revision_fingerprint
 		dataType: string
+		lineageTag: 6e0e3d4d-8692-4621-aa7e-cf3d1f76fb68
 		summarizeBy: none
 		sourceColumn: revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"revision_fingerprint"}]
 
 	column source_reported_status_age_state
 		dataType: string
+		lineageTag: a8e668e6-2f7e-4297-ba99-961e15bf387a
 		summarizeBy: none
 		sourceColumn: source_reported_status_age_state
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"source_reported_status_age_state"}]
 
 	column source_reported_status_age_days
 		dataType: int64
 		formatString: 0
+		lineageTag: e4550e71-7c95-453d-8202-dcc2c36ee6f3
 		summarizeBy: none
 		sourceColumn: source_reported_status_age_days
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"source_reported_status_age_days"}]
 
 	column record_count
 		dataType: int64
 		formatString: 0
+		lineageTag: bf80d7ca-a05b-48f3-acde-522609cce136
 		summarizeBy: none
 		sourceColumn: record_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_source_reported_status_age","column_name":"record_count"}]
 
 	partition mart_source_reported_status_age = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_source_reported_status_age.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"as_of_date", "release_revision", "revision_fingerprint", "source_reported_status_age_state", "source_reported_status_age_days", "record_count"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_source_reported_status_age.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"source_reported_status_age_state", type text}, {"source_reported_status_age_days", Int64.Type}, {"record_count", Int64.Type}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_source_reported_status_age.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"as_of_date", "release_revision", "revision_fingerprint", "source_reported_status_age_state", "source_reported_status_age_days", "record_count"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_source_reported_status_age.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"source_reported_status_age_state", type text}, {"source_reported_status_age_days", Int64.Type}, {"record_count", Int64.Type}}, "en-US")
+				in
+				    Typed
+

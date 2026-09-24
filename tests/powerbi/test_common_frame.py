@@ -34,7 +34,7 @@ class CommonFrameTests(unittest.TestCase):
         for name, display in PAGES:
             page = load(REPORT / "pages" / name / "page.json")
             self.assertEqual((page["displayName"], page["width"], page["height"]), (display, 1600, 1440))
-            self.assertEqual(page.get("visibility"), "AlwaysVisible")
+            self.assertIn(page.get("visibility", "AlwaysVisible"), {"AlwaysVisible"})
             self.assertNotIn("pageBinding", page)
             self.assertNotIn("type", page)
 

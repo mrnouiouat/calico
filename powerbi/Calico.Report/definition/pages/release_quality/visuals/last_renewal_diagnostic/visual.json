@@ -1,2 +1,220 @@
-{"$schema":"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json","name":"last_renewal_diagnostic","position":{"x":24,"y":808,"z":330,"height":272,"width":1552,"tabOrder":330},"visual":{"visualType":"tableEx","query":{"queryState":{"Values":{"projections":[
-{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"from_as_of_date"}},"queryRef":"mart_last_renewal_diagnostic.from_as_of_date"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"from_release_revision"}},"queryRef":"mart_last_renewal_diagnostic.from_release_revision"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"to_as_of_date"}},"queryRef":"mart_last_renewal_diagnostic.to_as_of_date"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"to_release_revision"}},"queryRef":"mart_last_renewal_diagnostic.to_release_revision"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"gap_days"}},"queryRef":"mart_last_renewal_diagnostic.gap_days"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"diagnostic_role"}},"queryRef":"mart_last_renewal_diagnostic.diagnostic_role"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"measure_name"}},"queryRef":"mart_last_renewal_diagnostic.measure_name"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"diagnostic_eligible_count"}},"queryRef":"mart_last_renewal_diagnostic.diagnostic_eligible_count"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"numerator_count"}},"queryRef":"mart_last_renewal_diagnostic.numerator_count"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"denominator_count"}},"queryRef":"mart_last_renewal_diagnostic.denominator_count"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"measure_value"}},"queryRef":"mart_last_renewal_diagnostic.measure_value"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"wilson_95_lower"}},"queryRef":"mart_last_renewal_diagnostic.wilson_95_lower"},{"field":{"Column":{"Expression":{"SourceRef":{"Entity":"mart_last_renewal_diagnostic"}},"Property":"wilson_95_upper"}},"queryRef":"mart_last_renewal_diagnostic.wilson_95_upper"}]}}},"visualContainerObjects":{"title":[{"properties":{"text":{"expr":{"Literal":{"Value":"'Last Renewal — release-quality diagnostic'"}}}}}],"subTitle":[{"properties":{"text":{"expr":{"Literal":{"Value":"'These measures are diagnostics against any observed exit; they do not define an event. Manifest: https://raw.githubusercontent.com/mrnouiouat/calico/published-data/manifest/published-manifest-v1.json'"}}}}}]}}}
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "last_renewal_diagnostic",
+  "position": {
+    "x": 24,
+    "y": 808,
+    "z": 330,
+    "height": 272,
+    "width": 1552,
+    "tabOrder": 330
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "from_as_of_date"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.from_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "from_release_revision"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.from_release_revision"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "to_as_of_date"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.to_as_of_date"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "to_release_revision"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.to_release_revision"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "gap_days"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.gap_days"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "diagnostic_role"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.diagnostic_role"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "measure_name"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.measure_name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "diagnostic_eligible_count"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.diagnostic_eligible_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "numerator_count"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.numerator_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "denominator_count"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.denominator_count"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "measure_value"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.measure_value"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "wilson_95_lower"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.wilson_95_lower"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "mart_last_renewal_diagnostic"
+                    }
+                  },
+                  "Property": "wilson_95_upper"
+                }
+              },
+              "queryRef": "mart_last_renewal_diagnostic.wilson_95_upper"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Last Renewal — release-quality diagnostic'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'These measures are diagnostics against any observed exit; they do not define an event. Manifest: https://raw.githubusercontent.com/mrnouiouat/calico/published-data/manifest/published-manifest-v1.json'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

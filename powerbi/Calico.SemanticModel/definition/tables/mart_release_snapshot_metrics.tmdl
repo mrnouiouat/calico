@@ -1,128 +1,166 @@
 table mart_release_snapshot_metrics
+	lineageTag: 9bab14fa-2077-4e3d-b9b3-78f2c71f3c82
 
 	column as_of_date
 		dataType: dateTime
 		formatString: yyyy-MM-dd
+		lineageTag: 7101dbce-d66b-4fc6-a62b-526f1c431118
 		summarizeBy: none
 		sourceColumn: as_of_date
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column release_revision
 		dataType: int64
 		formatString: 0
+		lineageTag: 8709ff3d-9344-4203-9688-69aa9ebc4530
 		summarizeBy: none
 		sourceColumn: release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"release_revision"}]
 
 	column revision_fingerprint
 		dataType: string
+		lineageTag: d233690a-9124-4582-a5c4-900cf7c0eda6
 		summarizeBy: none
 		sourceColumn: revision_fingerprint
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"revision_fingerprint"}]
 
 	column parser_contract_version
 		dataType: string
+		lineageTag: 29cb5b64-880c-4d44-8190-6eae86a4df87
 		summarizeBy: none
 		sourceColumn: parser_contract_version
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"parser_contract_version"}]
 
 	column published_delinquent_category
 		dataType: string
+		lineageTag: 665ad6e5-e1be-4384-9ca4-a4d0dc020ea5
 		summarizeBy: none
 		sourceColumn: published_delinquent_category
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"published_delinquent_category"}]
 
 	column published_delinquent_category_count
 		dataType: int64
 		formatString: 0
+		lineageTag: f01a53ac-29d6-4b72-bfe9-8159fe409af6
 		summarizeBy: none
 		sourceColumn: published_delinquent_category_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"published_delinquent_category_count"}]
 
 	column keyed_record_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 513ee17b-3893-43f3-958c-9b0ae44ff47e
 		summarizeBy: none
 		sourceColumn: keyed_record_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"keyed_record_count"}]
 
 	column unkeyed_record_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 0d639bbb-6c6b-429e-b41f-a4a93d346aaf
 		summarizeBy: none
 		sourceColumn: unkeyed_record_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"unkeyed_record_count"}]
 
 	column raw_total_record_count
 		dataType: int64
 		formatString: 0
+		lineageTag: 6eaa4429-66de-42eb-9877-8c65e400c81c
 		summarizeBy: none
 		sourceColumn: raw_total_record_count
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"raw_total_record_count"}]
 
 	column keyed_coverage_denominator_id
 		dataType: string
+		lineageTag: 1109ce77-92b7-49f5-9235-3d64858a87b1
 		summarizeBy: none
 		sourceColumn: keyed_coverage_denominator_id
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"keyed_coverage_denominator_id"}]
 
 	column unkeyed_coverage_denominator_id
 		dataType: string
+		lineageTag: bf9d92a8-3ada-4460-ace0-e1df576886e5
 		summarizeBy: none
 		sourceColumn: unkeyed_coverage_denominator_id
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"unkeyed_coverage_denominator_id"}]
 
 	column keyed_coverage_proportion
 		dataType: double
 		formatString: 0.0000
+		lineageTag: d1c49e6d-1113-484a-b916-5274c4c19eea
 		summarizeBy: none
 		sourceColumn: keyed_coverage_proportion
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"keyed_coverage_proportion"}]
 
 	column keyed_coverage_wilson_95_lower
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 8b0917b1-631c-4964-924a-f2f86e0bcdcf
 		summarizeBy: none
 		sourceColumn: keyed_coverage_wilson_95_lower
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"keyed_coverage_wilson_95_lower"}]
 
 	column keyed_coverage_wilson_95_upper
 		dataType: double
 		formatString: 0.0000
+		lineageTag: e7300fc2-4728-4edb-8c7f-b96c75079bde
 		summarizeBy: none
 		sourceColumn: keyed_coverage_wilson_95_upper
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"keyed_coverage_wilson_95_upper"}]
 
 	column unkeyed_coverage_proportion
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 37c9a645-8cc5-4763-ab4d-151c8c1e1db1
 		summarizeBy: none
 		sourceColumn: unkeyed_coverage_proportion
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"unkeyed_coverage_proportion"}]
 
 	column unkeyed_coverage_wilson_95_lower
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 129e6f78-e262-4d53-aa5a-405dbfe843a0
 		summarizeBy: none
 		sourceColumn: unkeyed_coverage_wilson_95_lower
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"unkeyed_coverage_wilson_95_lower"}]
 
 	column unkeyed_coverage_wilson_95_upper
 		dataType: double
 		formatString: 0.0000
+		lineageTag: 98797ba5-af54-4c9b-851c-dd4c7709157b
 		summarizeBy: none
 		sourceColumn: unkeyed_coverage_wilson_95_upper
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_release_snapshot_metrics","column_name":"unkeyed_coverage_wilson_95_upper"}]
 
 	partition mart_release_snapshot_metrics = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_release_snapshot_metrics.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"as_of_date", "release_revision", "revision_fingerprint", "parser_contract_version", "published_delinquent_category", "published_delinquent_category_count", "keyed_record_count", "unkeyed_record_count", "raw_total_record_count", "keyed_coverage_denominator_id", "unkeyed_coverage_denominator_id", "keyed_coverage_proportion", "keyed_coverage_wilson_95_lower", "keyed_coverage_wilson_95_upper", "unkeyed_coverage_proportion", "unkeyed_coverage_wilson_95_lower", "unkeyed_coverage_wilson_95_upper"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_release_snapshot_metrics.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"parser_contract_version", type text}, {"published_delinquent_category", type text}, {"published_delinquent_category_count", Int64.Type}, {"keyed_record_count", Int64.Type}, {"unkeyed_record_count", Int64.Type}, {"raw_total_record_count", Int64.Type}, {"keyed_coverage_denominator_id", type text}, {"unkeyed_coverage_denominator_id", type text}, {"keyed_coverage_proportion", type number}, {"keyed_coverage_wilson_95_lower", type number}, {"keyed_coverage_wilson_95_upper", type number}, {"unkeyed_coverage_proportion", type number}, {"unkeyed_coverage_wilson_95_lower", type number}, {"unkeyed_coverage_wilson_95_upper", type number}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_release_snapshot_metrics.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"as_of_date", "release_revision", "revision_fingerprint", "parser_contract_version", "published_delinquent_category", "published_delinquent_category_count", "keyed_record_count", "unkeyed_record_count", "raw_total_record_count", "keyed_coverage_denominator_id", "unkeyed_coverage_denominator_id", "keyed_coverage_proportion", "keyed_coverage_wilson_95_lower", "keyed_coverage_wilson_95_upper", "unkeyed_coverage_proportion", "unkeyed_coverage_wilson_95_lower", "unkeyed_coverage_wilson_95_upper"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "mart_release_snapshot_metrics.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"as_of_date", type date}, {"release_revision", Int64.Type}, {"revision_fingerprint", type text}, {"parser_contract_version", type text}, {"published_delinquent_category", type text}, {"published_delinquent_category_count", Int64.Type}, {"keyed_record_count", Int64.Type}, {"unkeyed_record_count", Int64.Type}, {"raw_total_record_count", Int64.Type}, {"keyed_coverage_denominator_id", type text}, {"unkeyed_coverage_denominator_id", type text}, {"keyed_coverage_proportion", type number}, {"keyed_coverage_wilson_95_lower", type number}, {"keyed_coverage_wilson_95_upper", type number}, {"unkeyed_coverage_proportion", type number}, {"unkeyed_coverage_wilson_95_lower", type number}, {"unkeyed_coverage_wilson_95_upper", type number}}, "en-US")
+				in
+				    Typed
+

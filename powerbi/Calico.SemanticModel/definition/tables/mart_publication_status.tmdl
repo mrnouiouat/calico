@@ -1,36 +1,48 @@
 table mart_publication_status
-
-	column published_as_of_date
-		dataType: dateTime
-		formatString: yyyy-MM-dd
-		summarizeBy: none
-		sourceColumn: published_as_of_date
-		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_as_of_date"}]
-
-	column published_release_revision
-		dataType: int64
-		formatString: 0
-		summarizeBy: none
-		sourceColumn: published_release_revision
-		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_release_revision"}]
+	lineageTag: 6c6f82f6-28a2-4038-a35c-0e0e9c853ae1
 
 	measure 'Published as-of date' = SELECTEDVALUE(mart_publication_status[published_as_of_date])
 		formatString: yyyy-MM-dd
+		lineageTag: c5c084fd-d617-402a-9738-616aceef8492
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_as_of_date"}]
 
 	measure 'Published release revision' = SELECTEDVALUE(mart_publication_status[published_release_revision])
 		formatString: 0
+		lineageTag: 0ed323db-04a8-468f-83c4-66f5cb5e1082
+
+		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_release_revision"}]
+
+	column published_as_of_date
+		dataType: dateTime
+		formatString: yyyy-MM-dd
+		lineageTag: 868a9ebb-a9c1-43c4-834a-53333348cba8
+		summarizeBy: none
+		sourceColumn: published_as_of_date
+
+		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_as_of_date"}]
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column published_release_revision
+		dataType: int64
+		formatString: 0
+		lineageTag: dc8a95b9-58d3-483b-926c-0128bd114dfd
+		summarizeBy: none
+		sourceColumn: published_release_revision
+
 		annotation CalicoBaseLineage = [{"table_name":"mart_publication_status","column_name":"published_release_revision"}]
 
 	partition mart_publication_status = m
 		mode: import
 		source =
-			let
-			    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_publication_status.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
-			    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
-			    Required = {"published_as_of_date", "published_release_revision"},
-			    Shape = if Table.ColumnNames(Headers) <> Required then error "publication_status.source_shape" else Headers,
-			    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
-			    Typed = Table.TransformColumnTypes(Selected, {{"published_as_of_date", type date}, {"published_release_revision", Int64.Type}}, "en-US")
-			in
-			    Typed
+				let
+				    Source = Csv.Document(Web.Contents(PublishedBaseUrl, [RelativePath="exports/mart_publication_status.csv"]), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars=false]),
+				    Required = {"published_as_of_date", "published_release_revision"},
+				    Shape = if Table.ColumnNames(Headers) <> Required then error "publication_status.source_shape" else Headers,
+				    Selected = Table.SelectColumns(Shape, Required, MissingField.Error),
+				    Typed = Table.TransformColumnTypes(Selected, {{"published_as_of_date", type date}, {"published_release_revision", Int64.Type}}, "en-US")
+				in
+				    Typed
+

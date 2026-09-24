@@ -27,7 +27,7 @@ class LookupGuardTests(unittest.TestCase):
         self.assertIn("state_charity_registration_number", text)
         self.assertIn('"singleSelect": {"expr": {"Literal": {"Value": "true"}}}', text)
         self.assertIn('"selectAllCheckboxEnabled": {"expr": {"Literal": {"Value": "false"}}}', text)
-        self.assertIn('"defaultSelection": {"expr": {"Literal": {"Value": "null"}}}', text)
+        self.assertNotIn('defaultSelection', text)
         model = TABLE.read_text(encoding="utf-8")
         key = model.split("column state_charity_registration_number",1)[1].split("\n\tcolumn",1)[0]
         self.assertIn("dataType: string", key)
