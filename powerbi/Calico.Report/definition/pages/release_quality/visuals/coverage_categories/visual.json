@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "coverage_categories",
+  "position": {"x": 808, "y": 568, "z": 321, "height": 224, "width": 768, "tabOrder": 321},
+  "visual": {
+    "visualType": "tableEx",
+    "query": {"queryState": {"Values": {"projections": [
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "as_of_date"}}, "queryRef": "mart_registry_population_coverage.as_of_date"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "release_revision"}}, "queryRef": "mart_registry_population_coverage.release_revision"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "source_list"}}, "queryRef": "mart_registry_population_coverage.source_list"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "source_reported_registry_status"}}, "queryRef": "mart_registry_population_coverage.source_reported_registry_status"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "coverage_class"}}, "queryRef": "mart_registry_population_coverage.coverage_class"},
+      {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_registry_population_coverage"}}, "Property": "record_count"}}, "queryRef": "mart_registry_population_coverage.record_count"}
+    ]}}},
+    "visualContainerObjects": {"title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Published registry population coverage by source category'"}}}}}]}
+  }
+}

@@ -6,7 +6,7 @@
     "y": 568,
     "z": 320,
     "height": 224,
-    "width": 1552,
+    "width": 768,
     "tabOrder": 320
   },
   "visual": {
@@ -131,58 +131,6 @@
                 }
               },
               "queryRef": "mart_release_snapshot_metrics.keyed_coverage_wilson_95_upper"
-            },
-            {
-              "field": {
-                "Column": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "mart_registry_population_coverage"
-                    }
-                  },
-                  "Property": "source_list"
-                }
-              },
-              "queryRef": "mart_registry_population_coverage.source_list"
-            },
-            {
-              "field": {
-                "Column": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "mart_registry_population_coverage"
-                    }
-                  },
-                  "Property": "source_reported_registry_status"
-                }
-              },
-              "queryRef": "mart_registry_population_coverage.source_reported_registry_status"
-            },
-            {
-              "field": {
-                "Column": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "mart_registry_population_coverage"
-                    }
-                  },
-                  "Property": "coverage_class"
-                }
-              },
-              "queryRef": "mart_registry_population_coverage.coverage_class"
-            },
-            {
-              "field": {
-                "Column": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "mart_registry_population_coverage"
-                    }
-                  },
-                  "Property": "record_count"
-                }
-              },
-              "queryRef": "mart_registry_population_coverage.record_count"
             }
           ]
         }
