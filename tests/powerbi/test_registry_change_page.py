@@ -39,6 +39,9 @@ class RegistryChangePageTests(unittest.TestCase):
             "mart_release_snapshot_metrics.published_delinquent_category",
             "mart_release_snapshot_metrics.published_delinquent_category_count",
         })
+        general = payload["visual"]["visualContainerObjects"]["general"]
+        self.assertIn("altText", general[0]["properties"])
+        self.assertNotIn("altText", payload["visual"]["visualContainerObjects"])
 
     def test_movement_keeps_entrant_populations_distinct_and_complete(self):
         expected = {f"mart_adjacent_pair_metrics.{name}" for name in (

@@ -10,6 +10,6 @@
     ]}, "Y": {"projections": [
       {"field": {"Column": {"Expression": {"SourceRef": {"Entity": "mart_release_snapshot_metrics"}}, "Property": "published_delinquent_category_count"}}, "queryRef": "mart_release_snapshot_metrics.published_delinquent_category_count", "nativeQueryRef": "Published delinquent category count"}
     ]}}},
-    "visualContainerObjects": {"title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Published delinquent population by accepted release and category'"}}}}}], "altText": [{"properties": {"altText": {"expr": {"Literal": {"Value": "'Published delinquent population category counts for each accepted release; exact values are shown in the adjacent support table.'"}}}}}]}
+    "visualContainerObjects": {"title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Published delinquent population by accepted release and category'"}}}}}], "general": [{"properties": {"altText": {"expr": {"Literal": {"Value": "'Published delinquent population category counts for each accepted release; exact values are shown in the adjacent support table.'"}}}}}]}
   }
 }

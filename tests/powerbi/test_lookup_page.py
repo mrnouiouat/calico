@@ -17,10 +17,16 @@ def refs(payload):
 
 class LookupPageTests(unittest.TestCase):
     def test_every_selected_detail_is_guarded(self):
-        for name in ('latest_observed','missing_warning','dated_history'):
-            payload=load(name); text=json.dumps(payload)
+        for name in ('latest_observed','missing_warning','dated_history','verification_and_caveats'):
+            payload=load(name)
             self.assertIn('dim_public_organizations.Exact Registration Selection Guard',refs(payload))
-            self.assertIn('"condition": "equals", "value": 1',text)
+            self.assertNotIn('filterConfig',payload['visual'])
+            filters=payload['filterConfig']['filters']
+            guard=next(item for item in filters if item['field'].get('Measure',{}).get('Property') == 'Exact Registration Selection Guard')
+            comparison=guard['filter']['Where'][0]['Condition']['Comparison']
+            self.assertEqual(comparison['ComparisonKind'],0)
+            self.assertEqual(comparison['Right']['Literal']['Value'],'1L')
+            self.assertEqual(comparison['Left']['Measure']['Expression']['SourceRef'],{'Source':'d'})
 
     def test_latest_warning_and_history_use_exported_fields(self):
         latest=refs(load('latest_observed'))
@@ -32,7 +38,7 @@ class LookupPageTests(unittest.TestCase):
         history=load('dated_history'); history_refs=refs(history)
         for field in ('as_of_date','release_revision','observation_state','source_reported_status'):
             self.assertIn(f'fct_public_status_observations.{field}',history_refs)
-        self.assertEqual([item['direction'] for item in history['visual']['query']['queryState']['sortDefinition']['sort']],['Descending','Descending'])
+        self.assertEqual([item['direction'] for item in history['visual']['query']['sortDefinition']['sort']],['Descending','Descending'])
 
     def test_static_verification_correction_lineage_and_caveats_remain_visible(self):
         payload=load('verification_and_caveats'); text=json.dumps(payload,ensure_ascii=False)
@@ -40,6 +46,10 @@ class LookupPageTests(unittest.TestCase):
                          'source-display-correction.yml','2026-08-19','2026-09-02','approximately 15 days',
                          'real-time','does not independently establish','Source files â†’ accepted release â†’ tested dbt models â†’ published export',
                          'published-manifest-v1.json','one due-diligence input'):
+            if required.startswith('Source files'):
+                for lineage_step in ('Source files','accepted release','tested dbt models','published export'):
+                    self.assertIn(lineage_step,text)
+                continue
             self.assertIn(required,text)
         self.assertNotIn('state_charity_registration_number=',text)
         self.assertIn('dim_public_organizations.official_verification_instructions',refs(payload))
