@@ -14,7 +14,7 @@ Known limitation: no organization was interviewed about willingness to pay. The 
 
 [Phase 10 report URL slot]
 
-A Publish to web report URL and final owner acceptance belong to Phase 10. The recording handoff is documented separately when available.
+A Publish to web report URL and final owner acceptance belong to Phase 10. The written walkthrough is linked below.
 
 ## Questions
 
@@ -400,5 +400,5 @@ The docs check is offline and makes no edits. An intentional evidence refresh fi
 Code and documentation use the [MIT license](LICENSE). Registry-derived data comes from a California public record, attributed to the California Attorney General Registry of Charities and Fundraisers through the source link above. This does not assign a new data license or claim public-domain status. The code license provides no warranty for source-reported registry data; the monitor does not replace the current official record.
 
 <!-- calico:walkthrough:start -->
-Walkthrough: owner recording pending (plan 09-09).
+Walkthrough: [Read the written walkthrough](docs/walkthrough.md).
 <!-- calico:walkthrough:end -->

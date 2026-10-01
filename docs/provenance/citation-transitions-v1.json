@@ -1,4 +1,197 @@
 {
   "schema_version": "citation-transitions-v1",
-  "entries": []
+  "entries": [
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L133:C11",
+        "target": "README.md#deliberate-non-claims",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L134:C1",
+        "target": "docs/powerbi-refresh-runbook.md",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L135:C1",
+        "target": "docs/evidence/public-readme-inputs-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L43:C11",
+        "target": "README.md#metric-definitions",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L44:C1",
+        "target": "docs/evidence/public-readme-inputs-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L45:C1",
+        "target": "docs/evidence/gate-a/correction-index-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L46:C1",
+        "target": "powerbi/Calico.Report/definition/pages/cohort_persistence/visuals/persistence_support/visual.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L71:C11",
+        "target": "docs/evidence/sql-excerpts-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L72:C1",
+        "target": "README.md#annotated-sql-excerpts",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L82:C11",
+        "target": "docs/evidence/gate-a/correction-index-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L83:C1",
+        "target": "docs/evidence/gate-a/spike-001-successor-v1.json",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    },
+    {
+      "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
+      "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
+      "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",
+      "occurrence": {
+        "source": "docs/walkthrough.md",
+        "locator": "L84:C5",
+        "target": "README.md#source-path",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null
+    }
+  ]
 }

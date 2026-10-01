@@ -351,7 +351,7 @@ TOPICS = (
     "How to reproduce",
 )
 BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts", "walkthrough")
-WALKTHROUGH_EMPTY = "Walkthrough: owner recording pending (plan 09-09)."
+WALKTHROUGH_LINK = "Walkthrough: [Read the written walkthrough](docs/walkthrough.md)."
 MIT_LICENSE = '''MIT License
 
 Copyright (c) 2026 mrnouiouat
@@ -387,48 +387,9 @@ def _block(name: str, body: str) -> str:
     return "<!-- calico:" + name + ":start -->\n" + body.rstrip() + "\n<!-- calico:" + name + ":end -->"
 
 
-def validate_walkthrough_link(body: str) -> str:
-    """Allow only the empty handoff or one bounded public video URL.
-
-Availability and owner privacy review are gates in the later recording plan;
-this validator proves URL shape and excludes account/private metadata only.
-"""
-    if body == WALKTHROUGH_EMPTY:
-        return body
-    if not isinstance(body, str):
-        _fail("readme.invalid_walkthrough_link")
-    matched = re.fullmatch(r"Walkthrough: \[Watch the walkthrough\]\(([^\n]+)\)", body)
-    if matched is None:
-        _fail("readme.invalid_walkthrough_link")
-    url = matched.group(1)
-    allowed = (
-        r"https://(?:www\.)?youtube\.com/watch\?v=[A-Za-z0-9_-]{11}",
-        r"https://youtu\.be/[A-Za-z0-9_-]{11}",
-        r"https://github\.com/mrnouiouat/calico/releases/download/[A-Za-z0-9_-][A-Za-z0-9._-]{0,99}/[A-Za-z0-9_-][A-Za-z0-9._-]{0,119}\.(?:mp4|webm|mov)",
-    )
-    if not any(re.fullmatch(pattern, url, re.ASCII) for pattern in allowed) or scan_text("README.md", body):
-        _fail("readme.invalid_walkthrough_link")
-    return body
-
-
 def _walkthrough_block(root: Path) -> str:
-    start, end = "<!-- calico:walkthrough:start -->", "<!-- calico:walkthrough:end -->"
-    candidate = _path(root, "README.md")
-    if not candidate.exists():
-        return _block("walkthrough", WALKTHROUGH_EMPTY)
-    try:
-        text = _read(root, "README.md").decode("utf-8")
-    except UnicodeError:
-        _fail("readme.invalid_readme")
-    starts, ends = text.count(start), text.count(end)
-    if starts == 0 and ends == 0:
-        return _block("walkthrough", WALKTHROUGH_EMPTY)
-    if starts != 1 or ends != 1 or text.index(end) < text.index(start):
-        _fail("readme.marker_drift")
-    body = text.split(start, 1)[1].split(end, 1)[0]
-    if not body.startswith("\n") or not body.endswith("\n"):
-        _fail("readme.invalid_walkthrough_link")
-    return _block("walkthrough", validate_walkthrough_link(body[1:-1]))
+    """Render the owner-selected written walkthrough as a fixed repository link."""
+    return _block("walkthrough", WALKTHROUGH_LINK)
 
 
 def _source_binding(document: dict, name: str) -> dict:
@@ -542,7 +503,7 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "`calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Registry Monitor.",
         "Built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.\n\n"
         "Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.",
-        "[Phase 10 report URL slot]\n\nA Publish to web report URL and final owner acceptance belong to Phase 10. The recording handoff is documented separately when available.",
+        "[Phase 10 report URL slot]\n\nA Publish to web report URL and final owner acceptance belong to Phase 10. The written walkthrough is linked below.",
         "- How does the published registry population change between accepted releases?\n"
         "- Which observed cohorts remain in the published delinquent population?\n"
         "- What source-reported compliance history is available for a selected organization?\n"

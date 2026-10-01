@@ -182,32 +182,15 @@ class ReadmeContracts(unittest.TestCase):
         self.assertEqual(arithmetic, [])
 
 
-class WalkthroughLinkSlotContracts(unittest.TestCase):
-    def test_empty_slot_and_safe_owner_url_preserve_strict_readme(self):
+class WrittenWalkthroughLinkContracts(unittest.TestCase):
+    def test_generated_readme_links_the_repository_document(self):
         from tools.docs_public import readme as api
-        self.assertTrue(callable(getattr(api, "validate_walkthrough_link", None)),
-                        "Later verified walkthrough links need a validated slot")
-        self.assertEqual(api.validate_walkthrough_link(api.WALKTHROUGH_EMPTY), api.WALKTHROUGH_EMPTY)
-        for url in ("https://www.youtube.com/watch?v=AbCdEfGhI_j", "https://youtu.be/AbCdEfGhI_j",
-                    "https://github.com/mrnouiouat/calico/releases/download/walkthrough/monitor.mp4"):
-            value = "Walkthrough: [Watch the walkthrough](" + url + ")"
-            self.assertEqual(api.validate_walkthrough_link(value), value)
+        content = api.generate_readme(ROOT)
+        self.assertIn(api.WALKTHROUGH_LINK, content)
+        self.assertNotIn("owner recording pending", content)
+        self.assertTrue((ROOT / "docs/walkthrough.md").is_file())
 
-    def test_slot_rejects_scheme_account_data_private_path_and_prose(self):
-        from tools.docs_public import readme as api
-        urls = ("http://youtu.be/AbCdEfGhI_j", "javascript:alert(1)",
-                "https://name:secret" + "@" + "youtu.be/AbCdEfGhI_j", "https://youtu.be/AbCdEfGhI_j?token=secret",
-                "https://example.invalid/owner/video", "https://github.com/other/private/releases/download/v1/video.mp4",
-                "https://www.youtube.com/watch?v=AbCdEfGhI_j&account=secret")
-        for url in urls:
-            with self.assertRaises(api.ReadmeInputError):
-                api.validate_walkthrough_link("Walkthrough: [Watch the walkthrough](" + url + ")")
-        private = "/" + "Users/" + "owner/" + "movie.mp4"
-        for value in (private, api.WALKTHROUGH_EMPTY + "\nExtra prose", "Owner approved", ""):
-            with self.assertRaises(api.ReadmeInputError):
-                api.validate_walkthrough_link(value)
-
-    def test_added_slot_does_not_exempt_other_readme_or_generated_drift(self):
+    def test_video_or_other_readme_edits_fail_strict_check(self):
         from tools.docs_public import readme as api
         import shutil
         with tempfile.TemporaryDirectory() as directory:
@@ -221,16 +204,11 @@ class WalkthroughLinkSlotContracts(unittest.TestCase):
             (target / ".git/objects/info/alternates").write_text(str(ROOT / ".git/objects") + "\n")
             api.generate_readme(target, write=True)
             source = (target / "README.md").read_text()
-            self.assertIn(api.WALKTHROUGH_EMPTY, source)
-            linked = source.replace(api.WALKTHROUGH_EMPTY,
-                "Walkthrough: [Watch the walkthrough](https://youtu.be/AbCdEfGhI_j)")
-            (target / "README.md").write_text(linked)
             api.check_readme(target)
-            api.generate_readme(target, write=True)
-            self.assertEqual((target / "README.md").read_text(), linked)
-            for damaged in (linked + "\nArbitrary prose\n", linked.replace("CP1252", "UTF-8"),
-                            linked.replace("[Phase 10 report URL slot]", "https://example.invalid/report"),
-                            linked.replace("<!-- calico:walkthrough:end -->", "")):
+            for damaged in (source.replace(api.WALKTHROUGH_LINK, "Walkthrough: https://youtu.be/AbCdEfGhI_j"),
+                            source + "\nArbitrary prose\n", source.replace("CP1252", "UTF-8"),
+                            source.replace("[Phase 10 report URL slot]", "https://example.invalid/report"),
+                            source.replace("<!-- calico:walkthrough:end -->", "")):
                 (target / "README.md").write_text(damaged)
                 with self.assertRaises(api.ReadmeInputError):
                     api.check_readme(target)
