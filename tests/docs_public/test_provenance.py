@@ -8,6 +8,7 @@ import io
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -79,6 +80,17 @@ class ProvenanceTests(unittest.TestCase):
             self.build()
         self.assertTrue(str(caught.exception) == "provenance.predecessor_hash", "unsafe error")
         self.assertFalse((self.root / "docs/provenance").exists(), "mismatch published")
+
+    def test_empty_body_is_rejected_before_publication(self):
+        self.source.write_bytes(b"")
+        anchor = self.api.PredecessorAnchor("empty-source", hashlib.sha256(b"").hexdigest(), "docs/provenance/empty.md")
+        rejected = False
+        try:
+            self.api.build_successor(self.source, anchor, self.root, POLICY, import_date="2026-10-01")
+        except self.api.ProvenanceError:
+            rejected = True
+        self.assertTrue(rejected, "empty historical body was accepted")
+        self.assertFalse((self.root / "docs/provenance").exists(), "empty body published")
 
     def test_marker_and_body_tampering_fail_closed(self):
         record = self.build()
@@ -185,6 +197,235 @@ class CommittedTracerTests(unittest.TestCase):
         for decision in (b"D-001", b"D-007", b"D-008", b"D-010", b"D-012", b"D-003"):
             self.assertTrue(decision in banner, "missing supersession authority")
         self.assertFalse(scan_paths(ROOT, sorted([record.destination, api.INDEX_PATH]), POLICY), "public tracer is unsafe")
+
+
+class ObservedFramingTests(unittest.TestCase):
+    def setUp(self):
+        self.api = importlib.import_module("tools.docs_public.provenance")
+
+    def test_guidance_is_observed_and_definition_aware(self):
+        body = b"# Historical\nAggregate-only publication.\nPower BI, otherwise Evidence.\n8 releases before analysis.\nArchive census prerequisite.\nPublic Registry Operations Monitor\n"
+        rows = self.api.derive_guidance(body)
+        self.api.validate_correction_rows(body, rows)
+        self.assertTrue(len(rows) == 5, "observed supersession rule missing")
+        for decision in ("D-001", "D-007", "D-008", "D-010", "D-012"):
+            self.assertTrue(any(decision in row.corrected for row in rows), "governing decision missing")
+        self.assertFalse(self.api.derive_guidance(b"# Ordinary historical note\nThere are 6 headings and 8 tasks.\n"), "unobserved rule invented")
+
+    def test_unmatched_or_forged_correction_rows_fail(self):
+        body = b"Aggregate-only publication.\n"
+        row = self.api.derive_guidance(body)[0]
+        for changed in (replace(row, body_lines=(2,)), replace(row, corrected="unsupported successor"), replace(row, body_lines=()), replace(row, body_lines=(1, 1))):
+            with self.assertRaises(self.api.ProvenanceError):
+                self.api.validate_correction_rows(body, [changed])
+        numeric = self.api.CorrectionRow("2026-08-05 total rows", "557,289", "557,291", self.api.AUTHORITY_LINKS[1], (1,))
+        with self.assertRaises(self.api.ProvenanceError):
+            self.api.validate_correction_rows(body, [numeric])
+        numeric_body = b"2026-08-05 total rows: 557,289\n"
+        self.api.validate_correction_rows(numeric_body, [numeric])
+        for changed in (replace(numeric, claim="unrelated claim"), replace(numeric, corrected="557,300"), replace(numeric, authority="unapproved.md")):
+            with self.assertRaises(self.api.ProvenanceError):
+                self.api.validate_correction_rows(numeric_body, [changed])
+
+    def test_observed_only_banner_does_not_invent_rules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "source.md"
+            body = b"# Historical note\r\nOrdinary unchanged prose.\r\n"
+            source.write_bytes(body)
+            anchor = self.api.PredecessorAnchor("synthetic-note", hashlib.sha256(body).hexdigest(), "docs/provenance/note.md")
+            record = self.api.build_successor(source, anchor, root, POLICY, import_date="2026-10-01", observed_only=True)
+            data = (root / anchor.destination).read_bytes()
+            self.assertTrue(self.api.validate_successor(data, record) == body, "historical body changed")
+            self.assertFalse(b"D-007" in data[:record.prefix_bytes], "unobserved publication rule invented")
+
+    def test_missing_source_and_wrong_cardinality_write_nothing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            missing = root / "missing.md"
+            for sources in ({}, {"migration-report": missing}, {"migration-report": missing, "gate-a-evidence": missing}, {"migration-report": missing, "gate-a-evidence": missing, "extra": missing}):
+                with self.assertRaises(self.api.ProvenanceError):
+                    self.api.build_core_successors(sources, root, POLICY, project=missing, import_date="2026-10-01")
+                self.assertFalse((root / "docs").exists(), "invalid inputs published")
+
+
+class CommittedCoreTests(unittest.TestCase):
+    def setUp(self):
+        self.api = importlib.import_module("tools.docs_public.provenance")
+        payload = json.loads((ROOT / self.api.INDEX_PATH).read_bytes())
+        self.records = [self.api.SuccessorRecord.from_dict(row) for row in payload["entries"]]
+
+    def test_core_original_redacted_successor_chain_and_five_locations(self):
+        core = [row for row in self.records if row.redaction_chain is not None]
+        self.assertTrue(len(core) == 2, "core slots missing")
+        self.assertTrue(sum(len(row.redaction_chain.regions) for row in core) == 5, "redaction cardinality differs")
+        payload = json.loads((ROOT / self.api.REDACTION_PATH).read_bytes())
+        self.api.validate_redaction_record(payload, self.records)
+        for record in core:
+            data = (ROOT / record.destination).read_bytes()
+            body = self.api.validate_successor(data, record)
+            self.assertTrue(body.count(self.api.LOCAL_PATH_TOKEN) == len(record.redaction_chain.regions), "replacement count differs")
+            self.assertFalse(scan_paths(ROOT, [record.destination], POLICY), "core candidate is unsafe")
+            self.assertTrue(self.api.REDACTION_PATH.split("/")[-1].encode() in data[:record.prefix_bytes], "redaction authority missing")
+
+    def test_forged_missing_extra_or_unrecorded_redaction_fails(self):
+        core = [row for row in self.records if row.redaction_chain is not None]
+        self.assertTrue(len(core) == 2, "core slots missing")
+        record = core[0]
+        data = (ROOT / record.destination).read_bytes()
+        chain = record.redaction_chain
+        for changed in (replace(chain, regions=chain.regions[:-1]), replace(chain, regions=chain.regions + chain.regions[:1]),
+                        replace(chain, original_bytes=0), replace(chain, preserved_sha256=("0" * 64,) * len(chain.preserved_sha256))):
+            with self.assertRaises(self.api.ProvenanceError):
+                self.api.validate_successor(data, replace(record, redaction_chain=changed))
+        with self.assertRaises(self.api.ProvenanceError):
+            self.api.validate_successor(data, replace(record, redaction_chain=None))
+        changed_body = data[record.prefix_bytes:].replace(self.api.LOCAL_PATH_TOKEN, b"[ALTERED]", 1)
+        changed = data[:record.prefix_bytes] + changed_body
+        with self.assertRaises(self.api.ProvenanceError):
+            self.api.validate_successor(changed, replace(record, body_sha256=hashlib.sha256(changed_body).hexdigest(), successor_sha256=hashlib.sha256(changed).hexdigest()))
+        payload = self.api.redaction_record(self.records)
+        for count in (0, 4, 6):
+            with self.assertRaises(self.api.ProvenanceError):
+                self.api.validate_redaction_record({**payload, "count": count}, self.records)
+
+    def test_gate_corrections_have_exact_numeric_occurrences(self):
+        record = next((row for row in self.records if row.source_label == "gate-a-evidence"), None)
+        self.assertTrue(record is not None, "Gate A slot missing")
+        data = (ROOT / record.destination).read_bytes()
+        body = self.api.validate_successor(data, record)
+        banner = data[:record.prefix_bytes]
+        self.assertTrue(b"7,733" in body and b"7,733" in banner and b"7,737" in banner and b"D-006" in banner, "definition correction missing")
+        self.assertTrue(b"557,065" in body and b"557,065" in banner and b"557,067" in banner, "coverage correction missing")
+        self.assertFalse(b"7,758" in banner, "absent denominator correction invented")
+        self.assertFalse(b"2026-08-05 to 2026-08-19 entries" in banner, "heading digit treated as transition count")
+
+
+class CommittedSharedGuidanceTests(unittest.TestCase):
+    def test_exact_five_source_slots_and_unchanged_shared_bodies(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        index = json.loads((ROOT / api.INDEX_PATH).read_bytes())
+        self.assertTrue(len(index["entries"]) == 5, "five retained sources are required")
+        expected = (
+            api.PredecessorAnchor("migration-report", api.CORE_SPECS["migration-report"][1], "docs/provenance/MIGRATION-REPORT.md"),
+            api.PredecessorAnchor("gate-a-evidence", api.CORE_SPECS["gate-a-evidence"][1], "docs/provenance/GATE-A-EVIDENCE.md"),
+            api.PredecessorAnchor("spike-002-readme", "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e", "docs/provenance/spikes/002-entity-change-validation/README.md"),
+            api.PredecessorAnchor("spike-manifest", "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3", "docs/provenance/spikes/MANIFEST.md"),
+            api.PredecessorAnchor("spike-conventions", "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144", "docs/provenance/spikes/CONVENTIONS.md"),
+        )
+        records = api.validate_index(ROOT, expected)
+        for record in records:
+            if record.source_label not in ("spike-manifest", "spike-conventions"):
+                continue
+            data = (ROOT / record.destination).read_bytes()
+            body = api.validate_successor(data, record)
+            self.assertTrue(len(body) == (3320 if record.source_label == "spike-manifest" else 2715), "shared body size differs")
+            self.assertTrue(record.body_sha256 == record.predecessor_sha256, "shared body bytes differ")
+            banner = data[:record.prefix_bytes]
+            for row in api.derive_guidance(body):
+                old, new, authority = row.render()
+                self.assertTrue(old.encode() in banner and new.encode() in banner, "observed supersession row missing")
+        self.assertFalse((ROOT / "docs/provenance/spikes/004-job-posting-audit").exists(), "missing spike fabricated")
+
+    def test_index_rejects_missing_extra_and_duplicate_records(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "source.md"
+            body = b"# Synthetic historical body\n"
+            source.write_bytes(body)
+            anchor = api.PredecessorAnchor("synthetic-slot", hashlib.sha256(body).hexdigest(), "docs/provenance/body.md")
+            api.build_successor(source, anchor, root, POLICY, import_date="2026-10-01")
+            api.validate_index(root, (anchor,))
+            extra = api.PredecessorAnchor("missing-slot", anchor.predecessor_sha256, "docs/provenance/missing.md")
+            for expected in ((), (anchor, extra), (anchor, anchor)):
+                with self.assertRaises(api.ProvenanceError):
+                    api.validate_index(root, expected)
+            (root / "docs/provenance/unindexed.md").write_bytes(body)
+            with self.assertRaises(api.ProvenanceError):
+                api.validate_index(root, (anchor,))
+
+
+class CoreTransactionTests(unittest.TestCase):
+    def setUp(self):
+        self.api = importlib.import_module("tools.docs_public.provenance")
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        (self.root / "docs").mkdir()
+        (self.root / "docs/previous.md").write_bytes(b"Existing public documentation.\n")
+
+    def synthetic_inputs(self, total=5):
+        sources, specs = {}, {}
+        for label, count in (("migration-report", max(0, total-1)), ("gate-a-evidence", min(1, total))):
+            sentinel = b"C:" + b"\\SyntheticWorkspace"
+            body = b"# Synthetic historical record\n" + (b"`" + sentinel + b"`\n") * count
+            source = self.root / (label + ".md")
+            source.write_bytes(body)
+            regions, cursor = [], 0
+            for _ in range(count):
+                start = body.index(sentinel, cursor)
+                end = start + len(sentinel)
+                regions.append((start, end, body[:start].count(b"\n") + 1, hashlib.sha256(sentinel).hexdigest()))
+                cursor = end
+            safe = body.replace(sentinel, self.api.LOCAL_PATH_TOKEN)
+            specs[label] = (len(body), hashlib.sha256(body).hexdigest(), hashlib.sha256(safe).hexdigest(), tuple(regions))
+            sources[label] = source
+        return sources, specs
+
+    def snapshot(self):
+        return {path.relative_to(self.root): path.read_bytes() for path in (self.root / "docs").rglob("*") if path.is_file()}
+
+    def import_inputs(self, sources, specs):
+        with patch.dict(self.api.CORE_SPECS, specs, clear=True), patch.object(self.api, "derive_core_corrections", return_value=[]):
+            return self.api.build_core_successors(sources, self.root, POLICY, project=self.root / "unused.md", import_date="2026-10-01")
+
+    def test_core_transaction_publishes_complete_five_region_record(self):
+        sources, specs = self.synthetic_inputs()
+        records = self.import_inputs(sources, specs)
+        self.assertTrue(len(records) == 2, "core transaction incomplete")
+        self.assertTrue(json.loads((self.root / self.api.REDACTION_PATH).read_bytes())["count"] == 5, "redaction record missing")
+        self.assertTrue((self.root / "docs/previous.md").read_bytes() == b"Existing public documentation.\n", "unrelated public documentation changed")
+        self.assertFalse((self.root / ".docs-provenance-last-complete").exists(), "backup left after success")
+
+    def test_wrong_cardinality_and_second_source_drift_leave_destinations_unchanged(self):
+        before = self.snapshot()
+        for total in (0, 4, 6):
+            sources, specs = self.synthetic_inputs(total)
+            with self.assertRaises(self.api.ProvenanceError):
+                self.import_inputs(sources, specs)
+            self.assertTrue(self.snapshot() == before, "wrong-cardinality candidate replaced destination")
+        sources, specs = self.synthetic_inputs()
+        sources["gate-a-evidence"].write_bytes(b"changed original")
+        with self.assertRaises(self.api.ProvenanceError):
+            self.import_inputs(sources, specs)
+        self.assertTrue(self.snapshot() == before, "second source drift replaced destination")
+
+    def test_record_scan_failure_does_not_replace_any_destination(self):
+        sources, specs = self.synthetic_inputs()
+        before = self.snapshot()
+        original_scan = self.api.scan_paths
+        def reject_record(root, paths, policy):
+            return [object()] if self.api.REDACTION_PATH in paths else original_scan(root, paths, policy)
+        with patch.object(self.api, "scan_paths", side_effect=reject_record):
+            with self.assertRaises(self.api.ProvenanceError):
+                self.import_inputs(sources, specs)
+        self.assertTrue(self.snapshot() == before, "unsafe record replaced destination")
+
+    def test_interrupted_common_directory_swap_restores_all_previous_docs(self):
+        sources, specs = self.synthetic_inputs()
+        before = self.snapshot()
+        original_replace = self.api.os.replace
+        def interrupt(source, destination):
+            if Path(destination) == self.root / "docs":
+                if Path(source) == self.root / ".docs-provenance-last-complete":
+                    return original_replace(source, destination)
+                raise KeyboardInterrupt()
+            return original_replace(source, destination)
+        with patch.object(self.api.os, "replace", side_effect=interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.import_inputs(sources, specs)
+        self.assertTrue(self.snapshot() == before, "interruption failed to restore documentation")
 
 
 if __name__ == "__main__":
