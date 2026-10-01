@@ -485,6 +485,14 @@ class WorkflowContractTests(unittest.TestCase):
         content = self._workflow()
         self.assertNotIn("continue-on-error", content)
 
+    def test_workflow_keeps_non_echo_checks_before_full_history_scan(self) -> None:
+        content = self._workflow()
+        diagnostic = "python -m unittest tests.tools.privacy_scan.test_non_echo -v"
+        self.assertIn(diagnostic, content)
+        self.assertLess(content.index(diagnostic), content.index(self.GATE_E_COMMAND))
+        for displaced in ("tools.docs_public", "tools.citation_scan", "tests/docs_public"):
+            self.assertNotIn(displaced, content)
+
     def test_workflow_never_installs_dbt(self) -> None:
         content = self._workflow()
         self.assertNotIn("requirements-dbt", content)

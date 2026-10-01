@@ -176,18 +176,39 @@ class ReadOnlyWorkflowContracts(unittest.TestCase):
                                "git push", "upload-artifact", "--mode real", "if: always()", "tools.citation_scan --write"):
                 self.assertNotIn(prohibited, text)
 
-    def test_privacy_workflow_requires_all_phase_gates_before_history(self):
+    def test_privacy_workflow_requires_non_echo_before_history_without_dbt(self):
         text = workflow("privacy-gate.yml")
         gates = (
-            "python -m tools.docs_public check",
-            "python -m tools.citation_scan --check",
-            "python -m unittest discover -s tests/docs_public -t . -v",
             "python -m unittest tests.tools.privacy_scan.test_non_echo -v",
             "python -m tools.privacy_scan --tree HEAD --history-all",
         )
         self.assertTrue(all(g in text for g in gates))
+        self.assertLess(text.index(gates[0]), text.index(gates[1]))
+        for displaced in ("pip install", "requirements-dbt", "dbt-core",
+                          "tools.docs_public", "tools.citation_scan", "tests/docs_public"):
+            self.assertNotIn(displaced, text)
+
+    def test_fixture_workflow_requires_all_documentation_gates_after_pins(self):
+        text = workflow("dbt-fixture.yml")
+        gates = (
+            "python -m pip install --requirement requirements-dbt.txt",
+            "python -m pip install --requirement requirements-capture.txt",
+            "python -m unittest discover -s tests -t . -v",
+            "python -m calico_dbt docs --mode fixture",
+            "python -m tools.docs_public check",
+            "git diff --exit-code -- docs/evidence/dbt-lineage-v1.json",
+            "python -m tools.citation_scan --check",
+            "python -m unittest discover -s tests/docs_public -t . -v",
+            "python -m tools.privacy_scan --tree HEAD --history-all",
+        )
+        self.assertTrue(all(g in text for g in gates))
         self.assertEqual([text.index(g) for g in gates], sorted(text.index(g) for g in gates))
-        self.assertIn("python -m pip install --requirement requirements-dbt.txt", text)
+        for name in WORKFLOWS:
+            triggers = workflow(name).split("permissions:", 1)[0]
+            for trigger in ("pull_request:", "push:", "- main", "workflow_dispatch:"):
+                self.assertIn(trigger, triggers)
+            for restriction in ("paths:", "paths-ignore:"):
+                self.assertNotIn(restriction, triggers)
 
     def test_fixture_docs_produces_lineage_before_drift_checks(self):
         text = workflow("dbt-fixture.yml")
@@ -208,7 +229,7 @@ class ReadOnlyWorkflowContracts(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
 
     def test_concurrent_verification_results_are_independent(self):
-        script = next(s for s in scripts(workflow("privacy-gate.yml")) if "tools.docs_public" in s)
+        script = next(s for s in scripts(workflow("dbt-fixture.yml")) if "tools.docs_public" in s)
         def run(code):
             return subprocess.run(["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c",
                                    "python() { return " + str(code) + "; };\n" + script], capture_output=True).returncode
