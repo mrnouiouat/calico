@@ -1,0 +1,217 @@
+{
+  "accepted_releases": [
+    {
+      "as_of_date": "2026-07-15",
+      "release_revision": 1,
+      "revision_fingerprint": "e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096",
+      "revision_manifest_sha256": "b0897b60d6f5923aa989a3988b642f19b68998a6b0c3bf280a72b21320531969",
+      "source_hashes": [
+        {
+          "sha256": "759e067df30b552c3b90840e08b5551d175d23a25277a66ce25b3dc223767d8b",
+          "source_list": "charities-may-not-operate"
+        },
+        {
+          "sha256": "d08bad94695e025200f8274edf6c4e2b70969277598d519ce78481f4a7eaf1c7",
+          "source_list": "charities-may-operate"
+        },
+        {
+          "sha256": "a98220def7b17a5e831513cfcaec915bc301ec999e80843a0b35f9483c570efa",
+          "source_list": "charities-not-operating"
+        },
+        {
+          "sha256": "b30f9d9d74bbdce7c139f708e8895147ce1e2976b11c17506336795f15bb1363",
+          "source_list": "charities-undetermined-status"
+        }
+      ]
+    },
+    {
+      "as_of_date": "2026-08-05",
+      "release_revision": 1,
+      "revision_fingerprint": "7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f",
+      "revision_manifest_sha256": "b6d50fef623789a07774d5e253ba9dcf62311abfadf9d9300a10a864972f82a9",
+      "source_hashes": [
+        {
+          "sha256": "4972d783377c81c464483c8d7a5cf44719d6f4a1831355005e8714397bfda7de",
+          "source_list": "charities-may-not-operate"
+        },
+        {
+          "sha256": "d5d5579c1cd1a3cdf0b8961a75f9f6a68b497920c94b7f0364006fd59f3b6168",
+          "source_list": "charities-may-operate"
+        },
+        {
+          "sha256": "4d8ef4a702f7d24eab602a32b39f5ae79064bf343d31698b653d10d2991413cc",
+          "source_list": "charities-not-operating"
+        },
+        {
+          "sha256": "260bf3266297f364c85395b8f8078ea32de1ae2762d5eca41e4e26b709cfdded",
+          "source_list": "charities-undetermined-status"
+        }
+      ]
+    },
+    {
+      "as_of_date": "2026-08-19",
+      "release_revision": 1,
+      "revision_fingerprint": "903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876",
+      "revision_manifest_sha256": "3ee18bed812cb639816dfe31dd687d7b679a52eb4311e33565c19aac325d1553",
+      "source_hashes": [
+        {
+          "sha256": "80051a6b522369cda459662728b9142f3e9111cd26731834b9c70156df338ac7",
+          "source_list": "charities-may-not-operate"
+        },
+        {
+          "sha256": "c4940ad9c98563564fb6acc05c156e1eef39c5701878e1b3bced137fafe6a07b",
+          "source_list": "charities-may-operate"
+        },
+        {
+          "sha256": "a1bd50de461ea5dc9c823d73d2f2e9fd72ed1a2faeab9460514ef79abd44c536",
+          "source_list": "charities-not-operating"
+        },
+        {
+          "sha256": "1f2834d46f231fcec73c21adc05e5ec4cca2721720f2d4addc1729e5fa0aa49f",
+          "source_list": "charities-undetermined-status"
+        }
+      ]
+    }
+  ],
+  "allowlist_version": "publication-exports-v3",
+  "claim": {
+    "approved_wording": "Between the July 15 and August 5 releases, 7,737 matched organizations were observed moving from `Current - Reporting Incomplete` into a delinquent category; most of the entry cohort carries a source-reported July 17 status date; the public files do not establish internal cause, exact processing time, or workflow. Across the next pair, total delinquency entries fell from 7,750 to 2, supporting a descriptive claim of a discrete bulk publication event rather than a steady flow.",
+    "claim_contract_version": 1,
+    "relation_version": "claim_support_status_movement_v1",
+    "sql_values": {
+      "next_total_matched_entry_count": "2",
+      "support_count": "7737",
+      "total_matched_entry_count": "7750"
+    }
+  },
+  "denominators": {
+    "contract_version": 1,
+    "denominator_definitions": [
+      {
+        "definition": "All exact-key records classified by the authoritative transition relation as delinquency_exit_observed for the accepted-release pair.",
+        "id": "all_observed_exits_v1"
+      },
+      {
+        "definition": "Observed exits whose source-reported Last Renewal value is populated at the start, including nonblank values that are unparseable as dates.",
+        "id": "observed_exits_with_populated_start_v1"
+      },
+      {
+        "definition": "Starting published delinquent population records observed at both endpoints with a populated source-reported Last Renewal value at start and a blank value at end.",
+        "id": "starting_delinquent_diagnostic_clears_v1"
+      }
+    ],
+    "diagnostic_role": "release_quality_diagnostic",
+    "measure_ids": [
+      "conditional_precision",
+      "eligible_exit_sensitivity",
+      "all_exit_sensitivity"
+    ]
+  },
+  "latest_attempt": {
+    "ended_at_utc": "2026-10-01T03:56:55.950Z",
+    "newer_attempt_not_accepted": true,
+    "outcome": "rejected",
+    "reason_category": "source_contract_mismatch",
+    "schema_version": 3,
+    "source_publication_retired_on": "2026-09-02",
+    "source_publication_state": "retired",
+    "started_at_utc": "2026-10-01T03:52:00.087Z",
+    "trigger": "workflow_dispatch"
+  },
+  "lineage_sha256": "be5f95ad3233a60119efc5cdd4e659b7856d79eadc1ee12c3226efe3107ba234",
+  "local_sources": [
+    {
+      "path": "contracts/ag-registry-csv-v1.json",
+      "sha256": "871e0dff938ca5f5d4fbe6871a9dcde539f5eea00294dcd91888a63b96e9d8ed"
+    },
+    {
+      "path": "contracts/claim-support-v1.json",
+      "sha256": "fdb2123e658a5b3fa293f4eac24106d93851155b2def227a47df30cdd78af8df"
+    },
+    {
+      "path": "contracts/dbt-input-catalog-v1.json",
+      "sha256": "cb4544408249160bc24ec4f3f56ae2575fd924405e3a4aa3127bc2d571ff6040"
+    },
+    {
+      "path": "contracts/metric-denominators-v1.json",
+      "sha256": "f99c0f2ee45cef25f069b4c00e18d702a2f2224fd9dbcc49994e61034d0ab237"
+    },
+    {
+      "path": "contracts/publication-exports-v3.json",
+      "sha256": "e0c7a9e4507a771ccf2d4c14434a5fcbdc8a52f81819ebc991dd55acc2795fc5"
+    },
+    {
+      "path": "dbt/models/marts/metrics.yml",
+      "sha256": "4670efe10c98880eac59e6d16f5d2c9a0b3dbc2f851efccc06508aca26e1b9da"
+    },
+    {
+      "path": "docs/build-modes.md",
+      "sha256": "dbe3c4908026851e191b3aa3dfbe4eab44e1a222cba5ecbc385147176690e601"
+    },
+    {
+      "path": "docs/capture-runbook.md",
+      "sha256": "0e78883836165e6c6985f3eea19bf894d9909f9af2a247806fa476a9b7c1365a"
+    },
+    {
+      "path": "docs/evidence/dbt-lineage-v1.json",
+      "sha256": "521569155ad7eff5cb49fd3b113a0f1fdea1989807738bacc2c8d176592e4eb6"
+    },
+    {
+      "path": "docs/evidence/gate-a/correction-index-v1.json",
+      "sha256": "54dcde68bce9cc149d98d7a7063301a917fabce971c6f1fd6857d03abd07e3b5"
+    },
+    {
+      "path": "docs/model-grains.md",
+      "sha256": "01cc31f2502e0df92130c4e637a85fd4c40e349ba2fbe732981576140727d80b"
+    },
+    {
+      "path": "docs/powerbi-refresh-runbook.md",
+      "sha256": "88f8a7ef1581ed4b856b1111a09cb671d9c46a005884fd2305958197ad4ab9c7"
+    }
+  ],
+  "parser_contract_version": "registry-csv-contract-v1",
+  "published_data_commit": "c35e88618fc78f6f8ddcb1f6e3f8dbd68b42b3ba",
+  "published_sources": [
+    {
+      "blob_oid": "b937605d24e6983e5aab41f6d3cf6a7ed36357eb",
+      "path": "capture-status.json",
+      "sha256": "f544b885cc2d5ec71b042ae6ab9eadddeac8fe31040bb7b672c2f800a1c49912"
+    },
+    {
+      "blob_oid": "a4ff713c0af7c25c710749232abb75fcaacb5676",
+      "path": "exports/mart_claim_support.csv",
+      "sha256": "a4a500ac6a07f6392ef894321aa4a118ef96186f37c3de2cb99c15238c85573a"
+    },
+    {
+      "blob_oid": "b4b99e5a8151ad4efbb297452999dff566692fa9",
+      "path": "exports/mart_release_quality.csv",
+      "sha256": "814afd784edbd32aee8ed776f68d91bfff4a9f55baf4283c23a010d1f8fb8654"
+    },
+    {
+      "blob_oid": "3416602698c71169ac45c4844eaafad121ef5bec",
+      "path": "manifest/published-manifest-v1.json",
+      "sha256": "da4f4a3385f674adc4aea66044ad977a8f8dea86fdc10a7ca5607f918755e7ed"
+    }
+  ],
+  "release_rules": [
+    {
+      "as_of_date": "2026-07-15",
+      "parser_contract_version": "1",
+      "revision_fingerprint": "e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096",
+      "rule_versions": "capture_outcome_available_v1:1:linked-accepted-or-recovered-capture-run-v1,parser_contract_version_known_v1:1:known-parser-contract-version-1-v1"
+    },
+    {
+      "as_of_date": "2026-08-05",
+      "parser_contract_version": "1",
+      "revision_fingerprint": "7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f",
+      "rule_versions": "capture_outcome_available_v1:1:linked-accepted-or-recovered-capture-run-v1,parser_contract_version_known_v1:1:known-parser-contract-version-1-v1"
+    },
+    {
+      "as_of_date": "2026-08-19",
+      "parser_contract_version": "1",
+      "revision_fingerprint": "903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876",
+      "rule_versions": "capture_outcome_available_v1:1:linked-accepted-or-recovered-capture-run-v1,parser_contract_version_known_v1:1:known-parser-contract-version-1-v1"
+    }
+  ],
+  "schema_version": "public-readme-inputs-v1"
+}

@@ -1,0 +1,51 @@
+{
+  "excerpts": [
+    {
+      "annotation": "A matching promotion pointer wins first; otherwise the highest accepted revision wins for that date. Revisions never create a new time point.",
+      "line_count": 25,
+      "ranges": [
+        [
+          22,
+          46
+        ]
+      ],
+      "selected_sha256": "cabe9a0bee9d13a2f9236ec34c25095a15c2da4c062f544669680b08e2d447bd",
+      "selected_text": "\n    select\n        r.as_of_date,\n        r.release_revision,\n        r.revision_fingerprint,\n        r.parser_contract_version,\n        row_number() over (\n            partition by r.as_of_date\n            order by (p.release_revision is not null) desc, r.release_revision desc\n        ) as promotion_rank\n    from {{ source('runtime_input', 'revision_catalog') }} r\n    left join {{ source('runtime_input', 'promotion_catalog') }} p\n      on r.as_of_date = p.as_of_date\n     and r.release_revision = p.release_revision\n     and r.revision_fingerprint = p.revision_fingerprint\n\n)\n\nselect\n    as_of_date,\n    release_revision,\n    revision_fingerprint,\n    parser_contract_version\nfrom ranked\nwhere promotion_rank = 1\n",
+      "source_path": "dbt/models/intermediate/int_promoted_releases.sql",
+      "source_sha256": "d5a74abb3103a5564a647a3b706df7ece0ed31491bbc7f68b5bd8df7f912bfd2"
+    },
+    {
+      "annotation": "The first source range matches the full registration key and both release identities. The second uses an anti-join to retain a missing endpoint; absence never becomes an invented status.",
+      "line_count": 18,
+      "ranges": [
+        [
+          114,
+          122
+        ],
+        [
+          153,
+          161
+        ]
+      ],
+      "selected_sha256": "0e907c3e2e742d7eb1d782d1142013e75fb703c947a705314d5289e181c77804",
+      "selected_text": "    from start_observations as s\n    inner join end_observations as e\n        on s.from_as_of_date = e.from_as_of_date\n       and s.from_release_revision = e.from_release_revision\n       and s.from_revision_fingerprint = e.from_revision_fingerprint\n       and s.to_as_of_date = e.to_as_of_date\n       and s.to_release_revision = e.to_release_revision\n       and s.to_revision_fingerprint = e.to_revision_fingerprint\n       and s.state_charity_registration_number = e.state_charity_registration_number\n    from start_observations as s\n    anti join end_observations as e\n        on s.from_as_of_date = e.from_as_of_date\n       and s.from_release_revision = e.from_release_revision\n       and s.from_revision_fingerprint = e.from_revision_fingerprint\n       and s.to_as_of_date = e.to_as_of_date\n       and s.to_release_revision = e.to_release_revision\n       and s.to_revision_fingerprint = e.to_revision_fingerprint\n       and s.state_charity_registration_number = e.state_charity_registration_number\n",
+      "source_path": "dbt/models/intermediate/int_entity_transitions.sql",
+      "source_sha256": "fc7531e2aa71fe6480a8d5d6828931b2a0bf4eca57df788338894a73426ba9c9"
+    },
+    {
+      "annotation": "A gap or observed non-delinquent neighbor starts a new island. A cumulative window numbers observed spells; the full model keeps onset and exit bounded and censoring explicit.",
+      "line_count": 25,
+      "ranges": [
+        [
+          54,
+          78
+        ]
+      ],
+      "selected_sha256": "e3c001707d14aeeaf2235bc696fe72d7616306f819004f3010fd1afde085dfb1",
+      "selected_text": "        *,\n        case\n            when prior_observation_ordinal is null then true\n            when not prior_is_delinquent then true\n            when prior_observation_ordinal != observation_ordinal - 1 then true\n            else false\n        end as is_island_start\n\n    from delinquent_observations\n\n),\n\nisland_numbering as (\n\n    select\n\n        *,\n        sum(case when is_island_start then 1 else 0 end) over (\n            partition by state_charity_registration_number\n            order by observation_ordinal\n            rows between unbounded preceding and current row\n        ) as spell_number\n\n    from island_start_flags\n\n",
+      "source_path": "dbt/models/intermediate/int_delinquency_spells.sql",
+      "source_sha256": "5843b4eadf4fa36098e2a034ce3058347d411ccde71b61ed7711eefdc49006f3"
+    }
+  ],
+  "schema_version": "sql-excerpts-v1"
+}
