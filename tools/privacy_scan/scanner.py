@@ -123,6 +123,23 @@ def _is_unapproved_join_url(url: str) -> bool:
     return False
 
 
+def _is_counted_prose(text: str, match: re.Match[str]) -> bool:
+    """Recognize a counted-object phrase ending in an adverbial 'the same way'.
+
+    Address labels and comma-delimited location context retain detection even
+    for an ambiguous lexical phrase. This is content grammar, independent of
+    the source path, hash, extension, or capitalization.
+    """
+    words = match.group().lower().split()
+    if words[-3:] != ["the", "same", "way"]:
+        return False
+    if not any(word in {"files", "records", "rows", "documents"} for word in words[1:-3]):
+        return False
+    before = text[max(0, match.start() - 80):match.start()]
+    after = text[match.end():match.end() + 2]
+    return not re.search(r"\b(?:address|mailing|located|location|street)\b", before, re.IGNORECASE) and not after.lstrip().startswith(",")
+
+
 def scan_text(path: str, text: str) -> list[Finding]:
     """Run every contextual content detector over decoded blob text."""
 
@@ -132,7 +149,8 @@ def scan_text(path: str, text: str) -> list[Finding]:
         findings.append(Finding("fein", path, _locator_for_offset(text, offset)))
 
     for match in _STREET_ADDRESS_RE.finditer(text):
-        findings.append(Finding("street_address", path, _locator_for_offset(text, match.start())))
+        if not _is_counted_prose(text, match):
+            findings.append(Finding("street_address", path, _locator_for_offset(text, match.start())))
 
     for match in _PHONE_RE.finditer(text):
         findings.append(Finding("contact_info", path, _locator_for_offset(text, match.start())))

@@ -1,0 +1,20 @@
+{
+  "schema_version": "provenance-index-v1",
+  "entries": [
+    {
+      "source_label": "spike-002-readme",
+      "predecessor_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
+      "destination": "docs/provenance/spikes/002-entity-change-validation/README.md",
+      "prefix_bytes": 2288,
+      "prefix_sha256": "c6b7bc010218ad88bc55bd000904b3276546e49f0510879df39101a488276592",
+      "body_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
+      "successor_sha256": "c40ca2576afe56b71538e5982001dd3d5a02fd5944b7c97e00976233eeef5d9b",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    }
+  ]
+}
