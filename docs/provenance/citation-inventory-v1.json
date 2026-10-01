@@ -1,0 +1,860 @@
+{
+  "schema_version": "citation-inventory-v1",
+  "entries": [
+    {
+      "source": "AGENTS.md",
+      "locator": "L70:C62",
+      "target": ".planning",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "CLAUDE.md",
+      "locator": "L70:C62",
+      "target": ".planning",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/ag-registry-migration-2026-08.md",
+      "locator": "L49:C1",
+      "target": "data/registry-archive/manifest.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/ag-registry-migration-2026-08.md",
+      "locator": "L4:C45",
+      "target": ".planning/phases/15-cure-reconstruction/15-DEEPLINK-PROBE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/build-modes.md",
+      "locator": "L32:C60",
+      "target": "public-eligibility-v1.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/capture-runbook.md",
+      "locator": "L155:C1",
+      "target": "public-eligibility-v1.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/capture-runbook.md",
+      "locator": "L175:C3",
+      "target": "2026-09-15-sidecar-absent-on-hosted-republish.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/capture-runbook.md",
+      "locator": "L228:C79",
+      "target": "attempts",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/capture-runbook.md",
+      "locator": "L229:C1",
+      "target": "releases",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/capture-runbook.md",
+      "locator": "L25:C3",
+      "target": "--requirement requirements-capture.txt",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/evidence/gate-a/correction-index-v1.json",
+      "locator": "L1:C1109",
+      "target": "data/registry-archive/manifest.json",
+      "kind": "private_path",
+      "resolution": "private",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/evidence/gate-a/correction-index-v1.json",
+      "locator": "L1:C1400",
+      "target": ".planning/spikes/001-archive-sample-validation/archive-sample-manifest.json",
+      "kind": "private_path",
+      "resolution": "private",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md"
+    },
+    {
+      "source": "docs/evidence/gate-a/correction-index-v1.json",
+      "locator": "L1:C1731",
+      "target": ".planning/spikes/002-entity-change-validation/entity-changes.json",
+      "kind": "private_path",
+      "resolution": "private",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md"
+    },
+    {
+      "source": "docs/evidence/gate-a/correction-index-v1.json",
+      "locator": "L1:C2010",
+      "target": "GATE-A-EVIDENCE.md",
+      "kind": "private_path",
+      "resolution": "private",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/GATE-A-EVIDENCE.md"
+    },
+    {
+      "source": "docs/powerbi-refresh-runbook.md",
+      "locator": "L124:C45",
+      "target": "08-UI-SPEC.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/powerbi-refresh-runbook.md",
+      "locator": "L6:C1",
+      "target": "08-TRACER-EVIDENCE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/powerbi-refresh-runbook.md",
+      "locator": "L6:C40",
+      "target": "08-04-SUMMARY.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/powerbi-refresh-runbook.md",
+      "locator": "L84:C51",
+      "target": "08-UI-SPEC.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L161:C108",
+      "target": "PORTFOLIO.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L181:C120",
+      "target": "registry-archive/2026-08-05",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L187:C1",
+      "target": "_data_cache/capture_release.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L217:C94",
+      "target": "ia-release-manifest.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L24:C27",
+      "target": "_migration/mitos/.planning/CODEX-DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L29:C3",
+      "target": ".planning/CODEX-DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L30:C54",
+      "target": "_migration/mitos",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L49:C19",
+      "target": "ia-release-manifest.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/GATE-A-EVIDENCE.md",
+      "locator": "L83:C1",
+      "target": "ca_may_not_operate.csv",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L105:C39",
+      "target": "PORTFOLIO.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L105:C6",
+      "target": "research-paper-direction.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L115:C18",
+      "target": "_to_delete",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C104",
+      "target": "pyproject.toml",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C122",
+      "target": "dbt_project.yml",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C29",
+      "target": "PROJECT.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C43",
+      "target": "STATE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C55",
+      "target": "ROADMAP.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L117:C69",
+      "target": "REQUIREMENTS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L122:C161",
+      "target": "DBT-BRIEF.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L122:C182",
+      "target": "15-CURE-PATTERNS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L122:C441",
+      "target": "15-DEEPLINK-PROBE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L122:C74",
+      "target": "PORTFOLIO.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L122:C99",
+      "target": "AB488-ENFORCEMENT-SCAN.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L130:C106",
+      "target": "docs/Details",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L130:C85",
+      "target": "mitos.db",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L23:C42",
+      "target": "_migration",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L27:C57",
+      "target": ".planning",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L29:C12",
+      "target": ".planning/CODEX-DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L30:C3",
+      "target": "_migration/mitos",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L40:C54",
+      "target": "calico/_to_delete",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L50:C3",
+      "target": ".planning/CODEX-DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L51:C3",
+      "target": ".planning/DBT-BRIEF.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L52:C3",
+      "target": ".planning/PORTFOLIO.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L58:C3",
+      "target": ".planning/research/ag-schema-baseline.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L59:C3",
+      "target": ".planning/research/CA-REGISTRY-FACTS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L60:C3",
+      "target": ".planning/research/DURATION-METRICS-SPEC.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L61:C3",
+      "target": ".planning/research/CURE-RATE-2026-08.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L65:C162",
+      "target": "entity-changes.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L67:C13",
+      "target": "entity-changes.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L73:C3",
+      "target": "docs/addressable-list-data-sources.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L75:C3",
+      "target": "docs/runbook-ag-capture.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L79:C1",
+      "target": "data/registry-archive/manifest.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L79:C43",
+      "target": "ia-release-manifest.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L83:C1",
+      "target": "scripts/research/archive_ag_release.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L83:C43",
+      "target": "diff_ag_releases.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L83:C66",
+      "target": "verify_ag_parse.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L83:C88",
+      "target": "verify_ag_schema.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L85:C222",
+      "target": "_data_cache/capture_release.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L93:C103",
+      "target": "Completed-Research.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L93:C18",
+      "target": "ENGINE-CONTRACT.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L93:C40",
+      "target": "engine-contract.json",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C124",
+      "target": "FEATURES.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C139",
+      "target": "PITFALLS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C154",
+      "target": "ARCHITECTURE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C173",
+      "target": "STACK.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C185",
+      "target": "SUMMARY.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C301",
+      "target": "ARCHITECTURE.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C31",
+      "target": "AB488-ENFORCEMENT-SCAN.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C323",
+      "target": "STACK.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C60",
+      "target": "MULTI-STATE-PLATFORM-GATES.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L94:C93",
+      "target": "FORM-TYPE-VS-DELINQUENCY.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L96:C22",
+      "target": "idea-consolidation.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L96:C47",
+      "target": "research-paper-direction.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L97:C123",
+      "target": "CODEX-CLAUDE-DBT-VALIDATION-FEEDBACK.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L97:C185",
+      "target": "CODEX-DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L97:C25",
+      "target": "DBT-FINAL-DECISIONS.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L97:C68",
+      "target": "CODEX-DBT-SCOPING-REVIEW.md",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C111",
+      "target": "scan_platform_coverage.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C140",
+      "target": "select_cure_cases.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C176",
+      "target": "tests/research",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C241",
+      "target": "cohort_probe.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C26",
+      "target": "cohort_probe.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C45",
+      "target": "form_type_vs_delinquency.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/MIGRATION-REPORT.md",
+      "locator": "L98:C76",
+      "target": "scan_delinquent_solicitation.py",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    },
+    {
+      "source": "docs/provenance/spikes/001-archive-sample-validation/README.md",
+      "locator": "L37:C31",
+      "target": "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json",
+      "kind": "markdown_link",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md"
+    },
+    {
+      "source": "docs/provenance/spikes/002-entity-change-validation/README.md",
+      "locator": "L51:C37",
+      "target": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json",
+      "kind": "markdown_link",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md"
+    },
+    {
+      "source": "docs/provenance/spikes/005-project-recommendation/README.md",
+      "locator": "L129:C161",
+      "target": "data/mitos.db",
+      "kind": "backtick_path",
+      "resolution": "missing",
+      "disposition": "annotated_left_behind",
+      "successor": "docs/decisions/planning-directory-not-published.md"
+    }
+  ]
+}
