@@ -647,7 +647,13 @@ def validate_index(root: Path, expected: tuple[PredecessorAnchor, ...]) -> list[
     wanted = {(row.source_label, row.destination, row.predecessor_sha256) for row in expected}
     if not expected or len(wanted) != len(expected) or slots != wanted or len(records) != len(expected):
         raise ProvenanceError("provenance.index_completeness")
-    actual_paths = {path.relative_to(root).as_posix() for path in (root / "docs/provenance").rglob("*") if path.is_file() and path.relative_to(root).as_posix() != INDEX_PATH}
+    non_successor_contracts = {
+        INDEX_PATH,
+        "docs/provenance/citation-inventory-v1.json",
+        "docs/provenance/citation-transitions-v1.json",
+    }
+    actual_paths = {path.relative_to(root).as_posix() for path in (root / "docs/provenance").rglob("*")
+                    if path.is_file() and path.relative_to(root).as_posix() not in non_successor_contracts}
     if actual_paths != {row.destination for row in records}:
         raise ProvenanceError("provenance.index_completeness")
     return records

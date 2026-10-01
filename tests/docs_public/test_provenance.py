@@ -228,6 +228,28 @@ class JsonEnvelopeTests(unittest.TestCase):
 
 
 class CompleteProvenanceTests(unittest.TestCase):
+    def test_citation_contracts_are_not_successors_and_unknown_files_fail(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            shutil.copytree(ROOT / "docs", root / "docs")
+            (root / "contracts").mkdir()
+            shutil.copyfile(ROOT / "contracts/metric-denominators-v1.json", root / "contracts/metric-denominators-v1.json")
+            records = api.validate_complete_index(root)
+            self.assertEqual(len(records), 10)
+            for name in ("citation-inventory-v1.json", "citation-transitions-v1.json"):
+                (root / "docs/provenance" / name).write_text('{"synthetic": true}\n')
+            self.assertEqual(len(api.validate_complete_index(root)), 10)
+            extra = root / "docs/provenance/unapproved.json"
+            extra.write_text('{}\n')
+            with self.assertRaises(api.ProvenanceError):
+                api.validate_complete_index(root)
+            extra.unlink()
+            successor = root / records[0].destination
+            successor.write_bytes(successor.read_bytes() + b"unexpected suffix")
+            with self.assertRaises(api.ProvenanceError):
+                api.validate_complete_index(root)
+
     def test_exact_ten_sources_are_retained(self):
         api = importlib.import_module("tools.docs_public.provenance")
         payload = json.loads((ROOT / api.INDEX_PATH).read_bytes())
