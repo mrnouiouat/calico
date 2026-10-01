@@ -205,6 +205,124 @@ class CitationTests(unittest.TestCase):
             commit = c.commit()
             self.assertEqual(s.transition_document(c.root, commit, rows, (c.root / "README.md").read_bytes())["entries"], [])
 
+    def test_successive_repoint_move_repoint_and_removal_preserve_history(self):
+        with Candidate() as c:
+            s = scanner()
+            for name in ("old.md", "new.md", "third.md"):
+                c.put(name, "# Target\n")
+            c.put("README.md", "[old](old.md)\n")
+            s.write_repository(c.root)
+            c.commit()
+            retained = []
+            for content, disposition in (("[new](new.md)\n", "repointed"),
+                    ("# Introduction\n\n[new](new.md)\n", "moved"),
+                    ("# Introduction\n\n[third](third.md)\n", "repointed"),
+                    ("# Introduction\n\nNo local link remains.\n", "removed")):
+                c.put("README.md", content)
+                s.write_repository(c.root)
+                document = s.load_document(c.root / s.TRANSITIONS_PATH)
+                entries = document["entries"]
+                self.assertEqual(len(entries), len(retained) + 1)
+                for earlier in retained:
+                    self.assertIn(earlier, entries, "retained endpoint evidence was rewritten")
+                fresh = next(e for e in entries if e not in retained)
+                self.assertEqual(fresh["disposition"], disposition)
+                self.assertIsNotNone(fresh["successor_blob"])
+                s.check_repository(c.root)
+                c.commit()
+                s.check_repository(c.root)
+                before = (c.root / s.TRANSITIONS_PATH).read_bytes()
+                s.write_repository(c.root)
+                self.assertEqual(before, (c.root / s.TRANSITIONS_PATH).read_bytes())
+                retained = entries
+
+    def test_duplicate_survivors_are_consumed_before_repoints_and_removals(self):
+        with Candidate() as c:
+            s = scanner()
+            c.put("target.md", "# Target\n")
+            c.put("other.md", "# Other\n")
+            c.put("README.md", "[one](target.md)\n[two](target.md)\n[three](target.md)\n")
+            prior = s.scan_citations(c.root)
+            commit = c.commit()
+            body = (c.root / "README.md").read_bytes()
+            # Exact survivor at line 2 and moved duplicate at line 4 are
+            # consumed first; the remaining line-3 occurrence is repointed.
+            c.put("README.md", "\n[two](target.md)\n[other](other.md)\n[three](target.md)\n")
+            document = s.transition_document(c.root, commit, prior, body)
+            self.assertEqual([e["disposition"] for e in document["entries"]], ["moved", "repointed"])
+            self.assertEqual({e["current"]["locator"] for e in document["entries"]}, {"L3:C1", "L4:C1"})
+            s.check_transitions(c.root, document)
+            c.put("README.md", "[one](target.md)\n")
+            document = s.transition_document(c.root, commit, prior, body)
+            self.assertEqual([e["disposition"] for e in document["entries"]], ["removed", "removed"])
+            s.check_transitions(c.root, document)
+
+    def test_committed_successor_tampering_and_source_deletion_fail_closed(self):
+        with Candidate() as c:
+            s = scanner()
+            c.put("old.md", "# Old\n")
+            c.put("new.md", "# New\n")
+            c.put("README.md", "[old](old.md)\n")
+            s.write_repository(c.root)
+            c.commit()
+            c.put("README.md", "[new](new.md)\n")
+            s.write_repository(c.root)
+            c.commit()
+            document = s.load_document(c.root / s.TRANSITIONS_PATH)
+            c.put("README.md", "# Heading\n[new](new.md)\n")
+            s.check_transitions(c.root, document)
+            for field, value in (("successor_blob", "0" * 40), ("successor_sha256", "0" * 64),
+                                 ("successor_commit", "0" * 40), ("current", None),
+                                 ("disposition", "removed")):
+                altered = json.loads(json.dumps(document))
+                altered["entries"][0][field] = value
+                with self.assertRaises(s.CitationError):
+                    s.check_transitions(c.root, altered)
+            s.write_repository(c.root)
+            c.commit()
+            (c.root / "README.md").unlink()
+            c.git("rm", "--", "README.md")
+            s.write_repository(c.root)
+            last = next(e for e in s.load_document(c.root / s.TRANSITIONS_PATH)["entries"]
+                        if e["successor_blob"] is None)
+            self.assertEqual(last["disposition"], "removed")
+            c.commit()
+            c.put("README.md", "# Restored\n[new](new.md)\n")
+            s.write_repository(c.root)
+            s.check_repository(c.root)
+
+    def test_legacy_migration_keeps_original_bytes_and_corrects_moved_citations(self):
+        with Candidate() as c:
+            s = scanner()
+            c.put("target.md", "# Target\n")
+            c.put("README.md", "[one](target.md)\n[two](target.md)\n")
+            commit = c.commit()
+            prior, blobs = s._historical(c.root.resolve(), commit)
+            legacy = {"schema_version": "citation-transitions-v1", "entries": []}
+            for old in prior:
+                blob, digest = blobs[old.source]
+                legacy["entries"].append({"prior_commit": commit, "prior_blob": blob,
+                    "prior_sha256": digest, "occurrence": s.asdict(old),
+                    "disposition": "removed", "current": None})
+            c.put("README.md", "# Introduction\n\n[one](target.md)\n")
+            c.put(s.LEGACY_TRANSITIONS_PATH, s.encode_document(legacy).decode())
+            c.commit()
+            before = (c.root / s.LEGACY_TRANSITIONS_PATH).read_bytes()
+            s.write_repository(c.root)
+            self.assertEqual(before, (c.root / s.LEGACY_TRANSITIONS_PATH).read_bytes())
+            migrated = s.load_document(c.root / s.TRANSITIONS_PATH)
+            self.assertEqual([e["disposition"] for e in migrated["entries"]], ["moved", "removed"])
+            self.assertEqual([e["supersedes"] for e in migrated["entries"]], [0, 1])
+            s.check_repository(c.root)
+            c.commit()
+            c.put("README.md", "# Another introduction\n\n\n[one](target.md)\n")
+            s.write_repository(c.root)
+            self.assertEqual(before, (c.root / s.LEGACY_TRANSITIONS_PATH).read_bytes())
+            altered = json.loads(json.dumps(migrated))
+            altered["entries"].pop()
+            with self.assertRaises(s.CitationError):
+                s.check_transitions(c.root, altered)
+
     def test_atomic_output_survives_interruption(self):
         with Candidate() as c:
             s = scanner()

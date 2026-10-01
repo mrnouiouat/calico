@@ -8,9 +8,11 @@ local citations. Commands, globs, extension tokens and documented API routes
 have explicit syntax categories. Unresolved retained references are annotated,
 with a public successor or the planning-boundary explanation as their pointer.
 
-Historical transitions independently authenticate a reachable commit, source
-blob, content SHA-256 and exact prior occurrence. They never enter the current
-unresolved inventory. All failures carry fixed categories only.
+Historical transitions authenticate both endpoint blobs and occurrences. An
+uncommitted successor is checked against exact candidate bytes; after commit,
+reachable descendant history authenticates it independently of later edits.
+The original v1 ledger stays intact; v2 records its classification corrections.
+All failures carry fixed categories only.
 """
 
 from __future__ import annotations
@@ -35,10 +37,11 @@ from tools.privacy_scan.scanner import scan_text
 MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
 MAX_OCCURRENCES = 50000
 INVENTORY_PATH = "docs/provenance/citation-inventory-v1.json"
-TRANSITIONS_PATH = "docs/provenance/citation-transitions-v1.json"
+LEGACY_TRANSITIONS_PATH = "docs/provenance/citation-transitions-v1.json"
+TRANSITIONS_PATH = "docs/provenance/citation-transitions-v2.json"
 REGISTER_PATH = "docs/decisions/register.md"
 BOUNDARY_PATH = "docs/decisions/planning-directory-not-published.md"
-GENERATED = frozenset({INVENTORY_PATH, TRANSITIONS_PATH})
+GENERATED = frozenset({INVENTORY_PATH, LEGACY_TRANSITIONS_PATH, TRANSITIONS_PATH})
 KINDS = frozenset({"markdown_link", "markdown_image", "reference_definition", "reference_link",
                    "backtick_path", "private_path", "command_syntax", "glob_syntax", "api_syntax",
                    "extension_syntax"})
@@ -419,21 +422,71 @@ def _historical(root: Path, commit: str):
         raise CitationError("citation.anchor_error") from None
 
 
-def _transition_entries(root: Path, commit: str, prior: list[CitationOccurrence], blobs: dict) -> list[dict]:
-    current = scan_citations(root)
-    keyed = {(o.source, o.locator, o.kind): o for o in current}
-    result = []
-    for old in prior:
-        if old.resolution == "syntax":
-            continue
-        new = keyed.get((old.source, old.locator, old.kind))
-        if new is not None and new.target == old.target:
-            continue
-        blob, digest = blobs[old.source]
-        result.append({"prior_commit": commit, "prior_blob": blob, "prior_sha256": digest,
-                       "occurrence": asdict(old), "disposition": "repointed" if new else "removed",
-                       "current": asdict(new) if new else None})
+def _matched_changes(prior: list[CitationOccurrence], current: list[CitationOccurrence]):
+    """Consume occurrences once: exact survivors, moves, repoints, removals.
+
+    Matching complete endpoint populations is essential when a target occurs
+    more than once. A surviving duplicate cannot also stand in for a removal.
+    Repoints require an unmatched occurrence at the same source/kind/locator;
+    layout alone never assigns an arbitrary replacement target.
+    """
+    old = [o for o in sorted(prior) if o.resolution != "syntax"]
+    new = [o for o in sorted(current) if o.resolution != "syntax"]
+    changes = []
+    for previous in old[:]:
+        match = next((o for o in new if (o.source, o.kind, o.locator, o.target) ==
+                      (previous.source, previous.kind, previous.locator, previous.target)), None)
+        if match is not None:
+            old.remove(previous)
+            new.remove(match)
+    for previous in old[:]:
+        match = next((o for o in new if (o.source, o.kind, o.target) ==
+                      (previous.source, previous.kind, previous.target)), None)
+        if match is not None:
+            old.remove(previous)
+            new.remove(match)
+            changes.append((previous, match, "moved"))
+    for previous in old:
+        match = next((o for o in new if (o.source, o.kind, o.locator) ==
+                      (previous.source, previous.kind, previous.locator)), None)
+        if match is not None:
+            new.remove(match)
+        changes.append((previous, match, "repointed" if match else "removed"))
+    return sorted(changes, key=lambda row: (row[0].source, row[0].locator, row[0].kind))
+
+
+def _candidate_blobs(root: Path) -> dict:
+    # Hash exact UTF-8 candidate bytes using Git's object format without
+    # writing objects, staging files or changing the real index.
+    algorithm = run_git(["rev-parse", "--show-object-format"], root).decode().strip()
+    if algorithm not in {"sha1", "sha256"}:
+        raise CitationError("citation.anchor_error")
+    result = {}
+    for name, text in _documents(root, candidate_paths(root)).items():
+        data = text.encode("utf-8")
+        oid = hashlib.new(algorithm, b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        result[name] = (oid, hashlib.sha256(data).hexdigest())
     return result
+
+
+def _transition_entries(commit: str, prior: list[CitationOccurrence], blobs: dict,
+                        current: list[CitationOccurrence], successor_blobs: dict,
+                        successor_commit: str | None = None) -> list[dict]:
+    result = []
+    for old, new, disposition in _matched_changes(prior, current):
+        blob, digest = blobs[old.source]
+        successor_blob, successor_digest = successor_blobs.get(old.source, (None, None))
+        result.append({"prior_commit": commit, "prior_blob": blob, "prior_sha256": digest,
+                       "occurrence": asdict(old), "disposition": disposition,
+                       "current": asdict(new) if new else None,
+                       "successor_commit": successor_commit, "successor_blob": successor_blob,
+                       "successor_sha256": successor_digest, "supersedes": None})
+    return result
+
+
+def _entry_key(entry: dict):
+    old = entry["occurrence"]
+    return (entry["prior_commit"], old["source"], old["locator"], old["kind"])
 
 
 def transition_document(root: object, commit: str, prior: list[CitationOccurrence], prior_bytes: bytes) -> dict:
@@ -444,24 +497,39 @@ def transition_document(root: object, commit: str, prior: list[CitationOccurrenc
             or not isinstance(prior_bytes, bytes)
             or hashlib.sha256(prior_bytes).hexdigest() != blobs[prior[0].source][1]):
         raise CitationError("citation.invalid_anchor")
-    return {"schema_version": "citation-transitions-v1", "entries": _transition_entries(base, commit, prior, blobs)}
+    # Match the full predecessor so subsets cannot reuse surviving duplicates.
+    entries = _transition_entries(commit, authenticated, blobs, scan_citations(base), _candidate_blobs(base))
+    return {"schema_version": "citation-transitions-v2", "legacy": None,
+            "entries": [e for e in entries if _validate_occurrence(e["occurrence"]) in prior]}
 
 
 def check_transitions(root: object, document: object) -> None:
     base = _root(root)
-    if (not isinstance(document, dict) or set(document) != {"schema_version", "entries"}
-            or document["schema_version"] != "citation-transitions-v1" or not isinstance(document["entries"], list)):
+    if (not isinstance(document, dict) or set(document) != {"schema_version", "legacy", "entries"}
+            or document["schema_version"] != "citation-transitions-v2" or not isinstance(document["entries"], list)):
         raise CitationError("citation.invalid_transitions")
-    seen, cache = set(), {}
+    seen, cache, endpoint_cache = set(), {}, {}
+    legacy = _check_legacy(base, document["legacy"])
+    corrected = set()
     expected_order = []
     for entry in document["entries"]:
-        if (not isinstance(entry, dict) or set(entry) != {"prior_commit", "prior_blob", "prior_sha256", "occurrence", "disposition", "current"}
+        if (not isinstance(entry, dict) or set(entry) != {"prior_commit", "prior_blob", "prior_sha256", "occurrence", "disposition", "current",
+                                                        "successor_commit", "successor_blob", "successor_sha256", "supersedes"}
                 or not isinstance(entry["prior_blob"], str) or not _OID.fullmatch(entry["prior_blob"])
                 or not isinstance(entry["prior_sha256"], str) or not _SHA.fullmatch(entry["prior_sha256"])
-                or entry["disposition"] not in {"removed", "repointed"}):
+                or entry["disposition"] not in {"removed", "repointed", "moved"}):
             raise CitationError("citation.invalid_transition")
         old = _validate_occurrence(entry["occurrence"])
-        key = (entry["prior_commit"], old.source, old.locator, old.kind)
+        if entry["current"] is not None:
+            _validate_occurrence(entry["current"])
+        successor_blob, successor_digest = entry["successor_blob"], entry["successor_sha256"]
+        if ((successor_blob is None) != (successor_digest is None)
+                or (successor_blob is not None and (not isinstance(successor_blob, str) or not _OID.fullmatch(successor_blob)
+                    or not isinstance(successor_digest, str) or not _SHA.fullmatch(successor_digest)))
+                or (entry["successor_commit"] is not None and (not isinstance(entry["successor_commit"], str)
+                    or not _OID.fullmatch(entry["successor_commit"])) )):
+            raise CitationError("citation.invalid_successor")
+        key = _entry_key(entry)
         if key in seen:
             raise CitationError("citation.duplicate_transition")
         seen.add(key)
@@ -472,10 +540,128 @@ def check_transitions(root: object, document: object) -> None:
         rows, blobs = cache[commit]
         if old not in rows or blobs[old.source] != (entry["prior_blob"], entry["prior_sha256"]):
             raise CitationError("citation.anchor_mismatch")
-        if _transition_entries(base, commit, [old], blobs) != [entry]:
+        endpoint_key = (commit, old.source, entry["successor_commit"], successor_blob, successor_digest)
+        if endpoint_key not in endpoint_cache:
+            endpoint_cache[endpoint_key] = _successor_endpoints(base, entry, cache)
+        valid = False
+        for successor_rows, successor_blobs in endpoint_cache[endpoint_key]:
+            candidates = _transition_entries(commit, rows, blobs, successor_rows, successor_blobs, entry["successor_commit"])
+            expected = next((e for e in candidates if _entry_key(e) == key), None)
+            if expected is not None:
+                expected["supersedes"] = entry["supersedes"]
+                if expected == entry:
+                    valid = True
+                    break
+        if not valid:
             raise CitationError("citation.transition_mismatch")
+        index = entry["supersedes"]
+        if index is not None:
+            if (legacy is None or type(index) is not int or index < 0 or index >= len(legacy["entries"])
+                    or index in corrected or _entry_key(legacy["entries"][index]) != key
+                    or legacy["entries"][index]["occurrence"] != entry["occurrence"]
+                    or entry["successor_commit"] != document["legacy"]["commit"]):
+                raise CitationError("citation.invalid_supersession")
+            corrected.add(index)
     if expected_order != sorted(expected_order):
         raise CitationError("citation.transition_order")
+    if legacy is not None and corrected != set(range(len(legacy["entries"]))):
+        raise CitationError("citation.missing_supersession")
+
+
+def _successor_endpoints(root: Path, entry: dict, cache: dict):
+    """Authenticate immutable successor bytes in descendant history or candidate.
+
+    A pending record already pins its Git blob and SHA-256. Once the document
+    is committed, that same record can be verified without consulting today's
+    document or mutating the record to add a commit ID.
+    """
+    source = entry["occurrence"]["source"]
+    wanted = (entry["successor_blob"], entry["successor_sha256"])
+    pinned = entry["successor_commit"]
+    commits = [pinned] if pinned else run_git(["log", "--all", "--reverse", "--format=%H", "--", source], root).decode().splitlines()
+    endpoints = []
+    for commit in commits:
+        if commit == entry["prior_commit"]:
+            continue
+        try:
+            run_git(["merge-base", "--is-ancestor", entry["prior_commit"], commit], root)
+        except Exception:
+            continue
+        if commit not in cache:
+            # Check the source blob cheaply before parsing a whole endpoint.
+            source_entry = next((e for e in list_tree(commit, root) if e.path == source), None)
+            if (source_entry.oid if source_entry else None) != wanted[0]:
+                continue
+            cache[commit] = _historical(root, commit)
+        rows, blobs = cache[commit]
+        if blobs.get(source, (None, None)) == wanted:
+            endpoints.append((rows, blobs))
+    if pinned:
+        if not endpoints:
+            raise CitationError("citation.successor_mismatch")
+    elif not endpoints:
+        blobs = _candidate_blobs(root)
+        if blobs.get(source, (None, None)) == wanted:
+            endpoints.append((scan_citations(root), blobs))
+    return endpoints
+
+
+def _check_legacy(root: Path, anchor: object):
+    if anchor is None:
+        if (root / LEGACY_TRANSITIONS_PATH).exists():
+            raise CitationError("citation.missing_legacy_anchor")
+        return None
+    if (not isinstance(anchor, dict) or set(anchor) != {"path", "commit", "sha256"}
+            or anchor["path"] != LEGACY_TRANSITIONS_PATH or not isinstance(anchor["commit"], str)
+            or not _OID.fullmatch(anchor["commit"]) or not isinstance(anchor["sha256"], str)
+            or not _SHA.fullmatch(anchor["sha256"])):
+        raise CitationError("citation.invalid_legacy_anchor")
+    try:
+        _historical(root, anchor["commit"])
+        data = run_git(["show", anchor["commit"] + ":" + LEGACY_TRANSITIONS_PATH], root)
+        if hashlib.sha256(data).hexdigest() != anchor["sha256"] or (root / LEGACY_TRANSITIONS_PATH).read_bytes() != data:
+            raise CitationError("citation.legacy_mismatch")
+        document = _json(data.decode())
+    except CitationError:
+        raise
+    except Exception:
+        raise CitationError("citation.legacy_mismatch") from None
+    if (not isinstance(document, dict) or set(document) != {"schema_version", "entries"}
+            or document["schema_version"] != "citation-transitions-v1" or not isinstance(document["entries"], list)):
+        raise CitationError("citation.invalid_transitions")
+    return document
+
+
+def _migrate_legacy(root: Path) -> dict:
+    if not (root / LEGACY_TRANSITIONS_PATH).exists():
+        return {"schema_version": "citation-transitions-v2", "legacy": None, "entries": []}
+    data = (root / LEGACY_TRANSITIONS_PATH).read_bytes()
+    commits = run_git(["log", "--all", "--reverse", "--format=%H", "--", LEGACY_TRANSITIONS_PATH], root).decode().splitlines()
+    for successor in commits:
+        if run_git(["show", successor + ":" + LEGACY_TRANSITIONS_PATH], root) == data:
+            break
+    else:
+        raise CitationError("citation.uncommitted_legacy")
+    anchor = {"path": LEGACY_TRANSITIONS_PATH, "commit": successor, "sha256": hashlib.sha256(data).hexdigest()}
+    legacy = _check_legacy(root, anchor)
+    current, successor_blobs = _historical(root, successor)
+    result, cache = [], {}
+    for index, original in enumerate(legacy["entries"]):
+        commit = original["prior_commit"]
+        if commit not in cache:
+            cache[commit] = _historical(root, commit)
+        prior, blobs = cache[commit]
+        old = _validate_occurrence(original["occurrence"])
+        if old not in prior or blobs[old.source] != (original["prior_blob"], original["prior_sha256"]):
+            raise CitationError("citation.anchor_mismatch")
+        entry = next((e for e in _transition_entries(commit, prior, blobs, current, successor_blobs, successor)
+                      if _entry_key(e) == _entry_key(original)), None)
+        if entry is None:
+            raise CitationError("citation.invalid_supersession")
+        entry["supersedes"] = index
+        result.append(entry)
+    result.sort(key=_entry_key)
+    return {"schema_version": "citation-transitions-v2", "legacy": anchor, "entries": result}
 
 
 def scan_decision_ids(root: object) -> list[str]:
@@ -639,7 +825,7 @@ def write_repository(root: object, *, summaries: dict[str, str] | None = None) -
             transitions = load_document(base / TRANSITIONS_PATH)
             check_transitions(base, transitions)
         else:
-            transitions = {"schema_version": "citation-transitions-v1", "entries": []}
+            transitions = _migrate_legacy(base)
         # Empty repositories have no historical transitions. A HEAD anchor is
         # used only if one exists; every actual historical record is checked.
         try:
@@ -648,14 +834,13 @@ def write_repository(root: object, *, summaries: dict[str, str] | None = None) -
             commit = None
         if commit:
             old, blobs = _historical(base, commit)
-            new_entries = _transition_entries(base, commit, old, blobs)
-            known = {(e["prior_commit"], e["occurrence"]["source"], e["occurrence"]["locator"], e["occurrence"]["kind"])
-                     for e in transitions["entries"]}
+            new_entries = _transition_entries(commit, old, blobs, scan_citations(base), _candidate_blobs(base))
+            known = {_entry_key(e) for e in transitions["entries"]}
             for entry in new_entries:
-                key = (entry["prior_commit"], entry["occurrence"]["source"], entry["occurrence"]["locator"], entry["occurrence"]["kind"])
+                key = _entry_key(entry)
                 if key not in known:
                     transitions["entries"].append(entry)
-            transitions["entries"].sort(key=lambda e: (e["prior_commit"], e["occurrence"]["source"], e["occurrence"]["locator"], e["occurrence"]["kind"]))
+            transitions["entries"].sort(key=_entry_key)
             check_transitions(base, transitions)
         # Validate final projected candidate content before replacing any file.
         paths = tuple(sorted(set(candidate_paths(base)) | GENERATED | {REGISTER_PATH}))
