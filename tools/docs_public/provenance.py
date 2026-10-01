@@ -364,22 +364,14 @@ def derive_core_corrections(body: bytes, root: Path, project: Path) -> list[Corr
         raise ProvenanceError("provenance.evidence_schema") from None
 
 
-def _prefix(anchor: PredecessorAnchor, import_date: str, corrections: list[tuple[str, str, str]], *, guidance=None, redacted=False) -> bytes:
+def _prefix(anchor: PredecessorAnchor, import_date: str, corrections: list[tuple[str, str, str]], *, guidance=(), redacted=False) -> bytes:
     try:
         if date.fromisoformat(import_date).isoformat() != import_date:
             raise ValueError()
     except (ValueError, TypeError):
         raise ProvenanceError("provenance.import_date") from None
     decisions = "docs/decisions/register.md"
-    legacy_guidance = [
-        ("Public Registry Operations Monitor name", "California Charity Registry Monitor (D-001)", decisions),
-        ("Aggregate-only publication", "Bounded named organization history alongside aggregates (D-007)", decisions),
-        ("Power BI with an Evidence fallback", "One Power BI implementation; documented manual refresh fallback (D-008)", decisions),
-        ("Release-count readiness", "Five simultaneous estimability conditions; no formal survival analysis in v1 (D-010)", decisions),
-        ("Archive census as a prerequisite", "Archive census is outside v1 (D-012)", decisions),
-        ("Newline-aware default CSV interpretation", "CP1252 with QUOTE_NONE; there are no embedded record newlines (D-003)", decisions),
-        ("Strict-cure diagnostic denominators", "All observed exits are the diagnostic target (D-020)", "contracts/metric-denominators-v1.json")]
-    rows = [*corrections, *(legacy_guidance if guidance is None else guidance)]
+    rows = [*corrections, *guidance]
     parent = PurePosixPath(anchor.destination).parent.as_posix()
     def link(path):
         return os.path.relpath(path, parent).replace(os.sep, "/")
@@ -430,7 +422,7 @@ def _entries(root: Path) -> list[SuccessorRecord]:
 
 def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy: Policy, *, import_date: str,
                     historical_evidence: Path | None = None, replace_existing: bool = False,
-                    observed_only: bool = False, project: Path | None = None) -> SuccessorRecord:
+                    observed_only: bool = True, project: Path | None = None) -> SuccessorRecord:
     """Verify, scan, and publish a complete directory containing body and index.
 
     Both files are prepared off to the side. Directory renames expose the old
@@ -440,6 +432,8 @@ def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy:
     recovery on the next invocation. No private bytes enter that staging tree.
     """
     root = Path(root).resolve(strict=True)
+    if observed_only is not True:
+        raise ProvenanceError("provenance.unobserved_guidance")
     source = Path(source)
     target_dir = root / "docs/provenance"
     backup = root / "docs/.provenance-last-complete"
@@ -463,11 +457,10 @@ def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy:
         corrections = derive_corrections(body, root, historical_evidence) if historical_evidence is not None else []
         if project is not None:
             corrections = [row.render() for row in derive_core_corrections(body, root, project)]
-        guidance = derive_guidance(body) if observed_only else None
-        if guidance is not None:
-            validate_correction_rows(body, guidance)
+        guidance = derive_guidance(body)
+        validate_correction_rows(body, guidance)
         prefix = _prefix(anchor, import_date, corrections,
-            guidance=None if guidance is None else [row.render() for row in guidance], redacted=redaction_chain is not None)
+            guidance=[row.render() for row in guidance], redacted=redaction_chain is not None)
         data = prefix + body
         record = SuccessorRecord(anchor.source_label, anchor.predecessor_sha256, anchor.destination,
             len(prefix), _hash(prefix), _hash(body), _hash(data), MARKER_VERSION, AUTHORITY_LINKS, redaction_chain)

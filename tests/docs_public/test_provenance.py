@@ -234,10 +234,12 @@ class ObservedFramingTests(unittest.TestCase):
             body = b"# Historical note\r\nOrdinary unchanged prose.\r\n"
             source.write_bytes(body)
             anchor = self.api.PredecessorAnchor("synthetic-note", hashlib.sha256(body).hexdigest(), "docs/provenance/note.md")
-            record = self.api.build_successor(source, anchor, root, POLICY, import_date="2026-10-01", observed_only=True)
+            record = self.api.build_successor(source, anchor, root, POLICY, import_date="2026-10-01")
             data = (root / anchor.destination).read_bytes()
             self.assertTrue(self.api.validate_successor(data, record) == body, "historical body changed")
             self.assertFalse(b"D-007" in data[:record.prefix_bytes], "unobserved publication rule invented")
+            with self.assertRaises(self.api.ProvenanceError):
+                self.api.build_successor(source, anchor, root, POLICY, import_date="2026-10-01", observed_only=False)
 
     def test_missing_source_and_wrong_cardinality_write_nothing(self):
         with tempfile.TemporaryDirectory() as directory:
