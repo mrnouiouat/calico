@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   scan:
     name: Full-history privacy scan
@@ -25,6 +29,21 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13.15'
+
+      - name: Install exact fixture documentation toolchain pins
+        run: python -m pip install --requirement requirements-dbt.txt
+
+      - name: Check generated public documentation without regeneration
+        run: python -m tools.docs_public check
+
+      - name: Check exact citation inventory and decision register
+        run: python -m tools.citation_scan --check
+
+      - name: Run every public documentation contract
+        run: python -m unittest discover -s tests/docs_public -t . -v
+
+      - name: Run privacy diagnostic non-echo contracts
+        run: python -m unittest tests.tools.privacy_scan.test_non_echo -v
 
       - name: Run privacy gate (candidate tree + full reachable history)
         run: python -m tools.privacy_scan --tree HEAD --history-all

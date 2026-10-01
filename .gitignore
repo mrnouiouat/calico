@@ -11,6 +11,7 @@ logs/
 .user.yml
 
 # Data & secrets
+.planning/
 .env
 .env.*
 *.duckdb

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   fixture-build:
     name: Fixture-mode dbt build and contracts
@@ -46,6 +50,14 @@ jobs:
 
       - name: Run the fixture-mode dbt docs proof
         run: python -m calico_dbt docs --mode fixture
+
+      - name: Check fixture lineage and generated public documentation
+        run: |
+          python -m tools.docs_public check
+          git diff --exit-code -- docs/evidence/dbt-lineage-v1.json
+
+      - name: Check exact citation inventory and decision register
+        run: python -m tools.citation_scan --check
 
       - name: Run repository, disposition-matrix, and CI contract tests
         run: python -m unittest tests.test_repository_contract tests.dbt_foundation.test_disposition_matrix tests.dbt_foundation.test_ci_contract -v
