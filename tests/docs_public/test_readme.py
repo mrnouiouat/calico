@@ -7,6 +7,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -167,11 +168,23 @@ class ReadmeContracts(unittest.TestCase):
 
     def test_cli_is_non_echo_and_check_is_offline(self):
         marker = "invalid" + "-private" + "-reference"
-        result = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public", "inputs",
+        result = subprocess.run([sys.executable, "-m", "tools.docs_public", "inputs",
                                  "--published-ref", marker], cwd=ROOT, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(marker not in result.stdout + result.stderr, "CLI must not reflect invalid input")
         self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_cli_non_echo_in_checkout_without_local_environment(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory).resolve()
+            for package in ("tools", "calico_capture", "calico_dbt", "calico_publish", "calico_landing"):
+                shutil.copytree(ROOT / package, checkout / package,
+                                ignore=shutil.ignore_patterns("__pycache__"))
+            self.assertFalse((checkout / ".venv").exists())
+            # Run the real test against a real CLI, with no mocked subprocess.
+            with patch(__name__ + ".ROOT", checkout):
+                self.test_cli_is_non_echo_and_check_is_offline()
 
     def test_no_metric_math_in_documentation_formatter(self):
         import ast
