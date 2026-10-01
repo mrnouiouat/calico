@@ -350,7 +350,8 @@ TOPICS = (
     "Techniques demonstrated", "Annotated SQL excerpts", "Why the investigation trail is here",
     "How to reproduce",
 )
-BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts")
+BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts", "walkthrough")
+WALKTHROUGH_EMPTY = "Walkthrough: owner recording pending (plan 09-09)."
 MIT_LICENSE = '''MIT License
 
 Copyright (c) 2026 mrnouiouat
@@ -384,6 +385,50 @@ def validate_excerpts(root: Path, document: object) -> None:
 
 def _block(name: str, body: str) -> str:
     return "<!-- calico:" + name + ":start -->\n" + body.rstrip() + "\n<!-- calico:" + name + ":end -->"
+
+
+def validate_walkthrough_link(body: str) -> str:
+    """Allow only the empty handoff or one bounded public video URL.
+
+Availability and owner privacy review are gates in the later recording plan;
+this validator proves URL shape and excludes account/private metadata only.
+"""
+    if body == WALKTHROUGH_EMPTY:
+        return body
+    if not isinstance(body, str):
+        _fail("readme.invalid_walkthrough_link")
+    matched = re.fullmatch(r"Walkthrough: \[Watch the walkthrough\]\(([^\n]+)\)", body)
+    if matched is None:
+        _fail("readme.invalid_walkthrough_link")
+    url = matched.group(1)
+    allowed = (
+        r"https://(?:www\.)?youtube\.com/watch\?v=[A-Za-z0-9_-]{11}",
+        r"https://youtu\.be/[A-Za-z0-9_-]{11}",
+        r"https://github\.com/mrnouiouat/calico/releases/download/[A-Za-z0-9_-][A-Za-z0-9._-]{0,99}/[A-Za-z0-9_-][A-Za-z0-9._-]{0,119}\.(?:mp4|webm|mov)",
+    )
+    if not any(re.fullmatch(pattern, url, re.ASCII) for pattern in allowed) or scan_text("README.md", body):
+        _fail("readme.invalid_walkthrough_link")
+    return body
+
+
+def _walkthrough_block(root: Path) -> str:
+    start, end = "<!-- calico:walkthrough:start -->", "<!-- calico:walkthrough:end -->"
+    candidate = _path(root, "README.md")
+    if not candidate.exists():
+        return _block("walkthrough", WALKTHROUGH_EMPTY)
+    try:
+        text = _read(root, "README.md").decode("utf-8")
+    except UnicodeError:
+        _fail("readme.invalid_readme")
+    starts, ends = text.count(start), text.count(end)
+    if starts == 0 and ends == 0:
+        return _block("walkthrough", WALKTHROUGH_EMPTY)
+    if starts != 1 or ends != 1 or text.index(end) < text.index(start):
+        _fail("readme.marker_drift")
+    body = text.split(start, 1)[1].split(end, 1)[0]
+    if not body.startswith("\n") or not body.endswith("\n"):
+        _fail("readme.invalid_walkthrough_link")
+    return _block("walkthrough", validate_walkthrough_link(body[1:-1]))
 
 
 def _source_binding(document: dict, name: str) -> dict:
@@ -525,7 +570,7 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "Code and documentation use the [MIT license](LICENSE). Registry-derived data comes from a California public record, attributed to the California Attorney General Registry of Charities and Fundraisers through the source link above. This does not assign a new data license or claim public-domain status. The code license provides no warranty for source-reported registry data; the monitor does not replace the current official record.",
     ]
     text = "\n\n".join(("# " if index == 0 else "## ") + TOPICS[index] + "\n\n" + section
-                            for index, section in enumerate(sections)) + "\n"
+                            for index, section in enumerate(sections)) + "\n\n" + _walkthrough_block(base) + "\n"
     if scan_text("README.md", text):
         _fail("readme.unsafe_readme")
     if write:

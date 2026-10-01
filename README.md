@@ -398,3 +398,7 @@ python -m tools.privacy_scan --tree HEAD --history-all
 The docs check is offline and makes no edits. An intentional evidence refresh first fetches origin/published-data, then passes its full immutable commit to `python -m tools.docs_public inputs --published-ref <full-commit>`, followed by `python -m tools.docs_public generate`. Review, regenerate citations, test and privacy-scan before committing. See [build modes](docs/build-modes.md) for real-mode requirements.
 
 Code and documentation use the [MIT license](LICENSE). Registry-derived data comes from a California public record, attributed to the California Attorney General Registry of Charities and Fundraisers through the source link above. This does not assign a new data license or claim public-domain status. The code license provides no warranty for source-reported registry data; the monitor does not replace the current official record.
+
+<!-- calico:walkthrough:start -->
+Walkthrough: owner recording pending (plan 09-09).
+<!-- calico:walkthrough:end -->

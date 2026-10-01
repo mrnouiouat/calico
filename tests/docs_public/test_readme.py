@@ -182,5 +182,59 @@ class ReadmeContracts(unittest.TestCase):
         self.assertEqual(arithmetic, [])
 
 
+class WalkthroughLinkSlotContracts(unittest.TestCase):
+    def test_empty_slot_and_safe_owner_url_preserve_strict_readme(self):
+        from tools.docs_public import readme as api
+        self.assertTrue(callable(getattr(api, "validate_walkthrough_link", None)),
+                        "Later verified walkthrough links need a validated slot")
+        self.assertEqual(api.validate_walkthrough_link(api.WALKTHROUGH_EMPTY), api.WALKTHROUGH_EMPTY)
+        for url in ("https://www.youtube.com/watch?v=AbCdEfGhI_j", "https://youtu.be/AbCdEfGhI_j",
+                    "https://github.com/mrnouiouat/calico/releases/download/walkthrough/monitor.mp4"):
+            value = "Walkthrough: [Watch the walkthrough](" + url + ")"
+            self.assertEqual(api.validate_walkthrough_link(value), value)
+
+    def test_slot_rejects_scheme_account_data_private_path_and_prose(self):
+        from tools.docs_public import readme as api
+        urls = ("http://youtu.be/AbCdEfGhI_j", "javascript:alert(1)",
+                "https://name:secret" + "@" + "youtu.be/AbCdEfGhI_j", "https://youtu.be/AbCdEfGhI_j?token=secret",
+                "https://example.invalid/owner/video", "https://github.com/other/private/releases/download/v1/video.mp4",
+                "https://www.youtube.com/watch?v=AbCdEfGhI_j&account=secret")
+        for url in urls:
+            with self.assertRaises(api.ReadmeInputError):
+                api.validate_walkthrough_link("Walkthrough: [Watch the walkthrough](" + url + ")")
+        private = "/" + "Users/" + "owner/" + "movie.mp4"
+        for value in (private, api.WALKTHROUGH_EMPTY + "\nExtra prose", "Owner approved", ""):
+            with self.assertRaises(api.ReadmeInputError):
+                api.validate_walkthrough_link(value)
+
+    def test_added_slot_does_not_exempt_other_readme_or_generated_drift(self):
+        from tools.docs_public import readme as api
+        import shutil
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory).resolve()
+            for name in api.LOCAL_AUTHORITIES + (api.INPUTS, api.EXCERPTS):
+                destination = target / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            shutil.copytree(ROOT / "dbt/models", target / "dbt/models", dirs_exist_ok=True)
+            subprocess.run(["git", "init", "-q", str(target)], check=True)
+            (target / ".git/objects/info/alternates").write_text(str(ROOT / ".git/objects") + "\n")
+            api.generate_readme(target, write=True)
+            source = (target / "README.md").read_text()
+            self.assertIn(api.WALKTHROUGH_EMPTY, source)
+            linked = source.replace(api.WALKTHROUGH_EMPTY,
+                "Walkthrough: [Watch the walkthrough](https://youtu.be/AbCdEfGhI_j)")
+            (target / "README.md").write_text(linked)
+            api.check_readme(target)
+            api.generate_readme(target, write=True)
+            self.assertEqual((target / "README.md").read_text(), linked)
+            for damaged in (linked + "\nArbitrary prose\n", linked.replace("CP1252", "UTF-8"),
+                            linked.replace("[Phase 10 report URL slot]", "https://example.invalid/report"),
+                            linked.replace("<!-- calico:walkthrough:end -->", "")):
+                (target / "README.md").write_text(damaged)
+                with self.assertRaises(api.ReadmeInputError):
+                    api.check_readme(target)
+
+
 if __name__ == "__main__":
     unittest.main()
