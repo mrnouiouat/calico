@@ -36,6 +36,24 @@ CORE_SPECS = {
     "gate-a-evidence": (11086, "3c7943ad82184cd3e54ab0fd844c2b3ec2732fc63eb05395bd53d9662890cf62", "998dcb90fc82ff3bb1b8ea5d8ec574a1f215631297c8b6855d1437f1a7778152", (
         (8089, 8124, 152, "3ba7c097807ea772135216b74f50b5f9c60c67dcdec81c7f8f965a1cf0557392"),)),
 }
+# The source labels in index-v1 resolve through this closed canonical inventory.
+# These paths identify sources; public checks never open the private originals.
+SOURCE_SPECS = {
+    "migration-report": ("MIGRATION-REPORT.md", "450f0ad3ca822a8e7c5debab336783203687f2f280e948b714658763a418c1a0", "docs/provenance/MIGRATION-REPORT.md"),
+    "gate-a-evidence": ("GATE-A-EVIDENCE.md", "3c7943ad82184cd3e54ab0fd844c2b3ec2732fc63eb05395bd53d9662890cf62", "docs/provenance/GATE-A-EVIDENCE.md"),
+    "spike-manifest": (".planning/spikes/MANIFEST.md", "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3", "docs/provenance/spikes/MANIFEST.md"),
+    "spike-conventions": (".planning/spikes/CONVENTIONS.md", "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144", "docs/provenance/spikes/CONVENTIONS.md"),
+    "spike-001-readme": (".planning/spikes/001-archive-sample-validation/README.md", "53d3b172da598ff1bc4df6ecefd40e31ab91b39773b6aff894f40d746c8d4edb", "docs/provenance/spikes/001-archive-sample-validation/README.md"),
+    "spike-001-json": (".planning/spikes/001-archive-sample-validation/archive-sample-manifest.json", "3e70afb91b97a6ab2458ef8fbef870e203298b9bce0a5752d48e39e4f0df03b6", "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md"),
+    "spike-002-readme": (".planning/spikes/002-entity-change-validation/README.md", "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e", "docs/provenance/spikes/002-entity-change-validation/README.md"),
+    "spike-002-json": (".planning/spikes/002-entity-change-validation/entity-changes.json", "b6877890c5961664d4579bac1cd17b3149b2b983dc9819b6a0bc26bee2f238c2", "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md"),
+    "spike-003-readme": (".planning/spikes/003-duration-metrics/README.md", "09bb320d02b31820a4caed7805e2c5903f5785e556126167c63540ceb39fab97", "docs/provenance/spikes/003-duration-metrics/README.md"),
+    "spike-005-readme": (".planning/spikes/005-project-recommendation/README.md", "edb47f988e573c913dbfe95d07f6701f73ed217430ff1ecdcf6d6c4537e5818c", "docs/provenance/spikes/005-project-recommendation/README.md"),
+}
+
+
+def canonical_source(record):
+    return SOURCE_SPECS.get(record.source_label, (record.destination,))[0]
 
 
 @dataclass(frozen=True)
@@ -210,6 +228,11 @@ def validate_successor(data: bytes, record: SuccessorRecord) -> bytes:
                 raise ProvenanceError("provenance.hash_chain")
         else:
             validate_redaction_chain(body, PredecessorAnchor(record.source_label, record.predecessor_sha256, record.destination), record.redaction_chain)
+        if record.destination.endswith(".json.md"):
+            try:
+                json.loads(body)
+            except (ValueError, UnicodeError):
+                raise ProvenanceError("provenance.json_envelope") from None
         return body
     except (TypeError, ValueError, AttributeError):
         raise ProvenanceError("provenance.record_schema") from None
@@ -278,12 +301,16 @@ GUIDANCE_RULES = (
     (rb"archive[^\r\n]*census|census[^\r\n]*archive", "Archive census prerequisite", "Archive census is outside v1 (D-012)", "D-012"),
     (rb"newline.aware|embedded[^\r\n]*newline|real[^\r\n]*CSV reader", "Default CSV interpretation", "CP1252 with QUOTE_NONE; no embedded record newlines (D-003)", "D-003"),
 )
+SPIKE_GUIDANCE_RULES = (
+    (rb"Turnbull|restricted.mean|constant.hazard|survival|180[^\r\n]*365|365[^\r\n]*730", "Deferred duration analysis", "No Turnbull survival, restricted mean duration, constant-hazard equivalent or standardized 30-day risk in v1; final panel has three releases spanning 35 days. Separate evaluation requires all five estimability conditions (D-010)", "D-010"),
+    (rb"strict[^\r\n]*cur|conditional.precision|registry.wide.precision|unconditional.sensitivity", "Historical diagnostic denominator", "Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair (D-006)", "D-006"),
+)
 
 
-def derive_guidance(body: bytes) -> list[CorrectionRow]:
+def derive_guidance(body: bytes, *, extended: bool = False) -> list[CorrectionRow]:
     """Retain only supersession rules actually observed in this body."""
     rows = []
-    for pattern, claim, corrected, decision in GUIDANCE_RULES:
+    for pattern, claim, corrected, decision in (*GUIDANCE_RULES, *(SPIKE_GUIDANCE_RULES if extended else ())):
         locations = tuple(i for i, line in enumerate(body.splitlines(), 1) if re.search(pattern, line, re.I))
         if locations:
             rows.append(CorrectionRow(claim, claim, corrected, AUTHORITY_LINKS[2], locations))
@@ -297,9 +324,9 @@ def validate_correction_rows(body: bytes, rows: list[CorrectionRow]) -> None:
         if (not row.body_lines or row.body_lines != tuple(sorted(set(row.body_lines)))
                 or any(type(i) is not int or i < 1 or i > len(lines) for i in row.body_lines)):
             raise ProvenanceError("provenance.correction_occurrence")
-        guidance = [entry for entry in GUIDANCE_RULES if entry[1] == row.claim]
+        guidance = [entry for entry in (*GUIDANCE_RULES, *SPIKE_GUIDANCE_RULES) if entry[1] == row.claim]
         if guidance:
-            expected = next((candidate for candidate in derive_guidance(body) if candidate.claim == row.claim), None)
+            expected = next((candidate for candidate in derive_guidance(body, extended=True) if candidate.claim == row.claim), None)
             if row != expected:
                 raise ProvenanceError("provenance.correction_occurrence")
         else:
@@ -364,6 +391,94 @@ def derive_core_corrections(body: bytes, root: Path, project: Path) -> list[Corr
         raise ProvenanceError("provenance.evidence_schema") from None
 
 
+def derive_spike_corrections(body: bytes, root: Path, historical_evidence: Path,
+                             kind: str, project: Path | None = None) -> list[CorrectionRow]:
+    """Project already computed evidence, retaining each source occurrence.
+
+    No analytical totals or membership sets are recomputed here. The correction
+    index authenticates both the predecessor and the public successor bytes.
+    """
+    if kind not in ("001", "002"):
+        raise ProvenanceError("provenance.evidence_schema")
+    evidence = f"docs/evidence/gate-a/spike-{kind}-successor-v1.json"
+    index = _json(root / AUTHORITY_LINKS[0])
+    current = _json(root / evidence)
+    historical = _json(historical_evidence)
+    try:
+        anchors = [row for row in index["corrections"] if row["successor_file"] == Path(evidence).name]
+        if (len(anchors) != 1 or _sha256_file(root / evidence) != anchors[0]["successor_sha256"]
+                or _sha256_file(historical_evidence) != anchors[0]["supersedes"]["predecessor_sha256"]):
+            raise ProvenanceError("provenance.evidence_anchor")
+        pairs = []
+        if kind == "001":
+            release = current["as_of_date"]
+            for item in historical["entries"]:
+                if item["logical_release"] == release:
+                    old, new = item["parsed_rows"], current["logical_list_totals"][item["list"]]
+                    if old != new:
+                        pairs.append((f"{release} {item['list']} parsed rows (parser repair)", old, new, "parsed_rows"))
+            # PROJECT records this supersedes pair; never sum source rows here.
+            if project is None:
+                raise ProvenanceError("provenance.correction_authority")
+            table = project.read_bytes().split(b"## Superseded Figures and Claims", 1)[1].split(b"\n## ", 1)[0]
+            match = [line.split(b"|") for line in table.splitlines()
+                     if line.startswith(b"|") and f"{current['release_total']:,}".encode() in line.split(b"|")[2]]
+            if len(match) != 1:
+                raise ProvenanceError("provenance.correction_authority")
+            old_values = re.findall(rb"[0-9]+(?:,[0-9]{3})+", match[0][1])
+            new_values = re.findall(rb"[0-9]+(?:,[0-9]{3})+", match[0][2])
+            if (f"{current['release_total']:,}".encode() not in new_values
+                    or new_values.index(f"{current['release_total']:,}".encode()) >= len(old_values)):
+                raise ProvenanceError("provenance.correction_authority")
+            old = old_values[new_values.index(f"{current['release_total']:,}".encode())]
+            pairs.append((f"{release} total rows (parser repair)", int(old.replace(b",", b"")), current["release_total"], None))
+        else:
+            for item in current["coverage"]:
+                release = item["as_of_date"]
+                prior = historical["release_coverage"].get(release)
+                if prior is None:
+                    continue
+                for old_key, new_key in (("rows", "total_row_count"), ("keyless_rows", "keyless_row_count")):
+                    old, new = prior[old_key], item[new_key]
+                    if old != new:
+                        pairs.append((f"{release} {old_key} (parser repair)", old, new, old_key))
+        result = []
+        is_json = body.lstrip().startswith((b"{", b"["))
+        contexts = {}
+        release_context, list_context = None, None
+        for number, line in enumerate(body.splitlines(), 1):
+            release_match = re.search(rb'"logical_release"\s*:\s*"([0-9-]{10})"|"([0-9-]{10})"\s*:\s*\{', line)
+            if release_match:
+                release_context = next(group for group in release_match.groups() if group is not None).decode()
+            list_match = re.search(rb'"list"\s*:\s*"([a-z-]+)"', line)
+            if list_match:
+                list_context = list_match.group(1).decode()
+            contexts[number] = (release_context, list_context)
+        for claim, old, new, field in pairs:
+            token = re.compile(rb"(?<![0-9])" + re.escape(str(old).encode()) + rb"(?![0-9])|(?<![0-9,])" + re.escape(f"{old:,}".encode()) + rb"(?![0-9,])")
+            for number, line in enumerate(body.splitlines(), 1):
+                release_context, list_context = contexts[number]
+                correct_context = (not is_json or field is None or
+                    (release_context == claim[:10] and f'"{field}"'.encode() in line
+                     and (kind != "001" or list_context in claim)))
+                if token.search(line) and correct_context:
+                    result.append(CorrectionRow(claim, f"{old:,}", f"{new:,}", evidence, (number,)))
+        if kind == "002":
+            for field, date_key in (("from_keyed", "from"), ("to_keyed", "to")):
+                release = historical["comparison"][date_key]
+                prior_hash = historical["membership_sets"][field]["sha256"]
+                matches = [row for row in current["keyed_membership"] if row["as_of_date"] == release]
+                if len(matches) != 1 or prior_hash != matches[0]["sha256"]:
+                    raise ProvenanceError("provenance.correction_authority")
+                for number, line in enumerate(body.splitlines(), 1):
+                    if prior_hash.encode() in line:
+                        result.append(CorrectionRow(f"{release} canonical keyed membership", prior_hash,
+                            f"{matches[0]['sha256']}; confirmed by committed recomputation, no recalculation here", evidence, (number,)))
+        return result
+    except (KeyError, IndexError, TypeError, OSError, ValueError):
+        raise ProvenanceError("provenance.evidence_schema") from None
+
+
 def _prefix(anchor: PredecessorAnchor, import_date: str, corrections: list[tuple[str, str, str]], *, guidance=(), redacted=False) -> bytes:
     try:
         if date.fromisoformat(import_date).isoformat() != import_date:
@@ -408,7 +523,8 @@ def _entries(root: Path) -> list[SuccessorRecord]:
     records = [SuccessorRecord.from_dict(item) for item in payload["entries"]]
     destinations = [item.destination for item in records]
     labels = [item.source_label for item in records]
-    if destinations != sorted(set(destinations)) or len(labels) != len(set(labels)):
+    if (records != sorted(records, key=canonical_source) or len(destinations) != len(set(destinations))
+            or len(labels) != len(set(labels))):
         raise ProvenanceError("provenance.duplicate_slot")
     for item in records:
         path = root / item.destination
@@ -422,7 +538,8 @@ def _entries(root: Path) -> list[SuccessorRecord]:
 
 def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy: Policy, *, import_date: str,
                     historical_evidence: Path | None = None, replace_existing: bool = False,
-                    observed_only: bool = True, project: Path | None = None) -> SuccessorRecord:
+                    observed_only: bool = True, project: Path | None = None,
+                    spike_kind: str | None = None) -> SuccessorRecord:
     """Verify, scan, and publish a complete directory containing body and index.
 
     Both files are prepared off to the side. Directory renames expose the old
@@ -454,10 +571,14 @@ def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy:
         redaction_chain = None
         if anchor.source_label in CORE_SPECS:
             body, redaction_chain = redact_core_body(body, anchor)
-        corrections = derive_corrections(body, root, historical_evidence) if historical_evidence is not None else []
-        if project is not None:
+        corrections = derive_corrections(body, root, historical_evidence) if historical_evidence is not None and spike_kind is None else []
+        if spike_kind is not None:
+            if historical_evidence is None:
+                raise ProvenanceError("provenance.evidence_schema")
+            corrections = [row.render() for row in derive_spike_corrections(body, root, historical_evidence, spike_kind, project)]
+        if project is not None and spike_kind is None:
             corrections = [row.render() for row in derive_core_corrections(body, root, project)]
-        guidance = derive_guidance(body)
+        guidance = derive_guidance(body, extended=anchor.source_label in ("spike-001-readme", "spike-001-json", "spike-002-json", "spike-003-readme", "spike-005-readme"))
         validate_correction_rows(body, guidance)
         prefix = _prefix(anchor, import_date, corrections,
             guidance=[row.render() for row in guidance], redacted=redaction_chain is not None)
@@ -478,7 +599,7 @@ def build_successor(source: Path, anchor: PredecessorAnchor, root: Path, policy:
                 raise ProvenanceError("provenance.duplicate_slot")
             entries.remove(duplicates[0])
         entries.append(record)
-        entries.sort(key=lambda item: item.destination)
+        entries.sort(key=canonical_source)
         with tempfile.TemporaryDirectory(prefix="calico-provenance-") as directory:
             staging = Path(directory).resolve()
             candidate = staging / anchor.destination
@@ -524,11 +645,31 @@ def validate_index(root: Path, expected: tuple[PredecessorAnchor, ...]) -> list[
     records = _entries(root)
     slots = {(row.source_label, row.destination, row.predecessor_sha256) for row in records}
     wanted = {(row.source_label, row.destination, row.predecessor_sha256) for row in expected}
-    if len(wanted) != len(expected) or slots != wanted or len(records) != len(expected):
+    if not expected or len(wanted) != len(expected) or slots != wanted or len(records) != len(expected):
         raise ProvenanceError("provenance.index_completeness")
     actual_paths = {path.relative_to(root).as_posix() for path in (root / "docs/provenance").rglob("*") if path.is_file() and path.relative_to(root).as_posix() != INDEX_PATH}
     if actual_paths != {row.destination for row in records}:
         raise ProvenanceError("provenance.index_completeness")
+    return records
+
+
+def validate_complete_index(root: Path) -> list[SuccessorRecord]:
+    """Enforce ten locked slots and resolve evidence within the public root.
+
+    The decision register is the explicit next-plan (09-04) dependency. This
+    check verifies every evidence target now; citation completeness verifies
+    the register once that separately owned output is produced.
+    """
+    expected = tuple(PredecessorAnchor(label, digest, destination)
+                     for label, (_, digest, destination) in SOURCE_SPECS.items())
+    records = validate_index(root, expected)
+    for record in records:
+        prefix = (root / record.destination).read_bytes()[:record.prefix_bytes]
+        for target in re.findall(rb"\[[^\]]+\]\(([^)]+)\)", prefix):
+            path = (root / record.destination).parent / target.decode("utf-8")
+            _confined(root.resolve(), path)
+            if not path.is_file() and path.resolve() != (root / AUTHORITY_LINKS[2]).resolve():
+                raise ProvenanceError("provenance.missing_authority")
     return records
 
 

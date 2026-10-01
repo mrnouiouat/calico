@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import io
 import json
+import shutil
 import tempfile
 import unittest
 from dataclasses import replace
@@ -180,6 +181,141 @@ class ProvenanceTests(unittest.TestCase):
         self.assertFalse((self.root / "docs/provenance").exists(), "malformed source published")
 
 
+class JsonEnvelopeTests(unittest.TestCase):
+    def setUp(self):
+        self.api = importlib.import_module("tools.docs_public.provenance")
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+
+    def make(self, body=b'{"counts": [1, 2]}\r\n'):
+        source = self.root / "source.json"
+        source.write_bytes(body)
+        anchor = self.api.PredecessorAnchor("synthetic-json", hashlib.sha256(body).hexdigest(), "docs/provenance/synthetic.json.md")
+        record = self.api.build_successor(source, anchor, self.root, POLICY, import_date="2026-10-01")
+        return (self.root / record.destination).read_bytes(), record
+
+    def test_json_envelope_rejects_reanchored_suffix(self):
+        data, record = self.make()
+        changed = data + b"suffix"
+        forged = replace(record, predecessor_sha256=hashlib.sha256(changed[record.prefix_bytes:]).hexdigest(),
+            body_sha256=hashlib.sha256(changed[record.prefix_bytes:]).hexdigest(), successor_sha256=hashlib.sha256(changed).hexdigest())
+        with self.assertRaises(self.api.ProvenanceError):
+            self.api.validate_successor(changed, forged)
+
+    def test_json_envelope_preserves_boundary_and_final_byte(self):
+        for body in (b"{}", b'{"counts": [1, 2]}\r\n', b"[1,2]\n"):
+            with self.subTest(length=len(body)):
+                data, record = self.make(body)
+                self.assertTrue(self.api.validate_successor(data, record) == body, "JSON body changed")
+                self.assertTrue(data[record.prefix_bytes:] == body and data[-1:] == body[-1:], "JSON boundary changed")
+                self.assertTrue(json.loads(data[record.prefix_bytes:]) == json.loads(body), "JSON parse changed")
+                for changed in (data[:record.prefix_bytes - 1] + data[record.prefix_bytes:], data[:-1] + b"x"):
+                    with self.assertRaises(self.api.ProvenanceError):
+                        self.api.validate_successor(changed, record)
+                # Each iteration intentionally replaces the same logical source.
+                (self.root / self.api.INDEX_PATH).unlink()
+                (self.root / record.destination).unlink()
+                (self.root / "docs/provenance").rmdir()
+
+    def test_empty_single_and_multiple_correction_lists(self):
+        anchor = self.api.PredecessorAnchor("synthetic-json", "a" * 64, "docs/provenance/synthetic.json.md")
+        for count in (0, 1, 3):
+            rows = [(f"release list claim {i}", f"corrected {i}", self.api.AUTHORITY_LINKS[0]) for i in range(count)]
+            prefix = self.api._prefix(anchor, "2026-10-01", rows)
+            self.assertTrue(prefix.count(b"| [Authority](") == count, "correction cardinality changed")
+            self.assertTrue(prefix.endswith(self.api.END_MARKER), "end marker drift")
+
+
+class CompleteProvenanceTests(unittest.TestCase):
+    def test_exact_ten_sources_are_retained(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        payload = json.loads((ROOT / api.INDEX_PATH).read_bytes())
+        self.assertTrue(len(payload["entries"]) == 10, "exact ten-source inventory is incomplete")
+        api.validate_complete_index(ROOT)
+
+    def test_complete_index_rejects_missing_extra_duplicate_order_and_hash_drift(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            shutil.copytree(ROOT / "docs", root / "docs")
+            index = root / api.INDEX_PATH
+            original = json.loads(index.read_bytes())
+            rows = original["entries"]
+            for changed in ([], rows[:-1], rows + [rows[0]], list(reversed(rows)), rows[1:] + [dict(rows[0], source_label="fabricated")]):
+                index.write_text(json.dumps(dict(original, entries=changed)))
+                with self.assertRaises(api.ProvenanceError):
+                    api.validate_complete_index(root)
+            index.write_text(json.dumps(original))
+            path = root / rows[0]["destination"]
+            data = path.read_bytes()
+            path.write_bytes(data[:-1] + b"x")
+            with self.assertRaises(api.ProvenanceError):
+                api.validate_complete_index(root)
+
+    def test_remaining_body_anchors_json_and_observed_framing(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        records = api.validate_complete_index(ROOT)
+        lengths = {"spike-001-readme": 5984, "spike-001-json": 7305, "spike-002-json": 8781,
+                   "spike-003-readme": 7277, "spike-005-readme": 14578}
+        for record in records:
+            if record.source_label not in lengths:
+                continue
+            data = (ROOT / record.destination).read_bytes()
+            body = api.validate_successor(data, record)
+            self.assertTrue(len(body) == lengths[record.source_label], "body length changed")
+            self.assertTrue(record.body_sha256 == record.predecessor_sha256, "predecessor bytes changed")
+            banner = data[:record.prefix_bytes]
+            for row in api.derive_guidance(body, extended=True):
+                old, new, _ = row.render()
+                self.assertTrue(old.encode() in banner and new.encode() in banner, "observed guidance missing")
+            if record.destination.endswith(".json.md"):
+                self.assertTrue(isinstance(json.loads(body), dict), "historical JSON is not parseable")
+        self.assertFalse((ROOT / "docs/provenance/spikes/004-job-posting-audit").exists(), "absent spike fabricated")
+
+    def test_json_numeric_corrections_are_contextual_and_membership_is_confirmed(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        records = {row.source_label: row for row in api.validate_complete_index(ROOT)}
+        checks = {"spike-001-json": (b"128,475", b"128,477", b"charities-undetermined-status"),
+                  "spike-002-json": (b"557,065", b"557,067", b"557,289", b"557,291", b"309,624", b"309,626", b"309,212", b"309,214", b"canonical keyed membership")}
+        for label, tokens in checks.items():
+            record = records[label]
+            banner = (ROOT / record.destination).read_bytes()[:record.prefix_bytes]
+            self.assertTrue(all(token in banner for token in tokens), "contextual JSON correction missing")
+
+    def test_every_derived_numeric_occurrence_has_a_banner_row(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        records = {row.source_label: row for row in api.validate_complete_index(ROOT)}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project.md"
+            project.write_bytes(b"## Superseded Figures and Claims\n| 557,065 | 557,067 |\n")
+            for label, kind in (("spike-001-readme", "001"), ("spike-001-json", "001"), ("spike-002-json", "002")):
+                record = records[label]
+                data = (ROOT / record.destination).read_bytes()
+                body = api.validate_successor(data, record)
+                source_record = records[f"spike-{kind}-json"]
+                historical = root / f"{kind}.json"
+                historical.write_bytes(api.validate_successor((ROOT / source_record.destination).read_bytes(), source_record))
+                rows = api.derive_spike_corrections(body, ROOT, historical, kind, project if kind == "001" else None)
+                self.assertTrue(bool(rows), "numeric correction set is empty")
+                for row in rows:
+                    old, new, _ = row.render()
+                    self.assertTrue(old.encode() in data[:record.prefix_bytes] and new.encode() in data[:record.prefix_bytes], "numeric occurrence lacks banner row")
+                if label == "spike-001-readme":
+                    totals = [row for row in rows if "total rows" in row.claim]
+                    self.assertTrue(len(totals) == 2 and totals[0].body_lines != totals[1].body_lines, "equal occurrences collapsed")
+
+    def test_missing_committed_evidence_authority_fails(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            shutil.copytree(ROOT / "docs", root / "docs")
+            (root / api.AUTHORITY_LINKS[0]).unlink()
+            with self.assertRaises(api.ProvenanceError):
+                api.validate_complete_index(root)
+
+
 class CommittedTracerTests(unittest.TestCase):
     def test_public_tracer_chain_and_correction_rows(self):
         api = importlib.import_module("tools.docs_public.provenance")
@@ -304,10 +440,9 @@ class CommittedCoreTests(unittest.TestCase):
 
 
 class CommittedSharedGuidanceTests(unittest.TestCase):
-    def test_exact_five_source_slots_and_unchanged_shared_bodies(self):
+    def test_shared_source_slots_and_unchanged_shared_bodies(self):
         api = importlib.import_module("tools.docs_public.provenance")
         index = json.loads((ROOT / api.INDEX_PATH).read_bytes())
-        self.assertTrue(len(index["entries"]) == 5, "five retained sources are required")
         expected = (
             api.PredecessorAnchor("migration-report", api.CORE_SPECS["migration-report"][1], "docs/provenance/MIGRATION-REPORT.md"),
             api.PredecessorAnchor("gate-a-evidence", api.CORE_SPECS["gate-a-evidence"][1], "docs/provenance/GATE-A-EVIDENCE.md"),
@@ -315,7 +450,10 @@ class CommittedSharedGuidanceTests(unittest.TestCase):
             api.PredecessorAnchor("spike-manifest", "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3", "docs/provenance/spikes/MANIFEST.md"),
             api.PredecessorAnchor("spike-conventions", "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144", "docs/provenance/spikes/CONVENTIONS.md"),
         )
-        records = api.validate_index(ROOT, expected)
+        actual = {row["source_label"]: row for row in index["entries"]}
+        self.assertTrue(all(anchor.source_label in actual and actual[anchor.source_label]["predecessor_sha256"] == anchor.predecessor_sha256
+            and actual[anchor.source_label]["destination"] == anchor.destination for anchor in expected), "existing five anchors changed")
+        records = api.validate_index(ROOT, tuple(api.PredecessorAnchor(row["source_label"], row["predecessor_sha256"], row["destination"]) for row in index["entries"]))
         for record in records:
             if record.source_label not in ("spike-manifest", "spike-conventions"):
                 continue

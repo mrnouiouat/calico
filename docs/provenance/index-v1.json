@@ -2,6 +2,126 @@
   "schema_version": "provenance-index-v1",
   "entries": [
     {
+      "source_label": "spike-001-readme",
+      "predecessor_sha256": "53d3b172da598ff1bc4df6ecefd40e31ab91b39773b6aff894f40d746c8d4edb",
+      "destination": "docs/provenance/spikes/001-archive-sample-validation/README.md",
+      "prefix_bytes": 1961,
+      "prefix_sha256": "34aa7a64e2b553a4b2b82a7fe8febb07276a490eecee25666abf708fd187fe1d",
+      "body_sha256": "53d3b172da598ff1bc4df6ecefd40e31ab91b39773b6aff894f40d746c8d4edb",
+      "successor_sha256": "c675cc8342fa53c5bff65bcbc24a1fd6e23e95a4e96c81e1ab1daa2408d6bc3e",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-001-json",
+      "predecessor_sha256": "3e70afb91b97a6ab2458ef8fbef870e203298b9bce0a5752d48e39e4f0df03b6",
+      "destination": "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md",
+      "prefix_bytes": 1282,
+      "prefix_sha256": "5e309c032f5a9f274f772f9e169a47da94096c704bad490671967bbd41fdfc51",
+      "body_sha256": "3e70afb91b97a6ab2458ef8fbef870e203298b9bce0a5752d48e39e4f0df03b6",
+      "successor_sha256": "1605b57c82095b97acdfbd619d96f2e5ef7cc727b73eb451962cc7f3ebd77119",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-002-readme",
+      "predecessor_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
+      "destination": "docs/provenance/spikes/002-entity-change-validation/README.md",
+      "prefix_bytes": 2288,
+      "prefix_sha256": "c6b7bc010218ad88bc55bd000904b3276546e49f0510879df39101a488276592",
+      "body_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
+      "successor_sha256": "c40ca2576afe56b71538e5982001dd3d5a02fd5944b7c97e00976233eeef5d9b",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-002-json",
+      "predecessor_sha256": "b6877890c5961664d4579bac1cd17b3149b2b983dc9819b6a0bc26bee2f238c2",
+      "destination": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md",
+      "prefix_bytes": 2325,
+      "prefix_sha256": "931b3a4631eb13a4e15018cb93ad22e67373bbb99670aeafa48a75ba69d7a2bb",
+      "body_sha256": "b6877890c5961664d4579bac1cd17b3149b2b983dc9819b6a0bc26bee2f238c2",
+      "successor_sha256": "95a1675f9d7f07cb5150d5c493ba24f9f2667cab3e2937442666d949021f793d",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-003-readme",
+      "predecessor_sha256": "09bb320d02b31820a4caed7805e2c5903f5785e556126167c63540ceb39fab97",
+      "destination": "docs/provenance/spikes/003-duration-metrics/README.md",
+      "prefix_bytes": 1651,
+      "prefix_sha256": "215ca6bf82332ba059f096d05b3e7b457e3bcda9c551a163de1beacee1dd51d0",
+      "body_sha256": "09bb320d02b31820a4caed7805e2c5903f5785e556126167c63540ceb39fab97",
+      "successor_sha256": "fb92f25967b84345c8d0bdc425f14567ba688b07082f435e649c0a39d394635f",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-005-readme",
+      "predecessor_sha256": "edb47f988e573c913dbfe95d07f6701f73ed217430ff1ecdcf6d6c4537e5818c",
+      "destination": "docs/provenance/spikes/005-project-recommendation/README.md",
+      "prefix_bytes": 2384,
+      "prefix_sha256": "aae0393289ceac22b5264560839cf75b474287c9a113e38bf7c538597b431d2d",
+      "body_sha256": "edb47f988e573c913dbfe95d07f6701f73ed217430ff1ecdcf6d6c4537e5818c",
+      "successor_sha256": "1df397e143734bf811ff5ad493c437aa88763ce2e544505fc437288f8cead7b6",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-conventions",
+      "predecessor_sha256": "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144",
+      "destination": "docs/provenance/spikes/CONVENTIONS.md",
+      "prefix_bytes": 1158,
+      "prefix_sha256": "94922a95045411fd030b920ac8f0281f09cb387f77c4832c1141ba536d722391",
+      "body_sha256": "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144",
+      "successor_sha256": "da9eadcd04baf2b49f0765579d43d7b9e5fd5ca20eeeebfe02b4a47f922b3877",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
+      "source_label": "spike-manifest",
+      "predecessor_sha256": "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3",
+      "destination": "docs/provenance/spikes/MANIFEST.md",
+      "prefix_bytes": 1483,
+      "prefix_sha256": "92811397b664553ef232fb0f3312073a429e915893240c67cd01f5ec4acf4294",
+      "body_sha256": "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3",
+      "successor_sha256": "327f9fd318b49efc90157396caf6530eda1804c8be305b45802fa2a51d6bcc4b",
+      "marker_version": "calico-provenance-v1",
+      "authority_links": [
+        "docs/evidence/gate-a/correction-index-v1.json",
+        "docs/evidence/gate-a/spike-002-successor-v1.json",
+        "docs/decisions/register.md"
+      ]
+    },
+    {
       "source_label": "gate-a-evidence",
       "predecessor_sha256": "3c7943ad82184cd3e54ab0fd844c2b3ec2732fc63eb05395bd53d9662890cf62",
       "destination": "docs/provenance/GATE-A-EVIDENCE.md",
@@ -90,51 +210,6 @@
           "2da1a02cb3abf17cfc54c2a47628a4a059fe5b333fd76e6534d71768bff9114f"
         ]
       }
-    },
-    {
-      "source_label": "spike-002-readme",
-      "predecessor_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
-      "destination": "docs/provenance/spikes/002-entity-change-validation/README.md",
-      "prefix_bytes": 2288,
-      "prefix_sha256": "c6b7bc010218ad88bc55bd000904b3276546e49f0510879df39101a488276592",
-      "body_sha256": "349b619aa6f6111f7ec9b3e4dbb38e44d1b95934cabdc2ff86a6f96c60fa2e5e",
-      "successor_sha256": "c40ca2576afe56b71538e5982001dd3d5a02fd5944b7c97e00976233eeef5d9b",
-      "marker_version": "calico-provenance-v1",
-      "authority_links": [
-        "docs/evidence/gate-a/correction-index-v1.json",
-        "docs/evidence/gate-a/spike-002-successor-v1.json",
-        "docs/decisions/register.md"
-      ]
-    },
-    {
-      "source_label": "spike-conventions",
-      "predecessor_sha256": "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144",
-      "destination": "docs/provenance/spikes/CONVENTIONS.md",
-      "prefix_bytes": 1158,
-      "prefix_sha256": "94922a95045411fd030b920ac8f0281f09cb387f77c4832c1141ba536d722391",
-      "body_sha256": "5d69a9d50c1eaa9d8fb4335617ea065409df92aa94c375d207bc3f2857edd144",
-      "successor_sha256": "da9eadcd04baf2b49f0765579d43d7b9e5fd5ca20eeeebfe02b4a47f922b3877",
-      "marker_version": "calico-provenance-v1",
-      "authority_links": [
-        "docs/evidence/gate-a/correction-index-v1.json",
-        "docs/evidence/gate-a/spike-002-successor-v1.json",
-        "docs/decisions/register.md"
-      ]
-    },
-    {
-      "source_label": "spike-manifest",
-      "predecessor_sha256": "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3",
-      "destination": "docs/provenance/spikes/MANIFEST.md",
-      "prefix_bytes": 1483,
-      "prefix_sha256": "92811397b664553ef232fb0f3312073a429e915893240c67cd01f5ec4acf4294",
-      "body_sha256": "8004a7891823c98f7ee17c4332190cd217d558e11097ea846c40615d048226f3",
-      "successor_sha256": "327f9fd318b49efc90157396caf6530eda1804c8be305b45802fa2a51d6bcc4b",
-      "marker_version": "calico-provenance-v1",
-      "authority_links": [
-        "docs/evidence/gate-a/correction-index-v1.json",
-        "docs/evidence/gate-a/spike-002-successor-v1.json",
-        "docs/decisions/register.md"
-      ]
     }
   ]
 }
