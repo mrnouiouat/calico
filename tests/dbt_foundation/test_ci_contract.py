@@ -137,12 +137,13 @@ class WorkflowContractTests(unittest.TestCase):
         """
 
         content = self._workflow()
-        checked = 0
-        for line in content.splitlines():
-            if "python -m unittest discover" in line:
-                checked += 1
-                self.assertIn("-t .", line)
-        self.assertEqual(checked, 1, "expected exactly one discovery invocation")
+        discovery = [line.strip().removeprefix("run: ")
+                     for line in content.splitlines()
+                     if "python -m unittest discover" in line]
+        self.assertEqual(discovery, [
+            "python -m unittest discover -s tests -t . -v",
+            "python -m unittest discover -s tests/docs_public -t . -v",
+        ], "require both complete-suite and documentation discovery with repository imports")
 
     def test_workflow_runs_fixture_mode_only_and_never_real_mode(self) -> None:
         content = self._workflow()
