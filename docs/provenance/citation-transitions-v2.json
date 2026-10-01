@@ -7,6 +7,66 @@
   },
   "entries": [
     {
+      "prior_commit": "42449caee6d8c6b162d2c74e4d9d2b186f0fa9e5",
+      "prior_blob": "7cd43234e17a458b1a52d246290880f7d094a464",
+      "prior_sha256": "95a1675f9d7f07cb5150d5c493ba24f9f2667cab3e2937442666d949021f793d",
+      "occurrence": {
+        "source": "docs/provenance/spikes/002-entity-change-validation/entity-changes.json.md",
+        "locator": "L16:C268",
+        "target": "docs/decisions/register.md",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null,
+      "successor_commit": null,
+      "successor_blob": "b8fa88f37306568ab84fe7a0343c716ff985daa4",
+      "successor_sha256": "188a05739f98de96f65dfad8956c8f4d58ebceec6a9fb066205e025b8d54f7d5",
+      "supersedes": null
+    },
+    {
+      "prior_commit": "42449caee6d8c6b162d2c74e4d9d2b186f0fa9e5",
+      "prior_blob": "8ad43343300be0199d2a4967cc41473214d95eeb",
+      "prior_sha256": "fb92f25967b84345c8d0bdc425f14567ba688b07082f435e649c0a39d394635f",
+      "occurrence": {
+        "source": "docs/provenance/spikes/003-duration-metrics/README.md",
+        "locator": "L12:C260",
+        "target": "docs/decisions/register.md",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null,
+      "successor_commit": null,
+      "successor_blob": "07d6a3e8b4351900ddc78700cb9f34852996e402",
+      "successor_sha256": "dd623628ae013ff154d672be6ec0343d0eafbb1a9db96eefe46e22d7d509c0ac",
+      "supersedes": null
+    },
+    {
+      "prior_commit": "42449caee6d8c6b162d2c74e4d9d2b186f0fa9e5",
+      "prior_blob": "a408612ed7723ba860a1d5758886efb1f1fac1d1",
+      "prior_sha256": "1df397e143734bf811ff5ad493c437aa88763ce2e544505fc437288f8cead7b6",
+      "occurrence": {
+        "source": "docs/provenance/spikes/005-project-recommendation/README.md",
+        "locator": "L16:C260",
+        "target": "docs/decisions/register.md",
+        "kind": "markdown_link",
+        "resolution": "resolved",
+        "disposition": null,
+        "successor": null
+      },
+      "disposition": "removed",
+      "current": null,
+      "successor_commit": null,
+      "successor_blob": "8f272623df9603b0486cd51bdb32f92002db0278",
+      "successor_sha256": "62400e2211ed14f7f5187eb071a0cced4cbf5f882320aa1e4267444218189f6c",
+      "supersedes": null
+    },
+    {
       "prior_commit": "62231090dcd78b4811cc2e02c54575b4a3a07a21",
       "prior_blob": "c12646576bb1b31dbbbf99c30b23b2200a309c41",
       "prior_sha256": "97cecfa9927e0511d4fb4950a3a91ae315ce9b00b3470c2cabf9596911d1bce5",

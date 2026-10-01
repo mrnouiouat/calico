@@ -24,6 +24,7 @@ END_MARKER = b"<!-- calico-provenance-v1:end -->\n"
 MARKER_VERSION = "calico-provenance-v1"
 INDEX_PATH = "docs/provenance/index-v1.json"
 AUTHORITY_LINKS = ("docs/evidence/gate-a/correction-index-v1.json", "docs/evidence/gate-a/spike-002-successor-v1.json", "docs/decisions/register.md")
+DENOMINATOR_AUTHORITY = "contracts/metric-denominators-v1.json"
 REDACTION_PATH = "docs/redactions/phase-09-provenance-paths-v1.json"
 LOCAL_PATH_TOKEN = b"[LOCAL_PATH_REDACTED]"
 # Safe coordinates and digests, never the removed workstation values.
@@ -303,17 +304,18 @@ GUIDANCE_RULES = (
 )
 SPIKE_GUIDANCE_RULES = (
     (rb"Turnbull|restricted.mean|constant.hazard|survival|180[^\r\n]*365|365[^\r\n]*730", "Deferred duration analysis", "No Turnbull survival, restricted mean duration, constant-hazard equivalent or standardized 30-day risk in v1; final panel has three releases spanning 35 days. Separate evaluation requires all five estimability conditions (D-010)", "D-010"),
-    (rb"strict[^\r\n]*cur|conditional.precision|registry.wide.precision|unconditional.sensitivity", "Historical diagnostic denominator", "Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair (D-006)", "D-006"),
+    (rb"strict[^\r\n]*cur|conditional.precision|registry.wide.precision|unconditional.sensitivity", "Historical diagnostic denominator", "Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair", DENOMINATOR_AUTHORITY),
 )
 
 
 def derive_guidance(body: bytes, *, extended: bool = False) -> list[CorrectionRow]:
     """Retain only supersession rules actually observed in this body."""
     rows = []
-    for pattern, claim, corrected, decision in (*GUIDANCE_RULES, *(SPIKE_GUIDANCE_RULES if extended else ())):
+    for pattern, claim, corrected, authority in (*GUIDANCE_RULES, *(SPIKE_GUIDANCE_RULES if extended else ())):
         locations = tuple(i for i, line in enumerate(body.splitlines(), 1) if re.search(pattern, line, re.I))
         if locations:
-            rows.append(CorrectionRow(claim, claim, corrected, AUTHORITY_LINKS[2], locations))
+            rows.append(CorrectionRow(claim, claim, corrected,
+                                      DENOMINATOR_AUTHORITY if authority == DENOMINATOR_AUTHORITY else AUTHORITY_LINKS[2], locations))
     return rows
 
 

@@ -9,7 +9,7 @@ The original body below is preserved byte for byte. Historical rules apply only 
 |---|---|---|
 | Predecessor project name (body lines 58): Predecessor project name | California Charity Registry Monitor (D-001) | [Authority](../../../decisions/register.md) |
 | Deferred duration analysis (body lines 8, 17, 47, 49, 50, 64, 71, 76, 86): Deferred duration analysis | No Turnbull survival, restricted mean duration, constant-hazard equivalent or standardized 30-day risk in v1; final panel has three releases spanning 35 days. Separate evaluation requires all five estimability conditions (D-010) | [Authority](../../../decisions/register.md) |
-| Historical diagnostic denominator (body lines 50): Historical diagnostic denominator | Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair (D-006) | [Authority](../../../decisions/register.md) |
+| Historical diagnostic denominator (body lines 50): Historical diagnostic denominator | Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair | [Authority](../../../../contracts/metric-denominators-v1.json) |
 
 Current authority: [Gate A correction index](../../../evidence/gate-a/correction-index-v1.json), [recomputed spike evidence](../../../evidence/gate-a/spike-002-successor-v1.json), and [controlling decisions](../../../decisions/register.md).
 

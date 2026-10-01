@@ -337,6 +337,32 @@ class CompleteProvenanceTests(unittest.TestCase):
             with self.assertRaises(api.ProvenanceError):
                 api.validate_complete_index(root)
 
+    def test_diagnostic_correction_links_to_the_observed_exit_definition(self):
+        import re
+        api = importlib.import_module("tools.docs_public.provenance")
+        records = api.validate_complete_index(ROOT)
+        corrected = set()
+        for record in records:
+            banner = (ROOT / record.destination).read_bytes()[:record.prefix_bytes].decode()
+            rows = [line for line in banner.splitlines()
+                    if line.startswith("| Historical diagnostic denominator")]
+            for row in rows:
+                self.assertIn("all observed exits", row)
+                self.assertNotIn("D-006", row)
+                match = re.search(r"\[Authority\]\(([^)]+)\)", row)
+                self.assertIsNotNone(match)
+                authority = ((ROOT / record.destination).parent / match.group(1)).resolve()
+                self.assertEqual(authority, ROOT / "contracts/metric-denominators-v1.json")
+                contract = json.loads(authority.read_bytes())
+                definitions = {entry["id"]: entry["definition"] for entry in contract["denominator_definitions"]}
+                self.assertIn("All exact-key records", definitions["all_observed_exits_v1"])
+                self.assertIn("delinquency_exit_observed", definitions["all_observed_exits_v1"])
+                self.assertEqual(contract["diagnostic_role"], "release_quality_diagnostic")
+                self.assertEqual(set(contract["measure_ids"]),
+                                 {"conditional_precision", "eligible_exit_sensitivity", "all_exit_sensitivity"})
+                corrected.add(record.source_label)
+        self.assertEqual(corrected, {"spike-002-json", "spike-003-readme", "spike-005-readme"})
+
 
 class CommittedTracerTests(unittest.TestCase):
     def test_public_tracer_chain_and_correction_rows(self):

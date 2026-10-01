@@ -13,7 +13,7 @@ The original body below is preserved byte for byte. Historical rules apply only 
 | 2026-08-05 keyless_rows (parser repair) (body lines 21): 309,212 | 309,214 | [Authority](../../../evidence/gate-a/spike-002-successor-v1.json) |
 | 2026-07-15 canonical keyed membership (body lines 24): 0f153d45d0102eb3951bf876d00db440f6e5b5adfbe087d9dc2446e3b0c0c0fe | 0f153d45d0102eb3951bf876d00db440f6e5b5adfbe087d9dc2446e3b0c0c0fe; confirmed by committed recomputation, no recalculation here | [Authority](../../../evidence/gate-a/spike-002-successor-v1.json) |
 | 2026-08-05 canonical keyed membership (body lines 25): 974bd2be8fc0995bce483263982a6fbe50334503962a36399cf7786d017d6c87 | 974bd2be8fc0995bce483263982a6fbe50334503962a36399cf7786d017d6c87; confirmed by committed recomputation, no recalculation here | [Authority](../../../evidence/gate-a/spike-002-successor-v1.json) |
-| Historical diagnostic denominator (body lines 31, 38, 40): Historical diagnostic denominator | Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair (D-006) | [Authority](../../../decisions/register.md) |
+| Historical diagnostic denominator (body lines 31, 38, 40): Historical diagnostic denominator | Historical strict-cure percentages are not current governed metrics; the current last-renewal diagnostic uses all observed exits independently of parser repair | [Authority](../../../../contracts/metric-denominators-v1.json) |
 
 Current authority: [Gate A correction index](../../../evidence/gate-a/correction-index-v1.json), [recomputed spike evidence](../../../evidence/gate-a/spike-002-successor-v1.json), and [controlling decisions](../../../decisions/register.md).
 
