@@ -284,11 +284,12 @@ class SafeDocsProof:
 
 @dataclass(frozen=True)
 class DocsOutcome:
-    """The safe, non-echo result of one `docs()` call."""
+    """Safe docs proof plus fixture graph captured before raw artifact cleanup."""
 
     status: str
     category: str | None
     proof: SafeDocsProof | None
+    lineage: dict | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -857,7 +858,8 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
     Always fixture mode -- there is no `mode`/`store` argument, because the
     docs proof must never run against a real, private store (T-04-06B).
     Returns a closed `SafeDocsProof` carrying only fixed schema/status/count
-    fields -- never a path, row, or raw dbt/child output. Every generated
+    fields and an additive closed fixture lineage projection -- never a
+    path, row, SQL, or raw dbt/child output. Every generated
     file (the fixture's opaque input copies, the on-disk DuckDB database,
     the generated profile, and every dbt target/log/package/catalog
     artifact `docs generate` writes) lives beneath one runner-owned OS
@@ -916,6 +918,20 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
 
             docs_node_count, docs_artifact_count = _docs_safe_counts(target_path)
 
+            from tools.docs_public.lineage import LineageProjectionError, project_manifest
+
+            try:
+                lineage = project_manifest(
+                    (target_path / "manifest.json").read_bytes(),
+                    project_dir=project_dir,
+                    package="calico_registry" if _dbt_project_dir_override is None else "calico_dbt_test_project",
+                    require_paths=_dbt_project_dir_override is None,
+                )
+            except LineageProjectionError as exc:
+                return DocsOutcome(status="failed", category=exc.category, proof=None)
+            except OSError:
+                return DocsOutcome(status="failed", category="lineage.invalid_manifest", proof=None)
+
             proof = SafeDocsProof(
                 proof_schema_version=DOCS_PROOF_SCHEMA_VERSION,
                 command_schema_version=COMMAND_SCHEMA_VERSION,
@@ -927,7 +943,7 @@ def docs(*, _dbt_project_dir_override: str | Path | None = None) -> DocsOutcome:
                 docs_node_count=docs_node_count,
                 docs_artifact_count=docs_artifact_count,
             )
-            return DocsOutcome(status="success", category=None, proof=proof)
+            return DocsOutcome(status="success", category=None, proof=proof, lineage=lineage)
         finally:
             if fixture_context is not None:
                 fixture_context.__exit__(None, None, None)

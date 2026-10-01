@@ -32,6 +32,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from contextlib import ExitStack
 
 from calico_dbt import runner
 from tests.dbt_foundation.test_runner import _build_ephemeral_dbt_project
@@ -97,6 +98,16 @@ class RealProjectDocsProofTests(unittest.TestCase):
         self.assertGreater(proof.dbt_selected_node_count, 0)
         self.assertGreater(proof.docs_node_count, 0)
         self.assertGreater(proof.docs_artifact_count, 0)
+
+    def test_docs_returns_safe_lineage_before_cleanup(self) -> None:
+        patcher, captured = _spy_on_mkdtemp()
+        with patcher:
+            outcome = runner.docs()
+        self.assertEqual(outcome.status, "success", outcome.category)
+        self.assertIsInstance(getattr(outcome, "lineage", None), dict)
+        self.assertEqual(len(outcome.lineage["nodes"]), 32)
+        self.assertEqual(len(captured), 1)
+        self.assertFalse(Path(captured[0]).exists())
 
     def test_docs_proof_over_the_real_dag_is_closed_and_value_free(self) -> None:
         outcome = runner.docs()
@@ -174,6 +185,43 @@ class CliDocsContractTests(unittest.TestCase):
         self.assertEqual(args.command, "docs")
         self.assertEqual(args.mode, "fixture")
 
+
+class ProjectionCleanupTests(unittest.TestCase):
+    """Fail/interruption plumbing at the actual projection-to-cleanup boundary."""
+
+    def exercise(self, failure):
+        patcher, captured = _spy_on_mkdtemp()
+
+        def generated(**kwargs):
+            (kwargs["target_path"] / "manifest.json").write_bytes(b"{}")
+
+        with ExitStack() as stack:
+            stack.enter_context(patcher)
+            stack.enter_context(patch.object(runner, "_prepare_environment", return_value=(None, None)))
+            stack.enter_context(patch.object(runner, "_ls_selected_nodes", return_value=["model"]))
+            stack.enter_context(patch.object(runner, "_run_dbt_build"))
+            stack.enter_context(patch.object(runner, "_run_results_counts", return_value=(32, 18)))
+            stack.enter_context(patch.object(runner, "_run_dbt_docs_generate", side_effect=generated))
+            stack.enter_context(patch.object(runner, "_docs_safe_counts", return_value=(50, 3)))
+            stack.enter_context(patch("tools.docs_public.lineage.project_manifest", side_effect=failure))
+            if isinstance(failure, KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    runner.docs()
+            else:
+                outcome = runner.docs()
+                self.assertEqual(outcome.status, "failed")
+                self.assertIsNone(outcome.proof)
+                self.assertIsNone(outcome.lineage)
+                self.assertEqual(outcome.category, "lineage.invalid_graph")
+        self.assertEqual(len(captured), 1)
+        self.assertFalse(Path(captured[0]).exists())
+
+    def test_projection_failure_removes_raw_manifest_and_temp_root(self):
+        from tools.docs_public.lineage import LineageProjectionError
+        self.exercise(LineageProjectionError("lineage.invalid_graph"))
+
+    def test_projection_interruption_removes_raw_manifest_and_temp_root(self):
+        self.exercise(KeyboardInterrupt())
 
 if __name__ == "__main__":
     unittest.main()

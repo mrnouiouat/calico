@@ -1,0 +1,522 @@
+{
+  "edges": [
+    {
+      "from": "model.calico_registry.base_admitted_registry_records",
+      "to": "model.calico_registry.stg_registry_records"
+    },
+    {
+      "from": "model.calico_registry.int_adjacent_release_pairs",
+      "to": "model.calico_registry.int_entity_transitions"
+    },
+    {
+      "from": "model.calico_registry.int_adjacent_release_pairs",
+      "to": "model.calico_registry.int_release_flags"
+    },
+    {
+      "from": "model.calico_registry.int_capture_runs",
+      "to": "model.calico_registry.int_release_flags"
+    },
+    {
+      "from": "model.calico_registry.int_capture_runs",
+      "to": "model.calico_registry.mart_release_quality"
+    },
+    {
+      "from": "model.calico_registry.int_delinquency_spells",
+      "to": "model.calico_registry.mart_spell_censoring_summary"
+    },
+    {
+      "from": "model.calico_registry.int_entity_observation_sequence",
+      "to": "model.calico_registry.int_delinquency_spells"
+    },
+    {
+      "from": "model.calico_registry.int_entity_transitions",
+      "to": "model.calico_registry.int_transition_matrix"
+    },
+    {
+      "from": "model.calico_registry.int_entity_transitions",
+      "to": "model.calico_registry.mart_adjacent_pair_metrics"
+    },
+    {
+      "from": "model.calico_registry.int_entity_transitions",
+      "to": "model.calico_registry.mart_claim_support"
+    },
+    {
+      "from": "model.calico_registry.int_entity_transitions",
+      "to": "model.calico_registry.mart_last_renewal_diagnostic"
+    },
+    {
+      "from": "model.calico_registry.int_entity_transitions",
+      "to": "model.calico_registry.mart_starting_cohort_persistence"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.dim_public_organizations"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.fct_public_status_observations"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.int_entity_observation_sequence"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.int_entity_transitions"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.int_public_organization_eligibility"
+    },
+    {
+      "from": "model.calico_registry.int_keyed_snapshots",
+      "to": "model.calico_registry.mart_source_reported_status_age"
+    },
+    {
+      "from": "model.calico_registry.int_keyless_registry_coverage",
+      "to": "model.calico_registry.int_unkeyed_coverage"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_date_spine",
+      "to": "model.calico_registry.int_adjacent_release_pairs"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_date_spine",
+      "to": "model.calico_registry.int_delinquency_spells"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_date_spine",
+      "to": "model.calico_registry.int_entity_observation_sequence"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_registry_records",
+      "to": "model.calico_registry.int_keyed_snapshots"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_registry_records",
+      "to": "model.calico_registry.int_registry_record_dispositions"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.fct_public_status_observations"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.int_promoted_date_spine"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.int_promoted_registry_records"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.int_registry_record_dispositions"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.int_release_flags"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.mart_publication_status"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.mart_release_quality"
+    },
+    {
+      "from": "model.calico_registry.int_promoted_releases",
+      "to": "model.calico_registry.mart_release_snapshot_metrics"
+    },
+    {
+      "from": "model.calico_registry.int_public_organization_eligibility",
+      "to": "model.calico_registry.dim_public_organizations"
+    },
+    {
+      "from": "model.calico_registry.int_public_organization_eligibility",
+      "to": "model.calico_registry.fct_public_status_observations"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.int_keyed_snapshots"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.int_keyless_registry_coverage"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.int_registry_record_exclusions"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.int_release_flags"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.mart_registry_population_coverage"
+    },
+    {
+      "from": "model.calico_registry.int_registry_record_dispositions",
+      "to": "model.calico_registry.mart_release_snapshot_metrics"
+    },
+    {
+      "from": "model.calico_registry.int_release_flags",
+      "to": "model.calico_registry.mart_release_quality"
+    },
+    {
+      "from": "model.calico_registry.int_transition_matrix",
+      "to": "model.calico_registry.mart_adjacent_pair_metrics"
+    },
+    {
+      "from": "model.calico_registry.mart_adjacent_pair_metrics",
+      "to": "model.calico_registry.mart_claim_support"
+    },
+    {
+      "from": "model.calico_registry.mart_publication_status",
+      "to": "model.calico_registry.dim_public_organizations"
+    },
+    {
+      "from": "model.calico_registry.stg_capture_attempts",
+      "to": "model.calico_registry.int_capture_runs"
+    },
+    {
+      "from": "model.calico_registry.stg_registry_records",
+      "to": "model.calico_registry.int_promoted_registry_records"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.capture_attempts",
+      "to": "model.calico_registry.stg_capture_attempts"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.charities_may_not_operate",
+      "to": "model.calico_registry.base_admitted_registry_records"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.charities_may_operate",
+      "to": "model.calico_registry.base_admitted_registry_records"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.charities_not_operating",
+      "to": "model.calico_registry.base_admitted_registry_records"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.charities_undetermined_status",
+      "to": "model.calico_registry.base_admitted_registry_records"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.promotion_catalog",
+      "to": "model.calico_registry.int_promoted_releases"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.public_eligibility_classifications",
+      "to": "model.calico_registry.int_public_organization_eligibility"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.revision_catalog",
+      "to": "model.calico_registry.int_promoted_releases"
+    },
+    {
+      "from": "source.calico_registry.runtime_input.revision_catalog",
+      "to": "model.calico_registry.int_revision_catalog"
+    }
+  ],
+  "manifest_schema_version": 12,
+  "mode": "fixture",
+  "model_hashes": [
+    {
+      "id": "model.calico_registry.base_admitted_registry_records",
+      "sha256": "6ec2929868a5af852a3f86de308da1b216e68d1c51cdebaf5f3a2fa4af973673"
+    },
+    {
+      "id": "model.calico_registry.dim_public_organizations",
+      "sha256": "96fc0eed1fd3cafffaae0525e1bc6f6a4ce11cc4a4a2a98495b20f4cfc556487"
+    },
+    {
+      "id": "model.calico_registry.fct_public_status_observations",
+      "sha256": "eed515361c635974948564561a214878d730b482ab9be6f37442e9d005393d20"
+    },
+    {
+      "id": "model.calico_registry.int_adjacent_release_pairs",
+      "sha256": "6f99c6abee284aab49f9ce17a201353e2f7d920109d6ff3c9469a8357d66f70d"
+    },
+    {
+      "id": "model.calico_registry.int_capture_runs",
+      "sha256": "2f7df9667fe21ec61efabd067a495156646036b12da8f11da8ac133474c179ee"
+    },
+    {
+      "id": "model.calico_registry.int_delinquency_spells",
+      "sha256": "5843b4eadf4fa36098e2a034ce3058347d411ccde71b61ed7711eefdc49006f3"
+    },
+    {
+      "id": "model.calico_registry.int_entity_observation_sequence",
+      "sha256": "7a77b8bfed2a2332034b179609bdf1faa78b37783908b81a722e8d0eab6e2026"
+    },
+    {
+      "id": "model.calico_registry.int_entity_transitions",
+      "sha256": "fc7531e2aa71fe6480a8d5d6828931b2a0bf4eca57df788338894a73426ba9c9"
+    },
+    {
+      "id": "model.calico_registry.int_keyed_snapshots",
+      "sha256": "9a534c2277f13cbd32fe7073270a26658fd5c49459228df6c0e07a98aa387711"
+    },
+    {
+      "id": "model.calico_registry.int_keyless_registry_coverage",
+      "sha256": "a756b4a7d66d1c1c0d3ad2a7149d3e91bc031fdb87693df66351eac116640156"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_date_spine",
+      "sha256": "167096c1080b2ab7ded946949224ef434162c5bdcb4b7fe1f7e7455cfcb0213e"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_registry_records",
+      "sha256": "7cacf334e6d8f66ce8228ce7e5234c84c1f1276b74930831a1ca523be4deb1e4"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_releases",
+      "sha256": "d5a74abb3103a5564a647a3b706df7ece0ed31491bbc7f68b5bd8df7f912bfd2"
+    },
+    {
+      "id": "model.calico_registry.int_public_organization_eligibility",
+      "sha256": "30f0a1c81778614d921d3ea2faa5af5e77d6a1419d9f089b018dbec287e5ffad"
+    },
+    {
+      "id": "model.calico_registry.int_registry_record_dispositions",
+      "sha256": "a2a13bfeb01b02a54a6ed6117a815135d8e2da4d850f5c3bdf0e3dd00df3ede1"
+    },
+    {
+      "id": "model.calico_registry.int_registry_record_exclusions",
+      "sha256": "d58be0792b73769ba234be319c913e581a3b89caf747fabc5c3fa2854a633610"
+    },
+    {
+      "id": "model.calico_registry.int_release_flags",
+      "sha256": "2a9fd517072d290e346f6626ba35910ee3af637df4d90efa76b78362e72fccd6"
+    },
+    {
+      "id": "model.calico_registry.int_revision_catalog",
+      "sha256": "cdd58547bf7fff73f4d70e23e65d23cd504ec71299fa828a14c344b07ecf1af2"
+    },
+    {
+      "id": "model.calico_registry.int_transition_matrix",
+      "sha256": "8e6aa6edd40797c5d2d84a1c5de1386a3b3022fd563409842bf58ef745a499aa"
+    },
+    {
+      "id": "model.calico_registry.int_unkeyed_coverage",
+      "sha256": "5f45da50a56bb434fbcd91421093f8d1df8736db6a1ea01f026175407e838262"
+    },
+    {
+      "id": "model.calico_registry.mart_adjacent_pair_metrics",
+      "sha256": "b6bc5f16257fd251808f8240b4f7c3572ddd4333c3742efedfe33e9c2bc776c0"
+    },
+    {
+      "id": "model.calico_registry.mart_claim_support",
+      "sha256": "a48a76ae48c02d680bf43084239f63ae68805ca6805257f9f559c4d146c1e792"
+    },
+    {
+      "id": "model.calico_registry.mart_last_renewal_diagnostic",
+      "sha256": "2cabc665f4c6852ca1e4c046f1408e0b39cd8a2a8d51f9cfc3353df3b15819bd"
+    },
+    {
+      "id": "model.calico_registry.mart_publication_status",
+      "sha256": "9e62d8fa19818d2a7aacb7f0e6b36efce85b6b65770e26e1be4f02525e23930b"
+    },
+    {
+      "id": "model.calico_registry.mart_registry_population_coverage",
+      "sha256": "87982deea7b029f2240670fcc18f58a6cc06fdee7fffd5c61361ad1f4810b15e"
+    },
+    {
+      "id": "model.calico_registry.mart_release_quality",
+      "sha256": "1e438a705e34d57631c3142299a8575d7dbb4d2442207bed5dd74d7cae0f5e4a"
+    },
+    {
+      "id": "model.calico_registry.mart_release_snapshot_metrics",
+      "sha256": "b995c30efa8693ba3ebf8b0581a02b401a7afb3155c41ca2e44ee6f21fca10a1"
+    },
+    {
+      "id": "model.calico_registry.mart_source_reported_status_age",
+      "sha256": "90cfa115364f431cffd6e1273c5503ddb23074539f8e4704b9395a18385b964b"
+    },
+    {
+      "id": "model.calico_registry.mart_spell_censoring_summary",
+      "sha256": "21959a2f3c40b18671c8a0fde385af202d0cc9a2207a882b4a6b2891e47a4c5b"
+    },
+    {
+      "id": "model.calico_registry.mart_starting_cohort_persistence",
+      "sha256": "b666d1c37f769d14f63f5d7d9db8ddb76f50ad8f8b0c90e9b5be470def40af55"
+    },
+    {
+      "id": "model.calico_registry.stg_capture_attempts",
+      "sha256": "e0afc19d7ed858bdfeb8a01150256919689e7aeb99c8a5dfb56b5424adf55a7a"
+    },
+    {
+      "id": "model.calico_registry.stg_registry_records",
+      "sha256": "0e0afa2da09aec8708a72688f670ee4b2e5ab27001953b3d32af47a4777b8f65"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "model.calico_registry.base_admitted_registry_records",
+      "name": "base_admitted_registry_records"
+    },
+    {
+      "id": "model.calico_registry.dim_public_organizations",
+      "name": "dim_public_organizations"
+    },
+    {
+      "id": "model.calico_registry.fct_public_status_observations",
+      "name": "fct_public_status_observations"
+    },
+    {
+      "id": "model.calico_registry.int_adjacent_release_pairs",
+      "name": "int_adjacent_release_pairs"
+    },
+    {
+      "id": "model.calico_registry.int_capture_runs",
+      "name": "int_capture_runs"
+    },
+    {
+      "id": "model.calico_registry.int_delinquency_spells",
+      "name": "int_delinquency_spells"
+    },
+    {
+      "id": "model.calico_registry.int_entity_observation_sequence",
+      "name": "int_entity_observation_sequence"
+    },
+    {
+      "id": "model.calico_registry.int_entity_transitions",
+      "name": "int_entity_transitions"
+    },
+    {
+      "id": "model.calico_registry.int_keyed_snapshots",
+      "name": "int_keyed_snapshots"
+    },
+    {
+      "id": "model.calico_registry.int_keyless_registry_coverage",
+      "name": "int_keyless_registry_coverage"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_date_spine",
+      "name": "int_promoted_date_spine"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_registry_records",
+      "name": "int_promoted_registry_records"
+    },
+    {
+      "id": "model.calico_registry.int_promoted_releases",
+      "name": "int_promoted_releases"
+    },
+    {
+      "id": "model.calico_registry.int_public_organization_eligibility",
+      "name": "int_public_organization_eligibility"
+    },
+    {
+      "id": "model.calico_registry.int_registry_record_dispositions",
+      "name": "int_registry_record_dispositions"
+    },
+    {
+      "id": "model.calico_registry.int_registry_record_exclusions",
+      "name": "int_registry_record_exclusions"
+    },
+    {
+      "id": "model.calico_registry.int_release_flags",
+      "name": "int_release_flags"
+    },
+    {
+      "id": "model.calico_registry.int_revision_catalog",
+      "name": "int_revision_catalog"
+    },
+    {
+      "id": "model.calico_registry.int_transition_matrix",
+      "name": "int_transition_matrix"
+    },
+    {
+      "id": "model.calico_registry.int_unkeyed_coverage",
+      "name": "int_unkeyed_coverage"
+    },
+    {
+      "id": "model.calico_registry.mart_adjacent_pair_metrics",
+      "name": "mart_adjacent_pair_metrics"
+    },
+    {
+      "id": "model.calico_registry.mart_claim_support",
+      "name": "mart_claim_support"
+    },
+    {
+      "id": "model.calico_registry.mart_last_renewal_diagnostic",
+      "name": "mart_last_renewal_diagnostic"
+    },
+    {
+      "id": "model.calico_registry.mart_publication_status",
+      "name": "mart_publication_status"
+    },
+    {
+      "id": "model.calico_registry.mart_registry_population_coverage",
+      "name": "mart_registry_population_coverage"
+    },
+    {
+      "id": "model.calico_registry.mart_release_quality",
+      "name": "mart_release_quality"
+    },
+    {
+      "id": "model.calico_registry.mart_release_snapshot_metrics",
+      "name": "mart_release_snapshot_metrics"
+    },
+    {
+      "id": "model.calico_registry.mart_source_reported_status_age",
+      "name": "mart_source_reported_status_age"
+    },
+    {
+      "id": "model.calico_registry.mart_spell_censoring_summary",
+      "name": "mart_spell_censoring_summary"
+    },
+    {
+      "id": "model.calico_registry.mart_starting_cohort_persistence",
+      "name": "mart_starting_cohort_persistence"
+    },
+    {
+      "id": "model.calico_registry.stg_capture_attempts",
+      "name": "stg_capture_attempts"
+    },
+    {
+      "id": "model.calico_registry.stg_registry_records",
+      "name": "stg_registry_records"
+    }
+  ],
+  "projection_sha256": "be5f95ad3233a60119efc5cdd4e659b7856d79eadc1ee12c3226efe3107ba234",
+  "schema_version": "dbt-lineage-v1",
+  "sources": [
+    {
+      "id": "source.calico_registry.runtime_input.capture_attempts",
+      "name": "capture_attempts"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.charities_may_not_operate",
+      "name": "charities_may_not_operate"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.charities_may_operate",
+      "name": "charities_may_operate"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.charities_not_operating",
+      "name": "charities_not_operating"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.charities_undetermined_status",
+      "name": "charities_undetermined_status"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.promotion_catalog",
+      "name": "promotion_catalog"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.public_eligibility_classifications",
+      "name": "public_eligibility_classifications"
+    },
+    {
+      "id": "source.calico_registry.runtime_input.revision_catalog",
+      "name": "revision_catalog"
+    }
+  ]
+}
