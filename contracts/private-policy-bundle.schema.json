@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Private-only immutable sidecar binding. Seed verifies sidecar first and manifest last. Removing named classification copies requires an owner purge of every retained version; automation has no deletion capability.",
+  "properties": {
+    "classification_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "objects": {
+      "items": {
+        "pattern": "^archive/v1/private-policy/objects/[0-9a-f]{64}\\.json$",
+        "type": "string"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "type": "array"
+    },
+    "prior_publication_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "prior_publication_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "sidecar_length_bytes": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sidecar_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "classification_version",
+    "objects",
+    "prior_publication_commit",
+    "prior_publication_manifest_sha256",
+    "schema_version",
+    "sidecar_length_bytes",
+    "sidecar_sha256"
+  ],
+  "title": "Immutable private publication policy binding",
+  "type": "object"
+}

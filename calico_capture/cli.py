@@ -3,7 +3,7 @@ retention-posture boundaries (06-06-PLAN.md Task 1; D-04/D-06/D-08/D-09/D-10/
 D-12; `calico_landing/cli.py`'s thin-parser/closed-exception-translation
 pattern).
 
-Six commands -- `run`, `attest`, `seed`, `restore-build`, `inspect-retention`,
+Seven commands -- `run`, `attest`, `seed`, `seed-policy`, `restore-build`, `inspect-retention`,
 and `audit-hosted-output` -- all route to already-tested services
 (`calico_capture.orchestrator.capture`, `calico_capture.archive.
 synchronize_verified_transaction`, `calico_capture.restore.
@@ -60,6 +60,7 @@ from calico_capture.b2 import (
     RetentionPosture,
     inspect_retention_posture,
 )
+from calico_capture.private_policy import PrivatePolicyError, seed_private_policy_bundle
 from calico_capture.orchestrator import capture
 from calico_capture.restore import RestoreError, restore_verified_transaction
 from calico_capture.status import (
@@ -474,6 +475,28 @@ def _cmd_seed(args: argparse.Namespace) -> int:
     return exit_code
 
 
+# -- seed-policy --------------------------------------------------------
+
+
+def _seed_policy(store, published_manifest, published_data_commit, *, archive_factory=None):
+    factory = archive_factory if archive_factory is not None else _default_automation_archive_factory
+    try:
+        return seed_private_policy_bundle(factory(), store,
+                                          published_manifest_path=published_manifest,
+                                          published_data_commit=published_data_commit), 0
+    except (PrivatePolicyError, ArchiveError) as exc:
+        return {"category": exc.category}, 1
+    except Exception:
+        return {"category": "seed_policy.unexpected_error"}, 1
+
+
+def _cmd_seed_policy(args):
+    document, exit_code = _seed_policy(args.store, args.published_manifest, args.published_data_commit)
+    print(_dict_json(document))
+    print(document["category"], file=sys.stderr)
+    return exit_code
+
+
 # -- restore-build ------------------------------------------------------
 
 
@@ -765,6 +788,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     seed_parser.add_argument("--store", required=True)
 
+    policy_parser = subparsers.add_parser(
+        "seed-policy", help="Archive the exact private eligibility sidecar with its prior-publication binding."
+    )
+    policy_parser.add_argument("--store", required=True)
+    policy_parser.add_argument("--published-manifest", required=True)
+    policy_parser.add_argument("--published-data-commit", required=True)
+
     restore_parser = subparsers.add_parser(
         "restore-build",
         help="Restore every committed catalog release into a fresh external store and build.",
@@ -802,6 +832,7 @@ _COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "run": _cmd_run,
     "attest": _cmd_attest,
     "seed": _cmd_seed,
+    "seed-policy": _cmd_seed_policy,
     "restore-build": _cmd_restore_build,
     "inspect-retention": _cmd_inspect_retention,
     "audit-hosted-output": _cmd_audit_hosted_output,

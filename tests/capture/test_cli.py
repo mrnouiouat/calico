@@ -102,8 +102,19 @@ class ParserContractTests(unittest.TestCase):
         self.assertEqual(len(subparser_actions), 1)
         self.assertEqual(
             set(subparser_actions[0].choices.keys()),
-            {"run", "attest", "seed", "restore-build", "inspect-retention", "audit-hosted-output"},
+            {"run", "attest", "seed", "seed-policy", "restore-build", "inspect-retention", "audit-hosted-output"},
         )
+
+    def test_seed_policy_accepts_only_explicit_store_and_publication_binding(self):
+        parser = cli._build_parser()
+        args = parser.parse_args(["seed-policy", "--store", "synthetic-store",
+                                  "--published-manifest", "synthetic-publication", "--published-data-commit", "a" * 40])
+        self.assertEqual(args.command, "seed-policy")
+        for option in ("--credential", "--bucket", "--prefix", "--delete"):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                parser.parse_args(["seed-policy", "--store", "synthetic-store",
+                                   "--published-manifest", "synthetic-publication", "--published-data-commit", "a" * 40,
+                                   option, "synthetic"])
 
     def test_run_trigger_is_closed_vocabulary(self) -> None:
         parser = cli._build_parser()
@@ -250,6 +261,32 @@ class AttestCommandTests(unittest.TestCase):
 
 
 class SeedCommandTests(unittest.TestCase):
+    def test_seed_policy_cli_routes_to_existing_credential_factory_and_safe_json(self):
+        from tests.capture.test_private_policy import PrivatePolicyBundleTests, COMMIT
+        fixture = PrivatePolicyBundleTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        with mock.patch.object(cli, "_default_automation_archive_factory", return_value=fixture.archive):
+            code, out, err = _run_capture_cli(["seed-policy", "--store", str(fixture.store),
+                                              "--published-manifest", str(fixture.publication),
+                                              "--published-data-commit", COMMIT])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["category"], "seed_policy.completed")
+        self.assertEqual(err.strip(), "seed_policy.completed")
+        self.assertNotIn("synthetic-private-key", out + err)
+        self.assertNotIn(str(fixture.store), out + err)
+
+    def test_seed_policy_provider_exception_and_private_values_never_echo(self):
+        with mock.patch.object(cli, "_default_automation_archive_factory", side_effect=RuntimeError("provider-private-sentinel")):
+            code, out, err = _run_capture_cli(["seed-policy", "--store", "private-path-sentinel",
+                                              "--published-manifest", "private-manifest-sentinel",
+                                              "--published-data-commit", "a" * 40])
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out), {"category": "seed_policy.unexpected_error"})
+        for private in ("provider-private-sentinel", "private-path-sentinel", "private-manifest-sentinel"):
+            self.assertNotIn(private, out + err)
+
+
     def test_seed_rejects_a_store_inside_a_git_worktree(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         document, exit_code = cli._seed(
