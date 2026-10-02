@@ -26,7 +26,7 @@ class ExportBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="calico-export-")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.database = self.root / "fixture.duckdb"
         self.entry = ExportEntry("fixture_export", "aggregate", "fixture_export",
                                  ("sequence", "label"), ("sequence",), ("label",),
@@ -161,7 +161,7 @@ class FullExportTests(unittest.TestCase):
     def test_fixture_build_exports_all_eleven_twice_and_excluded_named_history_is_empty(self):
         allowlist = load_allowlist(_ALLOWLIST_PATH)
         with tempfile.TemporaryDirectory(prefix="calico-full-exports-") as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             captured = {}
 
             def export(database):

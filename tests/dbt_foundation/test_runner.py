@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from calico_dbt import runner
 from tests.fixtures.dbt_foundation.fixture_builder import gate_b_fixture_store
@@ -116,6 +118,51 @@ def _build_ephemeral_dbt_project(root: Path) -> Path:
         (models_dir / f"{name}.sql").write_text(body, encoding="utf-8")
 
     return project_dir
+
+
+class DbtExecutableTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="calico-dbt-script-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.scripts = self.root / "scripts"
+        self.scripts.mkdir()
+
+    @unittest.skipIf(os.name == "nt", "POSIX virtual-environment symlink semantics")
+    def test_symlinked_interpreter_uses_installation_scripts_scheme(self):
+        base = self.root / "base-python"
+        base.write_bytes(b"")
+        interpreter = self.scripts / "python"
+        interpreter.symlink_to(base)
+        executable = self.scripts / "dbt"
+        executable.write_bytes(b"")
+        with patch("sysconfig.get_path", return_value=str(self.scripts)) as scheme, \
+                patch.object(runner.sys, "executable", str(interpreter)), \
+                patch.object(runner, "os", SimpleNamespace(name="posix")):
+            self.assertTrue(runner._dbt_executable() == str(executable), "dbt script selection mismatch")
+            scheme.assert_called_once_with("scripts")
+
+    def test_windows_uses_dbt_exe_from_scripts_scheme(self):
+        executable = self.scripts / "dbt.exe"
+        executable.write_bytes(b"")
+        with patch("sysconfig.get_path", return_value=str(self.scripts)), \
+                patch.object(runner, "os", SimpleNamespace(name="nt")):
+            self.assertTrue(runner._dbt_executable() == str(executable), "dbt script selection mismatch")
+
+    def test_posix_uses_dbt_from_scripts_scheme(self):
+        executable = self.scripts / "dbt"
+        executable.write_bytes(b"")
+        with patch("sysconfig.get_path", return_value=str(self.scripts)), \
+                patch.object(runner, "os", SimpleNamespace(name="posix")):
+            self.assertTrue(runner._dbt_executable() == str(executable), "dbt script selection mismatch")
+
+    def test_missing_console_script_retains_path_fallback(self):
+        for platform in ("nt", "posix"):
+            with self.subTest(platform=platform), \
+                    patch("sysconfig.get_path", return_value=str(self.scripts)), \
+                    patch.object(runner, "os", SimpleNamespace(name=platform)), \
+                    patch.object(runner.sys, "executable", str(self.root / "python")):
+                self.assertEqual(runner._dbt_executable(), "dbt")
 
 
 class RunnerTestCase(unittest.TestCase):

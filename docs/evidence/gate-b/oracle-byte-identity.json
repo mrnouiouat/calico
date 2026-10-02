@@ -1,0 +1,12 @@
+{
+  "canonical": {
+    "byte_format": "LF",
+    "git_blob": "6c2035576d5f4c88615954d609bb6675e3c41a45",
+    "sha256": "3c7943ad82184cd3e54ab0fd844c2b3ec2732fc63eb05395bd53d9662890cf62"
+  },
+  "schema_version": 1,
+  "supersedes": {
+    "byte_format": "CRLF",
+    "sha256": "82543a3b3b6bc62e42e066d8997e968e2aca440d0c05d6f589905f4d54827133"
+  }
+}

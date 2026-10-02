@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import subprocess
+import copy
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from calico_dbt import runner
 
@@ -25,6 +29,58 @@ _ORACLE_PRESENT = ORACLE_PATH.is_file()
 _ORACLE_REASON = "Gate A oracle is private to the calico-build workspace and absent here"
 
 
+ORACLE_IDENTITY_PATH = REPO_ROOT / "docs/evidence/gate-b/oracle-byte-identity.json"
+CANONICAL_ORACLE_SHA256 = "3c7943ad82184cd3e54ab0fd844c2b3ec2732fc63eb05395bd53d9662890cf62"
+CANONICAL_ORACLE_BLOB = "6c2035576d5f4c88615954d609bb6675e3c41a45"
+
+
+def _unique_oracle_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("oracle.invalid_identity")
+        result[key] = value
+    return result
+
+
+def _load_oracle_identity(path=ORACLE_IDENTITY_PATH):
+    try:
+        document = json.loads(path.read_bytes(), object_pairs_hook=_unique_oracle_keys)
+        if (not isinstance(document, dict) or set(document) != {"schema_version", "canonical", "supersedes"}
+                or type(document["schema_version"]) is not int or document["schema_version"] != 1):
+            raise ValueError("oracle.invalid_identity")
+        canonical, predecessor = document["canonical"], document["supersedes"]
+        if (not isinstance(canonical, dict) or set(canonical) != {"byte_format", "sha256", "git_blob"}
+                or not isinstance(predecessor, dict) or set(predecessor) != {"byte_format", "sha256"}):
+            raise ValueError("oracle.invalid_identity")
+        for record in (canonical, predecessor):
+            if not isinstance(record["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"]):
+                raise ValueError("oracle.invalid_identity")
+        if (canonical["byte_format"] != "LF" or predecessor["byte_format"] != "CRLF"
+                or canonical["sha256"] != CANONICAL_ORACLE_SHA256
+                or predecessor["sha256"] != ORACLE_SHA256
+                or canonical["sha256"] == predecessor["sha256"]
+                or canonical["git_blob"] != CANONICAL_ORACLE_BLOB):
+            raise ValueError("oracle.invalid_identity")
+        return document
+    except (OSError, ValueError, TypeError, KeyError):
+        raise ValueError("oracle.invalid_identity") from None
+
+
+def _verify_oracle_identity(path=ORACLE_PATH):
+    document = _load_oracle_identity()
+    if hashlib.sha256(path.read_bytes()).hexdigest() != document["canonical"]["sha256"]:
+        raise ValueError("oracle.byte_identity_mismatch")
+    try:
+        blob = subprocess.check_output(
+            ["git", "rev-parse", "HEAD:GATE-A-EVIDENCE.md"], cwd=path.parent,
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        raise ValueError("oracle.git_identity_unavailable") from None
+    if blob != document["canonical"]["git_blob"]:
+        raise ValueError("oracle.git_identity_mismatch")
+
+
 class FixtureReconciliationTests(unittest.TestCase):
     def test_fixture_runs_the_complete_dag(self) -> None:
         outcome = runner.build(mode="fixture")
@@ -33,10 +89,56 @@ class FixtureReconciliationTests(unittest.TestCase):
 
     @unittest.skipUnless(_ORACLE_PRESENT, _ORACLE_REASON)
     def test_oracle_is_byte_identical(self) -> None:
-        self.assertEqual(hashlib.sha256(ORACLE_PATH.read_bytes()).hexdigest(), ORACLE_SHA256)
+        _verify_oracle_identity()
 
 
 class ReconciliationContractTests(unittest.TestCase):
+    def test_oracle_successor_preserves_both_exact_byte_identities(self):
+        document = _load_oracle_identity()
+        self.assertEqual(document["canonical"]["sha256"], CANONICAL_ORACLE_SHA256)
+        self.assertEqual(document["supersedes"]["sha256"], ORACLE_SHA256)
+        self.assertEqual(document["canonical"]["git_blob"], CANONICAL_ORACLE_BLOB)
+
+    def test_oracle_successor_rejects_unknown_keys_types_hashes_and_newline_labels(self):
+        original = _load_oracle_identity()
+        mutations = (
+            ((), "extra", True), ((), "schema_version", True), ((), "schema_version", 2),
+            (("canonical",), "extra", True), (("supersedes",), "extra", True),
+            (("canonical",), "sha256", "z" * 64), (("supersedes",), "sha256", "a" * 64),
+            (("canonical",), "sha256", ORACLE_SHA256),
+            (("supersedes",), "sha256", CANONICAL_ORACLE_SHA256),
+            (("canonical",), "byte_format", "CRLF"), (("supersedes",), "byte_format", "LF"),
+            (("canonical",), "git_blob", "a" * 40),
+        )
+        with tempfile.TemporaryDirectory(prefix="calico-oracle-schema-") as temp:
+            path = Path(temp) / "identity.json"
+            for traversal, key, value in mutations:
+                document = copy.deepcopy(original)
+                target = document
+                for component in traversal:
+                    target = target[component]
+                target[key] = value
+                path.write_text(json.dumps(document), encoding="utf-8")
+                with self.subTest(field=key), self.assertRaisesRegex(ValueError, "^oracle.invalid_identity$"):
+                    _load_oracle_identity(path)
+            path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "^oracle.invalid_identity$"):
+                _load_oracle_identity(path)
+
+    def test_changed_or_converted_oracle_bytes_fail_without_normalization(self):
+        with tempfile.TemporaryDirectory(prefix="calico-oracle-bytes-") as temp:
+            path = Path(temp) / "oracle.md"
+            for raw in (b"changed\n", b"changed\r\n"):
+                path.write_bytes(raw)
+                with self.assertRaisesRegex(ValueError, "^oracle.byte_identity_mismatch$"):
+                    _verify_oracle_identity(path)
+
+    @unittest.skipUnless(_ORACLE_PRESENT, _ORACLE_REASON)
+    def test_changed_tracked_oracle_blob_fails_independently_of_file_bytes(self):
+        with patch(__name__ + ".subprocess.check_output", return_value="a" * 40):
+            with self.assertRaisesRegex(ValueError, "^oracle.git_identity_mismatch$"):
+                _verify_oracle_identity()
+
     def test_sql_is_real_gated_and_contains_locked_counts(self) -> None:
         content = SQL_PATH.read_text(encoding="utf-8")
         self.assertIn("var('calico_verified_mode')", content)

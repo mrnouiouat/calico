@@ -29,6 +29,7 @@ import os
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import uuid
 from contextlib import AbstractContextManager
@@ -365,7 +366,7 @@ def _dbt_executable() -> str:
     stable entry point.
     """
 
-    scripts_dir = Path(sys.executable).resolve().parent
+    scripts_dir = Path(sysconfig.get_path("scripts"))
     candidate = scripts_dir / ("dbt.exe" if os.name == "nt" else "dbt")
     if candidate.is_file():
         return str(candidate)
