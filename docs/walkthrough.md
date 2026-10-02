@@ -1,4 +1,4 @@
-# A written walkthrough of the California Charity Registry Monitor
+# A written walkthrough of the California Charity Observatory
 
 The monitor follows what California's public charity registry reports across accepted releases.
 This walkthrough connects one finding to its SQL, explains a source-reading defect, and sets out

@@ -343,7 +343,7 @@ def _write(root: Path, name: str, data: bytes):
 
 
 TOPICS = (
-    "California Charity Registry Monitor", "Build, measure, retire", "Report",
+    "California Charity Observatory", "Build, measure, retire", "Report",
     "Questions", "Deliberate non-claims", "SQL-first responsibility boundary",
     "Architecture", "Data grains", "Source path", "Build modes", "Metric definitions",
     "Limitations", "Accepted release and latest capture attempt", "dbt lineage",
@@ -502,9 +502,9 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
     sections = [
         "Calico preserves California's published charity registry releases and turns them into a reproducible history of reported status changes. It helps readers examine changes across the published registry population and inspect the recorded history of a selected organization. Python captures and verifies source files; DuckDB and dbt SQL model the history; Power BI presents the results.\n\n"
         "**Current scope:** historical analysis of three accepted releases: July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2. Automated capture continues checking the source; incompatible candidates are rejected without changing the accepted history. Adopting the successor publication is future work requiring new source and metric contracts.\n\n"
-        "`calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Registry Monitor.",
+        "`calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Observatory.",
         "Historical commercial investigation: built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.\n\n"
-        "Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.\n\nClarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.",
+        "The retained engineering artifact explains the measurements and their limits.\n\nClarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.",
         "Start with the written walkthrough: one observed finding, the SQL behind it, a source-reading correction and the limits of the data.\n\n"
         + _walkthrough_block(base) + "\n\n"
         "| Report page | What to explore |\n|---|---|\n"

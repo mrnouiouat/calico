@@ -107,6 +107,8 @@ class ReadmeContracts(unittest.TestCase):
         headings = [line for line in text.splitlines() if line.startswith("# ") or line.startswith("## ")]
         self.assertEqual(headings, [("# " if i == 0 else "## ") + api.TOPICS[i] for i in api.README_TOPIC_ORDER])
         self.assertEqual(len(headings), 18)
+        self.assertNotIn("willingness to pay", text)
+        self.assertNotIn("California Charity Registry Monitor", text)
         self.assertLess(text.index("## Report"), text.index("## Build, measure, retire"))
         self.assertLess(text.index("<!-- calico:walkthrough:start -->"), text.index("## Architecture"))
         self.assertEqual(text.count("<details>"), 6)
@@ -114,7 +116,7 @@ class ReadmeContracts(unittest.TestCase):
         self.assertIn("public access is pending final publication approval", text)
         self.assertIn("**One observed finding:**", text)
         for required in ("**cali**fornia **c**harity **o**bservatory", "retrocat",
-                "no organization was interviewed about willingness to pay", "2026-09-02",
+                "California Charity Observatory", "2026-09-02",
                 "final three-release panel", "pending verification", api.MANUAL_DISCLOSURE,
                 "**Current scope:**", "Adopting the successor publication is future work",
                 "retirement described here concerns the commercial proposition",
