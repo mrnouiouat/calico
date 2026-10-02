@@ -51,6 +51,7 @@ def _evaluate_published_workflow_expression(
     status_result: str,
     status_json: str,
     cancelled: bool = False,
+    calendar_result: str = "success",
 ) -> bool:
     """Evaluate the committed publish condition, rather than duplicating it."""
 
@@ -64,6 +65,7 @@ def _evaluate_published_workflow_expression(
     for reference, variable in (
         ("needs.calendar-gate.outputs.should_run", "should_run"),
         ("needs.calendar-gate.outputs.mode", "mode"),
+        ("needs.calendar-gate.result", "calendar_result"),
         ("needs.capture.outputs.status_json", "status_json"),
         ("needs.capture.result", "capture_result"),
         ("needs.status.result", "status_result"),
@@ -87,6 +89,7 @@ def _evaluate_published_workflow_expression(
                 "status_result": status_result,
                 "status_json": status_json,
                 "cancelled": cancelled,
+                "calendar_result": calendar_result,
             },
         )
     )
@@ -247,6 +250,69 @@ class _ReplayHarness:
 
 
 class PublicationReplayTests(unittest.TestCase):
+    def test_republish_literal_expression_rejects_every_failed_dependency_or_cancellation(self):
+        import itertools
+        states = ("success", "skipped", "failure", "cancelled")
+        for calendar, captured, status, cancelled in itertools.product(states, states, states, (False, True)):
+            with self.subTest(calendar=calendar, captured=captured, status=status, cancelled=cancelled):
+                self.assertEqual(_evaluate_published_workflow_expression(
+                    mode="republish", should_run="true", calendar_result=calendar,
+                    capture_result=captured, status_result=status, status_json="", cancelled=cancelled),
+                    calendar == "success" and captured == status == "skipped" and not cancelled)
+
+    def test_capture_literal_expression_requires_accepted_and_successful_dependencies(self):
+        import itertools
+        states = ("success", "skipped", "failure", "cancelled")
+        for calendar, captured, status, outcome in itertools.product(states, states, states,
+                ("accepted", "no_new_release", "rejected", "operational_error", "")):
+            with self.subTest(calendar=calendar, captured=captured, status=status, outcome=outcome):
+                self.assertEqual(_evaluate_published_workflow_expression(
+                    mode="capture", should_run="true", calendar_result=calendar,
+                    capture_result=captured, status_result=status,
+                    status_json=json.dumps({"outcome": outcome}) if outcome else ""),
+                    calendar == captured == status == "success" and outcome == "accepted")
+
+    def test_republish_actual_real_cli_blocks_missing_or_corrupt_private_policy(self):
+        from tests.capture.test_restore import archived_catalog_fixture
+        from calico_capture.private_policy import private_policy_manifest_key
+        from calico_capture.status import project_safe_status
+        from calico_publish import cli
+        for kind in ("missing", "corrupt"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                source = root / "source"
+                source.mkdir()
+                archive, catalog, binding = archived_catalog_fixture(source)
+                manifest_key = private_policy_manifest_key(binding[0])
+                if kind == "missing":
+                    del archive._versions[manifest_key]
+                else:
+                    archive.set_read_override(manifest_key, b"invalid private policy")
+                store = root / "store"
+                store.mkdir()
+                status = project_safe_status(trigger="local", outcome="no_new_release",
+                    reason_category="source_not_advanced", started_at_utc="2032-01-01T00:00:00Z",
+                    ended_at_utc="2032-01-01T00:00:01Z").to_dict()
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with patch.object(cli, "load_prior_publication_binding", return_value=binding), \
+                     patch.object(cli, "build", side_effect=AssertionError("build must not start")) as build, \
+                     patch.object(cli, "export_all", side_effect=AssertionError("export must not start")) as export, \
+                     patch.object(cli, "publish_tree", side_effect=AssertionError("transaction must not start")) as transaction, \
+                     redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = publish_main(["publish", "--mode", "real", "--store", str(store),
+                        "--staging", str(root / "staging"), "--remote", "origin", "--target-ref", "published-data"],
+                        archive_factory=lambda: archive, catalog_loader=lambda: catalog,
+                        control_loader=lambda **kwargs: status)
+                self.assertEqual(code, 1)
+                expected = "preflight.public_eligibility_" + ("missing" if kind == "missing" else "invalid")
+                self.assertEqual(json.loads(stdout.getvalue()), {"category": expected})
+                self.assertEqual(stderr.getvalue(), expected + "\n")
+                build.assert_not_called()
+                export.assert_not_called()
+                transaction.assert_not_called()
+                self.assertFalse((store / "public-eligibility-v1.json").exists())
+                self.assertNotIn("synthetic-private-key", stdout.getvalue() + stderr.getvalue())
+
     def test_cold_accepted_capture_restores_full_catalog_and_policy_through_production_preflight(self):
         from tests.capture.test_restore import archived_catalog_fixture
         from calico_dbt.catalog import build_catalog_from_manifests

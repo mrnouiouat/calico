@@ -124,3 +124,35 @@ identifiers, street addresses, contact details or personal information.
 Record every explicit and backstop row from `08-UI-SPEC.md` by element/category with a dated result
 and safe screenshot reference. Static contracts establish readiness only; owner interaction and
 native Service history supply the acceptance evidence.
+
+## Correction — 2026-10-01: private policy enables hosted republish
+
+**Supersedes:** manual-only data publication wording from 2026-09-16. The proven manual Power BI
+Service observation above remains the condition-6 fallback: use **Refresh now** after the governed
+stable URLs advance. Hosted publication does not prove scheduled Power BI reliability or make the
+report fully automatic. Keep the report disclosure above unchanged.
+
+The production `mode=republish` route restores from B2-only state on a fresh runner, verifies
+the complete catalog and bound private policy, builds once, gates and atomically updates
+`published-data` without force. Missing policy fails closed with
+`preflight.public_eligibility_missing`. The owner must first run
+`python -m calico_capture seed-policy` against the admitted store and pinned public manifest/commit,
+with exact-version readback. A successful hosted proof remains pending that seed/readback and
+evidence collection; a local sidecar or replay cannot substitute for it.
+
+The existing automation key retains exactly `listFiles`, `readFiles`, `writeFiles`; the existing
+publication key retains exactly `listFiles`, `readFiles`, on the same private bucket and
+archive/v1/ prefix. No new key or wider prefix is required. No workflow artifact or cache
+carries policy, and no private policy bytes enter status documents or logs. Output is category-only;
+safe evidence records only policy SHA-256 and `classification_version`.
+
+The source retired on 2026-09-02. A republish dispatch proves the hosted mechanism over existing
+accepted history, not an accepted live capture. A skipped schedule is not rejected. The literal
+accepted trigger is replay-proven; retirement prevents a newly accepted live release. Observe
+the resulting governed manifest and native Service refresh history separately.
+
+Private retention includes every immutable policy and manifest version. If the owner later
+explicitly chooses deletion, deliberately purge **every immutable private version**, including
+policy objects and private manifest versions; hiding/deleting only the latest visible copy is
+insufficient. No deletion capability is added to automation. See the dated
+[capture runbook correction](capture-runbook.md#correction--2026-10-01-private-policy-enables-hosted-republish).

@@ -230,3 +230,60 @@ Never delete, move, or rewrite the local owner-controlled admitted store, its `a
 Durable B2 storage removes the single-laptop dependency; it does not authorize discarding the
 local recovery copy. If disk space is a genuine concern, raise it as a separate, explicit decision
 -- never as a side effect of running a capture command.
+
+## Correction — 2026-10-01: private policy enables hosted republish
+
+**Historical procedure, superseded on 2026-10-01:** the owner-store-only requirement and
+hosted refusal above describe the earlier archive without private policy. This correction
+governs current seed, restore and hosted publication operations.
+
+**Supersedes:** the 2026-09-16 hosted republish refusal and manual-only publication procedure
+above. The production restoration seam now verifies the complete catalog and exact private
+policy before building once, exporting, gating and making a non-force `published-data`
+transaction. This enables the hosted mechanism; a successful hosted evidence run remains
+pending owner seed/readback and the subsequent evidence procedure.
+
+The existing automation key retains exactly `listFiles`, `readFiles`, `writeFiles`; the existing
+publication key retains exactly `listFiles`, `readFiles`. Both remain restricted to the same
+private bucket and archive/v1/ prefix. No new key or wider prefix is required. The retention
+inspection credential remains owner-only and is never used by the workflow.
+
+The owner first seeds the existing classified policy, without deriving new classifications:
+
+```
+python -m calico_capture seed-policy --store <owner-supplied-admitted-store-path> --published-manifest <pinned-public-manifest-path> --published-data-commit <pinned-published-data-commit>
+```
+
+Use the existing automation environment variables for this owner-local command. It binds the
+policy to the exact publication manifest and commit, additively writes immutable private objects
+under archive/v1/, and verifies exact-version readback before reporting success. Evidence may
+record only the policy SHA-256 and `classification_version`, never its entries or private keys.
+
+After seed/readback, prepare an empty external store with no link ancestors and run
+`python -m calico_capture restore-build --store <fresh-external-store-path>`. The production
+restore verifies policy hash, length, classification version and publication binding along with
+every catalog release before the real build. Missing policy fails with
+`preflight.public_eligibility_missing`; invalid or conflicting policy fails closed. There is no
+local-sidecar bypass or missing-policy fallback. A restore failure must be resolved before retrying
+publication; it never authorizes widening credentials or publishing without exclusions.
+
+Only after the owner-authorized evidence procedure, dispatch
+`gh workflow run capture-current.yml --ref main -f mode=republish`. The fresh runner creates an
+empty temporary store/staging root and invokes `python -m calico_publish publish --mode real`:
+B2-only restore, build once, export, gate/privacy scan and one atomic non-force transaction.
+The runner deletes its temporary root on exit. No workflow artifact or cache carries private
+policy; no status document, log or job summary copies private bytes. Logs are category-only,
+with no tracing or provider-error echo. Required-job failures and cancellation cannot publish.
+Capture publication still requires successful dependencies and literal parsed outcome `accepted`.
+
+The source retired on 2026-09-02. A republish dispatch proves the hosted mechanism over accepted
+history; it is not an accepted live capture. A skipped schedule is skipped, not rejected. Replay
+proves capture-to-publish trigger chaining; retirement prevents claiming a newly accepted live
+release. Power BI still uses manual **Refresh now** as the condition-6 Service fallback; this
+change does not prove scheduled Power BI reliability or make the report fully automatic.
+
+Private policy copies inherit immutable-version retention. Never delete local admitted history
+as a side effect of seeding. If the owner later explicitly chooses policy deletion, deliberately
+purge **every immutable private version**, including policy objects and private manifest versions;
+hiding or deleting only the latest visible copy does not remove older versions. Confirm applicable
+retention constraints before that separate owner action; no automation key gains deletion rights.

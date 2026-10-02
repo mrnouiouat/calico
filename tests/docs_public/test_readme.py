@@ -227,5 +227,46 @@ class WrittenWalkthroughLinkContracts(unittest.TestCase):
                     api.check_readme(target)
 
 
+class HostedRepublishRunbookContracts(unittest.TestCase):
+    RUNBOOKS = ("docs/capture-runbook.md", "docs/build-modes.md", "docs/powerbi-refresh-runbook.md")
+    CORRECTION = "## Correction — 2026-10-01: private policy enables hosted republish"
+
+    def assert_current_operations(self, text):
+        self.assertIn(self.CORRECTION, text)
+        current = text.split(self.CORRECTION, 1)[1].split("\n## ", 1)[0]
+        for required in ("**Supersedes:**", "2026-09-16", "2026-09-02", "seed-policy",
+                "readback", "B2-only", "archive/v1/", "`listFiles`, `readFiles`, `writeFiles`",
+                "publication key retains exactly `listFiles`, `readFiles`",
+                "No new key or wider prefix", "workflow artifact", "category-only",
+                "classification_version", "preflight.public_eligibility_missing",
+                "every immutable private version", "private manifest versions", "Refresh now",
+                "not an accepted live capture"):
+            self.assertIn(required, current, "current operations contract is incomplete")
+        for contradiction in ("scheduled Power BI refresh is proven", "republish is an accepted live capture",
+                "skipped schedules are rejected", "only the latest private version needs deletion"):
+            self.assertNotIn(contradiction, current, "current operations must preserve the bounded claim")
+
+    def test_all_three_runbooks_share_the_corrected_mechanism_and_retention_boundary(self):
+        for path in self.RUNBOOKS:
+            with self.subTest(path=path):
+                self.assert_current_operations((ROOT / path).read_text())
+
+    def test_contradictory_refresh_retirement_or_retention_claims_are_rejected(self):
+        for path in self.RUNBOOKS:
+            text = (ROOT / path).read_text()
+            for contradiction in ("scheduled Power BI refresh is proven", "republish is an accepted live capture",
+                    "skipped schedules are rejected", "only the latest private version needs deletion"):
+                with self.subTest(path=path, claim=contradiction), self.assertRaises(AssertionError):
+                    self.assert_current_operations(text.replace(self.CORRECTION,
+                        self.CORRECTION + "\n" + contradiction))
+
+    def test_historical_refusal_and_manual_service_fallback_remain_visible(self):
+        capture = (ROOT / self.RUNBOOKS[0]).read_text()
+        self.assertIn("**The hosted republish path is refused, by design.**", capture)
+        self.assertIn("Historical procedure, superseded on 2026-10-01", capture)
+        from tools.docs_public import readme as api
+        self.assertIn(api.MANUAL_DISCLOSURE, api.generate_readme(ROOT))
+
+
 if __name__ == "__main__":
     unittest.main()

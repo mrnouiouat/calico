@@ -63,3 +63,32 @@ anywhere in this repository or its history, by design (D-02/D-15). Anyone outsid
 verify fixture-mode behavior in full; verifying real-mode behavior against the actual registry
 requires the owner's own private admitted store and cannot be reproduced from what is committed
 here.
+
+## Correction — 2026-10-01: private policy enables hosted republish
+
+**Supersedes:** the earlier "always local" real-mode boundary above and the 2026-09-16
+manual-only publication requirement. Fixture CI remains public and identity-free. Real builds
+also run inside the authorized hosted publication job after B2-only restore to an empty external
+runner-owned store; public CI cannot reproduce the private input. The production path restores
+the full catalog and exact bound policy before build/export/publication, preserving the same SQL
+DAG and fail-closed `preflight.public_eligibility_missing` defense. No local-sidecar bypass exists.
+
+The owner must run `python -m calico_capture seed-policy` against the admitted store and pinned
+public manifest/commit first; exact-version readback verifies the immutable private policy bundle.
+The existing automation key retains exactly `listFiles`, `readFiles`, `writeFiles`; the existing
+publication key retains exactly `listFiles`, `readFiles`, on the same private bucket and
+archive/v1/ prefix. No new key or wider prefix is required.
+
+The hosted mechanism uses `mode=republish` and the production real publication CLI, with no
+workflow artifact or cache, no private policy in status/logs, and category-only output. Safe
+evidence is policy SHA-256 and `classification_version`. A successful hosted proof remains
+pending owner seed/readback and evidence collection. The source retired on 2026-09-02: republish
+is not an accepted live capture, and skipped schedules are not rejected. Replay proves accepted
+trigger chaining; it does not create a new live release.
+
+Power BI keeps manual **Refresh now** as the condition-6 Service fallback; hosted publication
+does not prove scheduled Power BI reliability or make the report fully automatic. Private policy
+retention includes every immutable version. If the owner later chooses deletion, deliberately
+purge **every immutable private version**, including policy objects and private manifest versions;
+a latest-copy hide/delete is insufficient. No deletion capability is added. See the dated
+[capture runbook correction](capture-runbook.md#correction--2026-10-01-private-policy-enables-hosted-republish).

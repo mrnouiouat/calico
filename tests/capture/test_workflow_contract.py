@@ -95,28 +95,26 @@ class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
         self.assertEqual(options_block.count("- republish"), 1)
         self.assertEqual(options_block.count("- authorization_probe"), 1)
 
-    def test_calendar_gate_refuses_the_republish_mode(self) -> None:
-        """The publish job restores its store from B2, which has never
-        carried the private eligibility exclusion sidecar. Since the owner's
-        2026-09-15 decision made an unmatched key default to publishing, a
-        restored store would publish every excluded organization, so the
-        gate refuses the mode outright. Real mode also fails closed on it
-        (`preflight.public_eligibility_missing`) -- this is the fast, legible
-        half of a defence that is already sound without it.
-        """
-
+    def test_calendar_gate_allows_republish_without_capture(self) -> None:
+        import os
+        import subprocess
+        import sys
+        import tempfile
         gate_block = _job_block(self._workflow(), "calendar-gate")
-        self.assertIn('if mode == "republish":', gate_block)
-        self.assertIn("raise SystemExit(1)", gate_block)
-        self.assertIn("::error title=Hosted republish is disabled::", gate_block)
+        script = gate_block.split("python - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        import textwrap
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            result = subprocess.run([sys.executable, "-c", textwrap.dedent(script)],
+                env=dict(os.environ, GITHUB_EVENT_NAME="workflow_dispatch",
+                         CALICO_DISPATCH_MODE="republish", GITHUB_OUTPUT=str(output)),
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, "republish gate must succeed")
+            self.assertEqual(output.read_text().splitlines(),
+                ["should_run=true", "mode=republish", "trigger=workflow_dispatch"])
+            self.assertEqual(result.stdout + result.stderr, "")
 
     def test_republish_stays_a_documented_mode_rather_than_being_deleted(self) -> None:
-        """Refused is not the same as removed: the choice stays in the
-        dispatch enum and the publish job keeps its condition, so the
-        capability and its history remain legible and re-enabling it is one
-        gate change rather than a workflow rewrite.
-        """
-
         content = self._workflow()
         self.assertIn("- republish", content)
         self.assertIn("needs.calendar-gate.outputs.mode == 'republish'", content)
@@ -264,6 +262,17 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         self.assertEqual(block.count("CALICO_B2_PUBLISH_KEY"), 4)
         self.assertNotIn("CALICO_B2_APPLICATION_KEY", block)
 
+    def test_publish_uses_empty_runner_root_and_propagates_failures(self) -> None:
+        block = _job_block(self._workflow(), "publish")
+        publication = block.split("        id: publication", 1)[1].split("      - name:", 1)[0]
+        self.assertIn("set -euo pipefail", publication)
+        self.assertIn('PUBLISH_ROOT="$(mktemp -d)"', publication)
+        self.assertIn('mkdir -p "$PUBLISH_ROOT/store" "$PUBLISH_ROOT/staging"', publication)
+        self.assertIn('trap \'rm -rf "$PUBLISH_ROOT"\' EXIT', publication)
+        self.assertIn('python -m calico_publish publish --mode real --store "$PUBLISH_ROOT/store"', publication)
+        for forbidden in ("download-artifact", "--sidecar", "--policy", "set +e", "|| true"):
+            self.assertNotIn(forbidden, publication)
+
     def test_publish_condition_requires_exact_dependency_states(self) -> None:
         block = _job_block(self._workflow(), "publish")
         condition = next(
@@ -271,7 +280,8 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         )
         self.assertEqual(
             condition,
-            "if: ${{ !cancelled() && needs.calendar-gate.outputs.should_run == 'true' && "
+            "if: ${{ !cancelled() && needs.calendar-gate.result == 'success' && "
+            "needs.calendar-gate.outputs.should_run == 'true' && "
             "( ( needs.calendar-gate.outputs.mode == 'republish' && "
             "needs.capture.result == 'skipped' && needs.status.result == 'skipped' ) || "
             "( needs.calendar-gate.outputs.mode == 'capture' && "

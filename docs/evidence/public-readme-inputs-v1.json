@@ -146,11 +146,11 @@
     },
     {
       "path": "docs/build-modes.md",
-      "sha256": "dbe3c4908026851e191b3aa3dfbe4eab44e1a222cba5ecbc385147176690e601"
+      "sha256": "7bbc0e51bbd2429a67df493b73d1db968bf6d1c8a914bffd9e355e1e54300e58"
     },
     {
       "path": "docs/capture-runbook.md",
-      "sha256": "0e78883836165e6c6985f3eea19bf894d9909f9af2a247806fa476a9b7c1365a"
+      "sha256": "d9314ed8a4ad6e574eb01de93a92dcba4449a8292ea6ad3808e9ae67dda570bb"
     },
     {
       "path": "docs/evidence/dbt-lineage-v1.json",
@@ -166,7 +166,7 @@
     },
     {
       "path": "docs/powerbi-refresh-runbook.md",
-      "sha256": "88f8a7ef1581ed4b856b1111a09cb671d9c46a005884fd2305958197ad4ab9c7"
+      "sha256": "f74d4eb557b5d32a70f3e5d9d33d01ac954309757dbdde6076f78dcbbf72ff0b"
     }
   ],
   "parser_contract_version": "registry-csv-contract-v1",
