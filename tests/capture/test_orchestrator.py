@@ -404,6 +404,44 @@ class NoNewReleaseEqualityAndRetryTests(unittest.TestCase):
 
 
 class DefaultRestoreDiscoveryTests(unittest.TestCase):
+    def prepare_archive(self, archive):
+        import tempfile
+        from unittest.mock import patch
+        from calico_dbt.catalog import build_catalog_from_manifests
+        from tests.capture.test_restore import seed_policy_for_archive
+        with tempfile.TemporaryDirectory() as temporary:
+            binding = seed_policy_for_archive(archive, Path(temporary).resolve())
+        manifests = []
+        for key in archive.all_keys():
+            if key.startswith("archive/v1/store/releases/") and key.endswith("/manifest.json"):
+                raw = archive.get_object(key)
+                document = json.loads(raw)
+                manifests.append((document["as_of_date"], document["release_revision"],
+                                  document["revision_fingerprint"], raw))
+        catalog = build_catalog_from_manifests(manifests)
+        for name, value in (("_default_catalog_loader", catalog), ("load_prior_publication_binding", binding)):
+            patched = patch("calico_capture.restore." + name, return_value=value)
+            patched.start()
+            self.addCleanup(patched.stop)
+
+    def test_missing_policy_stops_cold_capture_before_candidate_fetch(self):
+        import tempfile
+        from tests.capture.test_restore import archived_catalog_fixture
+        from calico_capture.private_policy import private_policy_manifest_key
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temporary:
+            archive, catalog, binding = archived_catalog_fixture(Path(temporary).resolve())
+            del archive._versions[private_policy_manifest_key(binding[0])]
+            calls = []
+            with patch("calico_capture.restore._default_catalog_loader", return_value=catalog), \
+                 patch("calico_capture.restore.load_prior_publication_binding", return_value=binding):
+                status = capture(trigger="local", archive=archive,
+                    fetch_candidate=lambda: calls.append("fetch") or Path(temporary),
+                    build=lambda store: calls.append("build"), sleeper=_RecordingSleeper())
+            self.assertEqual(calls, [], "policy restoration must precede candidate work")
+            self.assertEqual(status.outcome, "operational_error")
+            self.assertEqual(status.reason_category, "restore_error")
+
     """Proves the real production default restore-before-capture boundary
     (`_restore_before_capture` / `calico_capture.restore.
     restore_latest_known_transaction`) correctly restores prior archived
@@ -429,6 +467,8 @@ class DefaultRestoreDiscoveryTests(unittest.TestCase):
             )
             self.assertEqual(first_status.outcome, "accepted")
             self.assertEqual(first_status.last_accepted_release_revision, 1)
+
+            self.prepare_archive(archive)
 
             second_build_spy = _BuildSpy(succeeds=True)
             second_status = capture(
@@ -462,6 +502,8 @@ class DefaultRestoreDiscoveryTests(unittest.TestCase):
             )
             self.assertEqual(first_status.outcome, "accepted")
             self.assertEqual(first_status.last_accepted_release_revision, 1)
+
+            self.prepare_archive(archive)
 
             second_build_spy = _BuildSpy(succeeds=True)
             second_status = capture(

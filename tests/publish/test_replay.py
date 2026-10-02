@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -246,6 +247,57 @@ class _ReplayHarness:
 
 
 class PublicationReplayTests(unittest.TestCase):
+    def test_cold_accepted_capture_restores_full_catalog_and_policy_through_production_preflight(self):
+        from tests.capture.test_restore import archived_catalog_fixture
+        from calico_dbt.catalog import build_catalog_from_manifests
+        from calico_dbt.preflight import prepare_runtime_input
+        calls = []
+        with tempfile.TemporaryDirectory() as temporary, _status_contract_compliant_candidate() as candidate:
+            root = Path(temporary).resolve()
+            source = root / "source"
+            source.mkdir()
+            archive, catalog, binding = archived_catalog_fixture(source)
+            def check_store(store, selected_catalog):
+                with tempfile.TemporaryDirectory() as preflight:
+                    bound = prepare_runtime_input(store_root=store, catalog=selected_catalog,
+                        temp_root=Path(preflight).resolve(), require_eligibility_sidecar=True)
+                return bound.verified_release_count
+            def fetch():
+                # Locate the caller-owned store through the restore boundary's
+                # observable argument recorded below; no restore function is mocked.
+                self.assertEqual(check_store(restored_roots[0], catalog), 3)
+                calls.append("fetch_after_full_restore")
+                return candidate.root
+            def build(store):
+                manifests = []
+                for path in sorted((store / "releases").glob("*/rev-*/manifest.json")):
+                    raw = path.read_bytes()
+                    document = json.loads(raw)
+                    manifests.append((document["as_of_date"], document["release_revision"],
+                                      document["revision_fingerprint"], raw))
+                # The admitted synthetic revision extends only this test catalog.
+                # SQL receives the same verified input/preflight shape as real mode.
+                selected_catalog = build_catalog_from_manifests(manifests)
+                self.assertEqual(check_store(store, selected_catalog), 4)
+                calls.append("production_preflight")
+                return BuildOutcome(status="success", category=None, proof=None)
+            from calico_capture.restore import restore_catalog_with_private_policy
+            restored_roots = []
+            def observe(*args, **kwargs):
+                result = restore_catalog_with_private_policy(*args, **kwargs)
+                restored_roots.append(args[1])
+                return result
+            with patch("calico_capture.restore._default_catalog_loader", return_value=catalog), \
+                 patch("calico_capture.restore.load_prior_publication_binding", return_value=binding), \
+                 patch("calico_capture.restore.restore_catalog_with_private_policy", side_effect=observe):
+                status = capture(trigger="local", archive=archive, fetch_candidate=fetch,
+                                 build=build, sleeper=lambda seconds: None)
+        self.assertEqual(status.outcome, "accepted")
+        self.assertEqual(calls, ["fetch_after_full_restore", "production_preflight"])
+        self.assertTrue(_evaluate_published_workflow_expression(mode="capture", should_run="true",
+            capture_result="success", status_result="success", status_json=status.to_json()))
+        self.assertNotIn("synthetic-private-key", status.to_json())
+
     def test_committed_workflow_expression_routes_every_dependency_state(self) -> None:
         cases = (
             ("republish", "true", "skipped", "skipped", "", False, True),
@@ -255,6 +307,13 @@ class PublicationReplayTests(unittest.TestCase):
             ("capture", "true", "success", "failure", "accepted", False, False),
             ("capture", "true", "failure", "success", "accepted", False, False),
             ("capture", "true", "success", "success", "rejected", False, False),
+            ("capture", "true", "success", "success", "no_new_release", False, False),
+            ("capture", "true", "success", "success", "operational_error", False, False),
+            ("capture", "true", "skipped", "success", "accepted", False, False),
+            ("capture", "true", "success", "skipped", "accepted", False, False),
+            ("capture", "true", "cancelled", "success", "accepted", False, False),
+            ("republish", "true", "skipped", "skipped", "", True, False),
+            ("republish", "true", "failure", "skipped", "", False, False),
             ("capture", "false", "success", "success", "accepted", False, False),
             ("capture", "true", "success", "success", "accepted", True, False),
         )
@@ -289,7 +348,7 @@ class PublicationReplayTests(unittest.TestCase):
 
     def _assert_skipped_without_tree_change(self, status: CaptureStatus) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            replay = _ReplayHarness(Path(directory))
+            replay = _ReplayHarness(Path(directory).resolve())
             before = replay.snapshot()
             code, document = replay.run(status)
             after = replay.snapshot()
@@ -307,13 +366,15 @@ class PublicationReplayTests(unittest.TestCase):
                 fetch_candidate=lambda: candidate.root,
                 build=_BuildSpy(),
             )
-            status = capture(
-                trigger="local",
-                archive=archive,
-                fetch_candidate=lambda: candidate.root,
-                build=_BuildSpy(),
-                clock=lambda: _CURRENT_DATE_CLOCK_TIMESTAMP,
-            )
+            from tests.capture.test_orchestrator import DefaultRestoreDiscoveryTests
+            helper = DefaultRestoreDiscoveryTests()
+            try:
+                helper.prepare_archive(archive)
+                status = capture(
+                    trigger="local", archive=archive, fetch_candidate=lambda: candidate.root,
+                    build=_BuildSpy(), clock=lambda: _CURRENT_DATE_CLOCK_TIMESTAMP)
+            finally:
+                helper.doCleanups()
         self.assertEqual(first.outcome, "accepted")
         self.assertEqual(status.outcome, "no_new_release")
         self._assert_skipped_without_tree_change(status)
@@ -346,7 +407,7 @@ class PublicationReplayTests(unittest.TestCase):
     def test_accepted_gate_failure_makes_zero_transaction_calls(self) -> None:
         status = self._accepted()
         with tempfile.TemporaryDirectory() as directory, extra_unapproved_column() as bad:
-            replay = _ReplayHarness(Path(directory))
+            replay = _ReplayHarness(Path(directory).resolve())
             before = replay.snapshot()
             code, _ = replay.run(status, publication=bad.root)
             after = replay.snapshot()
@@ -357,7 +418,7 @@ class PublicationReplayTests(unittest.TestCase):
     def test_accepted_privacy_failure_makes_zero_transaction_calls(self) -> None:
         status = self._accepted()
         with tempfile.TemporaryDirectory() as directory:
-            replay = _ReplayHarness(Path(directory))
+            replay = _ReplayHarness(Path(directory).resolve())
             before = replay.snapshot()
             code, _ = replay.run(status, add_privacy_finding=True)
             after = replay.snapshot()
@@ -368,7 +429,7 @@ class PublicationReplayTests(unittest.TestCase):
     def test_accepted_clean_publishes_exact_tree_once_then_no_change(self) -> None:
         status = self._accepted()
         with tempfile.TemporaryDirectory() as directory:
-            replay = _ReplayHarness(Path(directory))
+            replay = _ReplayHarness(Path(directory).resolve())
             before_head, _ = replay.snapshot()
             first_code, first_document = replay.run(status)
             first_snapshot = replay.snapshot()

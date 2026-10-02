@@ -32,22 +32,11 @@ only a fixed safe `category` -- never an offending key, path, byte, or
 provider exception text (mirrors `calico_capture.archive.ArchiveError`'s
 non-echo discipline).
 
-`restore_latest_known_transaction` is the actual production restore-before-
-capture boundary `calico_capture.orchestrator.capture()` now wires by
-default (2026-09-03 code review, CR-01 fix): it discovers the single most
-recently archived transaction, if any, via
-`calico_capture.archive.read_latest_transaction_pointer` and restores only
-that one transaction with `restore_verified_transaction`. Only the single
-latest transaction is restored, not the full historical catalog --
-`calico_landing.admission.admit()`'s own `no_new_release`/next-revision-
-number decision (`calico_landing.store.commit_revision`) only ever inspects
-the current attempt's expected `as_of_date` and the promotion pointer
-snapshot, both of which the latest transaction's own restored
-`promoted-releases.json` already carries, so restoring every earlier date's
-history is unnecessary for that comparison to be correct. A caller needing
-the *complete* historical catalog restored (e.g. a from-scratch warehouse
-rebuild) uses `calico_capture.cli`'s separate `restore-build` operator
-command instead, which loops every catalog anchor explicitly.
+`restore_catalog_with_private_policy` is the production restore boundary for
+restore-build, capture and publication. It verifies the complete catalog and
+exact privately bound policy before materializing a caller-visible store.
+`restore_latest_known_transaction` remains a single-transaction compatibility
+helper; production build paths use the full catalog boundary.
 """
 
 from __future__ import annotations
@@ -55,6 +44,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import os
+import stat
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -137,10 +130,28 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _unique_manifest_fields(pairs):
+    document = {}
+    for key, value in pairs:
+        if key in document:
+            raise RestoreError("restore.malformed_transaction_manifest")
+        document[key] = value
+    return document
+
+
 def _fetch_object(archive: Archive, key: str, *, category: str) -> bytes:
     try:
-        return archive.get_object(key)
-    except ArchiveError as exc:
+        versions = archive.list_versions(key)
+        if len(versions) != 1 or versions[0].action != "upload":
+            raise RestoreError(category)
+        version = versions[0]
+        data = archive.get_object(key, version_id=version.version_id)
+        if not isinstance(data, bytes) or len(data) != version.content_length or _sha256_bytes(data) != version.sha256:
+            raise RestoreError("restore.object_hash_mismatch")
+        return data
+    except RestoreError:
+        raise
+    except Exception as exc:
         raise RestoreError(category) from exc
 
 
@@ -157,7 +168,7 @@ def _validate_transaction_manifest_document(
 
     if not isinstance(document, dict) or set(document.keys()) != _TRANSACTION_MANIFEST_KEYS:
         raise RestoreError("restore.malformed_transaction_manifest")
-    if document.get("schema_version") != _TRANSACTION_SCHEMA_VERSION:
+    if type(document.get("schema_version")) is not int or document.get("schema_version") != _TRANSACTION_SCHEMA_VERSION:
         raise RestoreError("restore.malformed_transaction_manifest")
 
     if document.get("transaction_id") != expected_transaction_id:
@@ -320,7 +331,7 @@ def restore_verified_transaction(
         archive, manifest_key, category="restore.transaction_not_found"
     )
     try:
-        manifest_document = json.loads(manifest_bytes.decode("utf-8"))
+        manifest_document = json.loads(manifest_bytes.decode("utf-8"), object_pairs_hook=_unique_manifest_fields)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RestoreError("restore.malformed_transaction_manifest") from exc
 
@@ -444,4 +455,215 @@ __all__ = [
     "RestoredTransaction",
     "restore_latest_known_transaction",
     "restore_verified_transaction",
+    "restore_catalog_with_private_policy",
+    "restore_private_policy_bundle",
+    "RestoredPrivatePolicy",
 ]
+
+
+@dataclass(frozen=True)
+class RestoredPrivatePolicy:
+    """Positive proof projection; never contains sidecar bytes or paths."""
+
+    expected_sha256: str
+    actual_sha256: str
+    classification_version: str
+    prior_publication_manifest_sha256: str
+    prior_publication_commit: str
+    readback_verified: bool = True
+
+    def to_dict(self):
+        from dataclasses import asdict
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RestoredCatalog:
+    restored_transaction_count: int
+    object_count: int
+    release_manifest_sha256s: tuple[str, ...]
+    private_policy: RestoredPrivatePolicy
+
+
+def _default_catalog_loader():
+    from calico_dbt.catalog import load_input_catalog
+    return load_input_catalog(Path(__file__).resolve().parents[1] / "contracts/dbt-input-catalog-v1.json")
+
+
+def load_prior_publication_binding(*, remote="origin", target_ref="published-data"):
+    """Read the current public binding, with Git output captured and never echoed.
+
+    The public manifest has no classification-version field. Its content hash
+    selects the immutable private manifest, whose version is the owner's seed
+    attestation of the last-used version, not a version invented by restoration.
+    """
+    from calico_publish.transaction import _tip
+    if not isinstance(remote, str) or not remote or remote.startswith("-") or target_ref != "published-data":
+        raise RestoreError("preflight.public_eligibility_invalid")
+    try:
+        repo = Path(__file__).resolve().parents[1]
+        commit = _tip(repo, remote, "refs/heads/published-data")
+        raw = subprocess.run(["git", "-C", str(repo), "show",
+                              f"{commit}:manifest/published-manifest-v1.json"],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, check=True).stdout
+        if not re.fullmatch(r"[0-9a-f]{40}", commit) or not raw:
+            raise ValueError
+        return _sha256_bytes(raw), commit
+    except Exception:
+        raise RestoreError("preflight.public_eligibility_invalid") from None
+
+
+def restore_private_policy_bundle(archive, *, binding, expected_classification_version=None):
+    """Validate exact archived versions in memory before installing anything."""
+    from calico_capture.private_policy import load_private_policy_manifest, _read_exact, PrivatePolicyError
+    try:
+        digest, commit = binding
+        manifest = load_private_policy_manifest(
+            archive, prior_publication_manifest_sha256=digest, prior_publication_commit=commit,
+            expected_classification_version=expected_classification_version)
+        raw = _read_exact(archive, manifest.objects[0])
+        if _sha256_bytes(raw) != manifest.sidecar_sha256 or len(raw) != manifest.sidecar_length_bytes:
+            raise PrivatePolicyError("private_policy.readback_mismatch")
+        proof = RestoredPrivatePolicy(manifest.sidecar_sha256, _sha256_bytes(raw),
+                                      manifest.classification_version, digest, commit)
+        return proof, raw
+    except PrivatePolicyError as exc:
+        missing = exc.category in {"private_policy.manifest_missing", "private_policy.object_missing"}
+        raise RestoreError("preflight.public_eligibility_missing" if missing
+                           else "preflight.public_eligibility_invalid") from None
+    except Exception:
+        raise RestoreError("preflight.public_eligibility_invalid") from None
+
+
+def _check_unlinked_path(path):
+    """Reject symlink/reparse aliases in every existing component."""
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    try:
+        for part in absolute.parts[1:]:
+            current = current / part
+            try:
+                metadata = os.lstat(current)
+            except FileNotFoundError:
+                continue
+            reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+            if stat.S_ISLNK(metadata.st_mode) or (reparse and getattr(metadata, "st_file_attributes", 0) & reparse):
+                raise RestoreError("preflight.public_eligibility_invalid")
+    except OSError:
+        raise RestoreError("preflight.public_eligibility_invalid") from None
+    return absolute
+
+
+def _check_destination(path, raw):
+    from calico_capture.private_policy import _read_local_file, PrivatePolicyError
+    _check_unlinked_path(path)
+    try:
+        if path.exists() and _read_local_file(path) != raw:
+            raise RestoreError("restore.pre_existing_conflict")
+    except PrivatePolicyError:
+        raise RestoreError("restore.pre_existing_conflict") from None
+
+
+def _install_verified(path, raw):
+    _check_destination(path, raw)
+    if path.exists():
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _check_unlinked_path(path)
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        _check_destination(path, raw)
+    except OSError:
+        raise RestoreError("restore.write_failed") from None
+
+
+def restore_catalog_with_private_policy(archive, destination_root, *, catalog=None,
+                                        binding_loader=None, expected_classification_version=None,
+                                        allow_empty_archive=False):
+    """Verify the complete ordered catalog and policy before exposing any bytes.
+
+    Each transaction is checked in an owned temporary store. Promotion snapshots
+    are successive historical states; only the final verified snapshot is
+    installed. Existing caller files must match and are never overwritten.
+    This seam does no build: every caller owns its one final production build.
+    """
+    from calico_dbt.catalog import load_and_verify_revision_manifest, CatalogError
+    from calico_landing.candidate import reject_store_in_git_worktree, CandidateError
+    root = _check_unlinked_path(destination_root)
+    try:
+        reject_store_in_git_worktree(root)
+        if not root.is_dir():
+            raise RestoreError("restore.invalid_destination_root")
+    except CandidateError:
+        raise RestoreError("restore.invalid_destination_root") from None
+    if allow_empty_archive:
+        try:
+            pointer = read_latest_transaction_pointer(archive)
+        except Exception:
+            raise RestoreError("restore.latest_pointer_read_failed") from None
+        if pointer is None:
+            ensure_store_layout(root)
+            return None
+    catalog = catalog if catalog is not None else _default_catalog_loader()
+    anchors = sorted(catalog.releases, key=lambda anchor: (anchor.as_of_date, anchor.release_revision))
+    if not anchors:
+        raise RestoreError("restore_build.empty_catalog")
+    content = {}
+    object_count = 0
+    class SkipBuild:
+        succeeded = True
+    with tempfile.TemporaryDirectory(prefix="calico-verified-restore-") as temporary:
+        scratch = Path(temporary).resolve()
+        for index, anchor in enumerate(anchors):
+            staging = scratch / str(index)
+            staging.mkdir()
+            restored = restore_verified_transaction(
+                archive, staging, as_of_date=anchor.as_of_date, release_revision=anchor.release_revision,
+                revision_fingerprint=anchor.revision_fingerprint, build=lambda _: SkipBuild())
+            manifest_path = staging / "releases" / anchor.as_of_date / f"rev-{anchor.release_revision:04d}-{anchor.revision_fingerprint[:8]}" / "manifest.json"
+            try:
+                load_and_verify_revision_manifest(manifest_path, anchor)
+            except CatalogError:
+                raise RestoreError("restore.manifest_verification_failed") from None
+            from calico_landing.store import read_promoted_releases
+            try:
+                promotions = read_promoted_releases(staging)
+                for date, promoted in promotions.items():
+                    pinned = catalog.anchor_for(date, promoted.release_revision)
+                    if pinned is None or pinned.revision_fingerprint != promoted.revision_fingerprint:
+                        raise RestoreError("restore.promotion_snapshot_invalid")
+            except StoreError:
+                raise RestoreError("restore.promotion_snapshot_invalid") from None
+            for key in restored.object_keys:
+                relative = key[len(_STORE_PREFIX):]
+                raw = (staging / relative).read_bytes()
+                if relative in content and content[relative] != raw:
+                    raise RestoreError("restore.pre_existing_conflict")
+                content[relative] = raw
+            content[_PROMOTION_SNAPSHOT_FILENAME] = (staging / _PROMOTION_SNAPSHOT_FILENAME).read_bytes()
+            # Match SafeBuildProof's input-object count (four canonical
+            # Parquets per release), not archive metadata/raw/attempt files.
+            object_count += sum("/canonical/" in key and key.endswith(".parquet")
+                                for key in restored.object_keys)
+    binding = (binding_loader or load_prior_publication_binding)()
+    policy, sidecar = restore_private_policy_bundle(
+        archive, binding=binding, expected_classification_version=expected_classification_version)
+    content["public-eligibility-v1.json"] = sidecar
+    # Check all local conflicts before making the first caller-visible write.
+    for relative, raw in content.items():
+        try:
+            _check_destination(root / relative, raw)
+        except RestoreError:
+            if relative == "public-eligibility-v1.json":
+                raise RestoreError("preflight.public_eligibility_invalid") from None
+            raise
+    for relative, raw in content.items():
+        _install_verified(root / relative, raw)
+    return RestoredCatalog(len(anchors), object_count,
+                           tuple(anchor.revision_manifest_sha256 for anchor in anchors), policy)

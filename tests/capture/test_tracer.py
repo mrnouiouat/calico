@@ -189,6 +189,13 @@ class TracerAcceptedPathTests(unittest.TestCase):
             )
             self.assertEqual(first.outcome, "accepted")
             self.assertEqual(first.last_accepted_release_revision, 1)
+            # Real cold restores now require the full trusted catalog and exact
+            # private sidecar. Supply those identity-free archive inputs while
+            # retaining the actual default restore path for both capture calls.
+            from tests.capture.test_orchestrator import DefaultRestoreDiscoveryTests
+            helper = DefaultRestoreDiscoveryTests()
+            helper.prepare_archive(archive)
+            self.addCleanup(helper.doCleanups)
             keys_after_first = archive.all_keys()
 
             second_build_spy = _BuildSpy(succeeds=True)

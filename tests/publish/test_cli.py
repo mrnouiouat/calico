@@ -41,10 +41,100 @@ def _invoke(argv: list[str], **kwargs) -> tuple[int, str, str]:
 
 
 class PublicationCliTests(unittest.TestCase):
+    def test_real_publish_restores_catalog_and_policy_before_preflight_export_gate_and_transaction(self):
+        import duckdb
+        from tests.capture.test_restore import archived_catalog_fixture
+        from calico_dbt.preflight import prepare_runtime_input
+        from calico_capture.status import project_safe_status
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = root / "source"
+            source.mkdir()
+            archive, catalog, binding = archived_catalog_fixture(source)
+            destination = root / "destination"
+            destination.mkdir()
+            calls = []
+            authority = load_allowlist(REPO_ROOT / "contracts/publication-exports-v3.json")
+            def build_runner(**kwargs):
+                self.assertEqual(kwargs["mode"], "real")
+                preflight = root / "preflight"
+                preflight.mkdir()
+                bound = prepare_runtime_input(store_root=kwargs["store"], catalog=catalog,
+                                temp_root=preflight, require_eligibility_sidecar=True)
+                self.assertEqual(bound.verified_release_count, 3)
+                calls.append("preflight")
+                database = root / "synthetic.duckdb"
+                with duckdb.connect(str(database)) as connection:
+                    for entry in authority.exports:
+                        columns = ", ".join('"' + column + '" VARCHAR' for column in entry.columns)
+                        connection.execute('CREATE TABLE "' + entry.source_relation + '" (' + columns + ')')
+                kwargs["export"](database)
+                calls.append("export")
+                return BuildOutcome(status="success", category=None, proof=None)
+            def publisher(**kwargs):
+                calls.append("transaction")
+                self.assertEqual(len(kwargs["staged_files"]), 13)
+                self.assertNotIn("public-eligibility-v1.json", kwargs["staged_files"])
+                return SimpleNamespace(status="published")
+            control = project_safe_status(trigger="local", outcome="no_new_release",
+                reason_category="source_not_advanced", started_at_utc="2032-01-01T00:00:00Z",
+                ended_at_utc="2032-01-01T00:00:01Z").to_dict()
+            with patch("calico_publish.cli.load_prior_publication_binding", return_value=binding):
+                code, out, err = _invoke(["publish", "--mode", "real", "--store", str(destination),
+                    "--staging", str(root / "staging"), "--remote", "origin", "--target-ref", "published-data"],
+                    archive_factory=lambda: archive, catalog_loader=lambda: catalog,
+                    control_loader=lambda **kwargs: control, build_runner=build_runner,
+                    transaction_publisher=publisher)
+            self.assertEqual(code, 0, err)
+            self.assertEqual(calls, ["preflight", "export", "transaction"])
+            self.assertEqual(json.loads(out), {"category": "publish.published"})
+
+    def test_real_publish_missing_or_invalid_policy_has_zero_downstream_calls(self):
+        from tests.capture.test_restore import archived_catalog_fixture
+        from calico_capture.private_policy import private_policy_manifest_key
+        from tests.fixtures.publish.fixture_builder import mutated_publication
+        for kind in ("missing", "invalid"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                source = root / "source"
+                source.mkdir()
+                archive, catalog, binding = archived_catalog_fixture(source)
+                key = private_policy_manifest_key(binding[0])
+                if kind == "missing":
+                    del archive._versions[key]
+                else:
+                    archive.set_read_override(key, b"private-sentinel")
+                destination = root / "destination"
+                destination.mkdir()
+                calls = []
+                def never_called(**kwargs):
+                    calls.append("effect")
+                    raise AssertionError("private-sentinel")
+                from calico_capture.status import project_safe_status
+                control = project_safe_status(trigger="local", outcome="no_new_release",
+                    reason_category="source_not_advanced", started_at_utc="2032-01-01T00:00:00Z",
+                    ended_at_utc="2032-01-01T00:00:01Z").to_dict()
+                # Use the committed real allowlist but supply a valid control source
+                # through the same existing test seam as other CLI tests.
+                with patch("calico_publish.cli.load_prior_publication_binding", return_value=binding), \
+                     patch("calico_publish.cli.verify", side_effect=never_called):
+                    code, out, err = _invoke(["publish", "--mode", "real", "--store", str(destination),
+                        "--staging", str(root / "staging"), "--remote", "origin", "--target-ref", "published-data"],
+                        archive_factory=lambda: archive, catalog_loader=lambda: catalog,
+                        control_loader=lambda **kwargs: control, build_runner=never_called,
+                        exporter=never_called, transaction_publisher=never_called)
+                category = "preflight.public_eligibility_" + ("missing" if kind == "missing" else "invalid")
+                self.assertEqual(code, 1)
+                self.assertEqual(json.loads(out), {"category": category})
+                self.assertEqual(err, category + "\n")
+                self.assertEqual(calls, [])
+                self.assertNotIn("private-sentinel", out + err)
+                self.assertNotIn(str(root), out + err)
+
     @unittest.skipIf(os.name == "nt", "POSIX symlink semantics required")
     def test_manifest_parent_symlink_is_rejected_before_outside_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             staging = root / "staging"
             outside = root / "outside"
             staging.mkdir()
@@ -254,7 +344,7 @@ class PublicationCliTests(unittest.TestCase):
 
     def test_publish_gate_failure_never_reaches_transaction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            staging = Path(directory)
+            staging = Path(directory).resolve()
             shutil.copy2(BASELINE_DIR / "publication-exports-v1.json", staging)
 
             def runner(**kwargs):
@@ -302,7 +392,7 @@ class PublicationCliTests(unittest.TestCase):
         authority = load_allowlist(REPO_ROOT / "contracts/publication-exports-v3.json")
         for malformed in (False, True):
             with self.subTest(malformed=malformed), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
+                root = Path(directory).resolve()
                 database = root / "synthetic.duckdb"
                 with duckdb.connect(str(database)) as connection:
                     for entry in authority.exports:
@@ -353,10 +443,10 @@ class PublicationCliTests(unittest.TestCase):
                 def archive_factory():
                     calls.append("archive")
                     raise AssertionError("archive must not be reached")
-                arguments = ["publish", "--mode", mode, "--staging", str(Path(temp) / "staging"),
+                arguments = ["publish", "--mode", mode, "--staging", str(Path(temp).resolve() / "staging"),
                              "--remote", "origin", "--target-ref", "published-data"]
                 if mode == "real":
-                    arguments.extend(["--store", str(Path(temp) / "synthetic-store")])
+                    arguments.extend(["--store", str(Path(temp).resolve() / "synthetic-store")])
                 code, stdout, stderr = _invoke(arguments, build_runner=build_runner,
                     archive_factory=archive_factory, control_loader=control_loader)
                 self.assertEqual(calls, [])
@@ -383,7 +473,7 @@ class PublicationCliTests(unittest.TestCase):
 
     def test_fixture_dry_run_builds_once_and_stops_before_transaction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            staging = Path(directory)
+            staging = Path(directory).resolve()
             shutil.copy2(BASELINE_DIR / "publication-exports-v1.json", staging)
             builds: list[str] = []
             publishes: list[str] = []

@@ -36,6 +36,7 @@ from calico_dbt.catalog import CatalogReleaseAnchor, InputCatalog, build_catalog
 from calico_landing.admission import admit
 from tests.capture.fakes import FakeArchive
 from tests.fixtures.landing.fixture_builder import mutated_candidate
+from tests.capture.test_restore import seed_policy_for_archive, archived_catalog_fixture
 
 
 def _admit_baseline_into_fresh_store() -> tuple[Path, "object", tempfile.TemporaryDirectory]:
@@ -359,6 +360,57 @@ class SeedCommandTests(unittest.TestCase):
 
 
 class RestoreBuildCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.binding = ("b" * 64, "a" * 40)
+        self.binding_patch = mock.patch("calico_capture.restore.load_prior_publication_binding",
+                                       side_effect=lambda: self.binding)
+        self.binding_patch.start()
+        self.addCleanup(self.binding_patch.stop)
+
+    def test_three_release_safe_proof_exists_before_one_final_build(self):
+        from types import SimpleNamespace
+        from calico_dbt.preflight import prepare_runtime_input
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = root / "source"
+            source.mkdir()
+            archive, catalog, self.binding = archived_catalog_fixture(source)
+            destination = root / "destination"
+            destination.mkdir()
+            calls = []
+            def build(store):
+                calls.append(store)
+                check = root / "preflight"
+                check.mkdir()
+                binding = prepare_runtime_input(store_root=store, catalog=catalog, temp_root=check,
+                                                require_eligibility_sidecar=True)
+                self.assertEqual(binding.verified_release_count, 3)
+                return SimpleNamespace(succeeded=True, proof=SimpleNamespace(dbt_model_count=72, dbt_test_count=211))
+            document, code = cli._restore_build(destination, archive_factory=lambda: archive,
+                            catalog_loader=lambda: catalog, final_build=build)
+            self.assertEqual(code, 0)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(document["dbt_model_count"], 72)
+            self.assertEqual(document["dbt_test_count"], 211)
+            self.assertEqual(document["release_manifest_sha256s"],
+                             [anchor.revision_manifest_sha256 for anchor in catalog.releases])
+            self.assertIs(document["private_policy"]["readback_verified"], True)
+            self.assertNotIn("synthetic-private-key", json.dumps(document))
+            self.assertNotIn(str(root), json.dumps(document))
+    def test_missing_private_policy_prevents_the_final_build(self):
+        root, result, temporary = _admit_baseline_into_fresh_store()
+        self.addCleanup(temporary.cleanup)
+        archive = FakeArchive()
+        synchronize_verified_transaction(archive, root, result)
+        calls = []
+        with tempfile.TemporaryDirectory() as destination:
+            document, code = cli._restore_build(
+                Path(destination).resolve(), archive_factory=lambda: archive,
+                catalog_loader=lambda: _catalog_for(root, result),
+                final_build=lambda store: calls.append(store) or _FakeBuildOutcome(succeeded=True))
+        self.assertEqual(calls, [], "missing policy must stop before a build")
+        self.assertEqual(code, 1)
+
     def test_restore_build_rejects_a_store_inside_a_git_worktree(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         document, exit_code = cli._restore_build(
@@ -385,6 +437,8 @@ class RestoreBuildCommandTests(unittest.TestCase):
             archive = FakeArchive()
             synchronize_verified_transaction(archive, store_root, result)
             catalog = _catalog_for(store_root, result)
+
+            self.binding = seed_policy_for_archive(archive, store_root)
 
             build_calls: list[Path] = []
 
@@ -414,6 +468,8 @@ class RestoreBuildCommandTests(unittest.TestCase):
             archive = FakeArchive()
             synchronize_verified_transaction(archive, store_root, result)
             catalog = _catalog_for(store_root, result)
+
+            self.binding = seed_policy_for_archive(archive, store_root)
 
             with tempfile.TemporaryDirectory(prefix="calico-cli-restore-build-dest-") as dest_tmp:
                 dest_root = Path(dest_tmp).resolve()

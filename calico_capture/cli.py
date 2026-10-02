@@ -62,7 +62,7 @@ from calico_capture.b2 import (
 )
 from calico_capture.private_policy import PrivatePolicyError, seed_private_policy_bundle
 from calico_capture.orchestrator import capture
-from calico_capture.restore import RestoreError, restore_verified_transaction
+from calico_capture.restore import RestoreError, restore_catalog_with_private_policy, _check_unlinked_path
 from calico_capture.status import (
     CaptureStatus,
     StatusError,
@@ -205,23 +205,6 @@ _AUTHZ_PROBE_REQUIRED_RESULTS: dict[str, str] = {
 #: (`CALICO_AUTHZ_PROBE::result=pass|unexpected`) -- excluded from the
 #: closed per-probe category set above (see `_audit_authorization_probe`).
 _AUTHZ_PROBE_SUMMARY_CATEGORY = "result"
-
-
-class _SkipBuildOutcome:
-    """A fixed, always-succeeded `BuildFn` result for every intermediate
-    `restore-build` catalog anchor.
-
-    `restore_verified_transaction` unconditionally invokes its `build`
-    boundary once per call; looping it over every catalog anchor would
-    otherwise re-run the real, expensive `calico_dbt` build once per
-    release. Only the final anchor's restore is allowed to invoke the real
-    build (`final_build`, defaulting to the real `calico_dbt.runner.build`
-    seam); every earlier anchor's restore is verified and materialized
-    exactly the same way, but its own per-call build invocation is a cheap,
-    fixed no-op success.
-    """
-
-    succeeded = True
 
 
 class _RetentionSessionError(Exception):
@@ -506,19 +489,19 @@ def _restore_build(
     archive_factory: Callable[[], Archive] | None = None,
     catalog_loader: Callable[[], InputCatalog] | None = None,
     final_build: Callable[[Path], object] | None = None,
+    binding_loader: Callable[[], tuple[str, str]] | None = None,
 ) -> tuple[dict, int]:
-    """Restore every committed catalog release into `store` -- a caller-
-    owned fresh external store -- and run the existing real-mode build
-    exactly once, on the final restored anchor (D-13). Every anchor's
-    restore is independently verified and materialized by
-    `restore_verified_transaction`; only the last anchor's own per-call
-    build invocation is the real build (`final_build`, defaulting to the
-    real `calico_dbt.runner.build` seam `restore_verified_transaction`
-    itself already defaults to when `build=None`).
+    """Restore the complete verified catalog and bound policy, then build once.
+
+    No final build is invoked before the shared restoration seam succeeds.
+    The result projects only safe real-build counts and verified identities.
     """
 
     try:
+        _check_unlinked_path(store)
         reject_store_in_git_worktree(store)
+    except RestoreError as exc:
+        return {"category": exc.category}, 1
     except CandidateError:
         return {"category": "restore_build.invalid_store"}, 1
     try:
@@ -546,30 +529,30 @@ def _restore_build(
     if not anchors:
         return {"category": "restore_build.empty_catalog"}, 1
 
-    restored_count = 0
-    object_count = 0
-    for index, anchor in enumerate(anchors):
-        is_final = index == len(anchors) - 1
-        build_fn = final_build if is_final else (lambda _root: _SkipBuildOutcome())
-        try:
-            restored = restore_verified_transaction(
-                archive,
-                layout.store_root,
-                as_of_date=anchor.as_of_date,
-                release_revision=anchor.release_revision,
-                revision_fingerprint=anchor.revision_fingerprint,
-                build=build_fn,
-            )
-        except RestoreError as exc:
-            return {"category": exc.category}, 1
-        restored_count += 1
-        object_count += len(restored.object_keys)
+    try:
+        restored = restore_catalog_with_private_policy(
+            archive, store, catalog=catalog, binding_loader=binding_loader)
+        if final_build is None:
+            from calico_dbt.runner import build
+            outcome = build(mode="real", store=layout.store_root)
+        else:
+            outcome = final_build(layout.store_root)
+        if not getattr(outcome, "succeeded", False):
+            return {"category": getattr(outcome, "category", None) or "restore.build_failed"}, 1
+    except RestoreError as exc:
+        return {"category": exc.category}, 1
+    except Exception:
+        return {"category": "restore.build_failed"}, 1
 
     return (
         {
             "category": "restore_build.completed",
-            "restored_transaction_count": restored_count,
-            "object_count": object_count,
+            "restored_transaction_count": restored.restored_transaction_count,
+            "object_count": restored.object_count,
+            "release_manifest_sha256s": list(restored.release_manifest_sha256s),
+            "dbt_model_count": getattr(getattr(outcome, "proof", None), "dbt_model_count", 0),
+            "dbt_test_count": getattr(getattr(outcome, "proof", None), "dbt_test_count", 0),
+            "private_policy": restored.private_policy.to_dict(),
         },
         0,
     )

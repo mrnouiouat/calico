@@ -16,6 +16,7 @@ import duckdb
 from calico_capture.archive import Archive, ArchiveError
 from calico_capture.b2 import B2ReadOnlyArchive
 from calico_capture.cli import _resolve_local_manifest_path, _restore_build
+from calico_capture.restore import RestoreError, load_prior_publication_binding
 from calico_dbt.catalog import InputCatalog, load_and_verify_revision_manifest, load_input_catalog
 from calico_dbt.runner import BuildOutcome, build
 from calico_landing.contracts import LOGICAL_LIST_ORDER
@@ -167,9 +168,10 @@ def _prepare_publication(
             archive_factory=archive_factory or _default_publication_archive_factory,
             catalog_loader=catalog_loader,
             final_build=final_build,
+            binding_loader=lambda: load_prior_publication_binding(remote=getattr(args, "remote", "origin")),
         )
         if code != 0 or document.get("category") != "restore_build.completed":
-            raise ManifestError("manifest.missing_input")
+            raise RestoreError(document.get("category", "manifest.missing_input"))
     else:
         if args.store:
             raise ManifestError("manifest.invalid_schema")
@@ -387,7 +389,7 @@ def main(
     try:
         return _COMMANDS[args.command](args, runtime=runtime)
     except (GateError, AllowlistError, ExportError, ManifestError, InventoryError, TmdlInventoryError, TransactionError,
-            PolicyError, ScanPathError, ArchiveError) as exc:
+            PolicyError, ScanPathError, ArchiveError, RestoreError) as exc:
         print(_dict_json({"category": exc.category}))
         print(exc.category, file=sys.stderr)
         return 1

@@ -22,14 +22,8 @@ the mandatory manual-recovery path (D-06).
 
 Every step follows 06-RESEARCH.md Pattern 2 ("Restore Before Capture,
 Archive Before Success"): establish a fresh external store, restore
-(`_restore_before_capture` now restores the single most recently archived
-transaction, if any, via `calico_capture.restore.restore_latest_known_transaction`
--- the real, independently proven single-transaction restore-and-build
-primitive 06-03-PLAN.md Task 2 built, finally wired into this production
-entry point by the 2026-09-03 code review's CR-01 fix; see that module's
-docstring for why restoring only the single latest transaction, not the
-full historical catalog, is sufficient for `admit()`'s own comparison to be
-correct), call the existing atomic
+the complete catalog and exact bound private policy through
+`_restore_before_capture`, then call the existing atomic
 `calico_landing.admission.admit()` with the
 closed status-vocabulary contract explicitly opted in, synchronize and
 read-back-verify the resulting transaction against the archive boundary
@@ -187,55 +181,17 @@ def is_capture_day(when: date, trigger: str) -> bool:
     return 1 <= when.day <= 7 or 15 <= when.day <= 21
 
 
-class _SkipBuildOutcome:
-    """A fixed, always-succeeded `BuildFn` result for the restore-before-
-    capture step (mirrors `calico_capture.cli._SkipBuildOutcome` exactly).
-
-    `restore_latest_known_transaction`/`restore_verified_transaction`
-    unconditionally invoke their own `build` boundary once per restored
-    transaction; running the real, expensive `calico_dbt` build again here
-    would be redundant work with no observable benefit -- this function's
-    caller (`capture()`, below) already invokes the one real build this
-    admission attempt needs, and only for a genuinely `accepted` outcome.
-    """
-
-    succeeded = True
-
-
-def _skip_build(_store_root: Path) -> object:
-    return _SkipBuildOutcome()
-
-
 def _restore_before_capture(archive: Archive, destination_root: Path) -> None:
-    """Restore the single most recently archived transaction, if any, into
-    `destination_root` before this call's own admission attempt (Pattern 2,
-    D-13; CR-01 fix, 2026-09-03 code review).
+    """Restore the complete catalog and exact private policy before candidate work.
 
-    `calico_landing.admission.admit()`'s own `no_new_release`/next-
-    revision-number decision (`calico_landing.store.commit_revision`) only
-    ever inspects the current attempt's expected `as_of_date` and the
-    promotion pointer -- both of which the single latest archived
-    transaction's own restored `promoted-releases.json` already carries --
-    so restoring only that one transaction (via
-    `calico_capture.restore.restore_latest_known_transaction`, the real,
-    independently proven primitive 06-03-PLAN.md Task 2 built) is
-    sufficient for this comparison to be correct; looping the full
-    historical catalog is unnecessary here and remains a separate,
-    explicitly-invoked operator command (`calico_capture.cli`'s
-    `restore-build`). For the very first capture into a never-before-
-    archived history, `restore_latest_known_transaction` returns `None` and
-    only establishes the empty, freshly laid out store layout this function
-    has always established for that case.
-
-    The real `calico_dbt` build is deliberately never re-run during this
-    restore step (`build=_skip_build`) -- `capture()`'s own build step,
-    below, is the one real build this admission attempt needs, and only
-    for a genuinely `accepted` outcome.
+    A genuinely empty archive establishes an empty first-capture store. A
+    nonempty archive must restore every anchored release and the bound sidecar.
+    This step performs no analytical build; the accepted path owns its build.
     """
 
-    from calico_capture.restore import restore_latest_known_transaction
+    from calico_capture.restore import restore_catalog_with_private_policy
 
-    restore_latest_known_transaction(archive, destination_root, build=_skip_build)
+    restore_catalog_with_private_policy(archive, destination_root, allow_empty_archive=True)
 
 
 #: Closed `calico_landing.result` reason codes that mean the source did not
@@ -319,7 +275,7 @@ def capture(
     the real UTC clock; tests inject a deterministic one. `sleeper` defaults
     to a real `time.sleep`-backed sleeper; tests inject a recording no-op.
     `restore` defaults to the internal `_restore_before_capture` boundary,
-    which restores the single most recently archived transaction (if any)
+    which restores the complete catalog and private policy (if archived)
     for `archive` (CR-01 fix; see that function's docstring); production
     callers never pass it, but tests may inject a boundary that
     pre-populates the fresh store differently before the retry loop runs.
