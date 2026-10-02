@@ -1,24 +1,10 @@
 # California Charity Registry Monitor
 
-An automated longitudinal data pipeline for California's published charity registry population, with a historical analysis of three accepted releases. Python admits source files; DuckDB and dbt SQL model the history; Power BI presents governed output.
+Calico preserves California's published charity registry releases and turns them into a reproducible history of reported status changes. It helps readers examine changes across the published registry population and inspect the recorded history of a selected organization. Python captures and verifies source files; DuckDB and dbt SQL model the history; Power BI presents the results.
 
-**Current scope:** v1 covers July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2, 2026. The capture workflow continues checking candidates against the source contract; incompatible files are rejected, preserving the accepted history. The three-release window reflects the end of that source series. Adopting the successor publication is future work requiring new source and metric contracts.
+**Current scope:** historical analysis of three accepted releases: July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2. Automated capture continues checking the source; incompatible candidates are rejected without changing the accepted history. Adopting the successor publication is future work requiring new source and metric contracts.
 
 `calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Registry Monitor.
-
-## Build, measure, retire
-
-Historical commercial investigation: built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.
-
-Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.
-
-Clarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.
-
-## Report
-
-[Phase 10 report URL slot]
-
-A Publish to web report URL and final owner acceptance belong to Phase 10. The written walkthrough is linked below.
 
 ## Questions
 
@@ -26,6 +12,42 @@ A Publish to web report URL and final owner acceptance belong to Phase 10. The w
 - Which observed cohorts remain in the published delinquent population?
 - What source-reported compliance history is available for a selected organization?
 - What do schema, capture and reconciliation checks show about each source release?
+
+## Report
+
+Start with the written walkthrough: one observed finding, the SQL behind it, a source-reading correction and the limits of the data.
+
+<!-- calico:walkthrough:start -->
+Walkthrough: [Read the written walkthrough](docs/walkthrough.md).
+<!-- calico:walkthrough:end -->
+
+| Report page | What to explore |
+|---|---|
+| Published registry change | Population coverage and observed status changes between releases. |
+| Cohort persistence | What happened to a starting published delinquent population across observed endpoints. |
+| Release quality | Source coverage, release checks and capture status. |
+| Organization lookup | A selected organization's dated observations, with official verification. |
+
+**Interactive report:** public access is pending final publication approval. The walkthrough is available now; an approved report screenshot will be added when available. Report updates use manual Power BI Refresh now.
+
+<!-- [Phase 10 report URL slot] -->
+
+## Techniques demonstrated
+
+- **Source integrity:** verified source bytes, explicit parsing contracts and all-or-nothing release admission.
+- **Longitudinal SQL modeling:** full-key joins, revision handling, observed status transitions and cohorts, with missing observations kept distinct.
+- **Reproducibility:** a public synthetic fixture exercises the same analytical models and tests without exposing the private archive.
+- **Operational controls:** scheduled capture, durable private preservation, CI checks and atomic publication boundaries.
+
+**One observed finding:** Between the July 15 and August 5 releases, 7,737 matched organizations were observed moving from `Current - Reporting Incomplete` into a delinquent category; most of the entry cohort carries a source-reported July 17 status date; the public files do not establish internal cause, exact processing time, or workflow. Across the next pair, total delinquency entries fell from 7,750 to 2, supporting a descriptive claim of a discrete bulk publication event rather than a steady flow.
+
+The source change also exercised the admission boundary: incompatible candidates were rejected while accepted release identity was preserved. The walkthrough and evidence sections below explain the findings and their limits.
+
+## Limitations
+
+The final three-release panel is bounded by the accepted identities below. It is a longitudinal history across those observations; continuing the series requires a compatible source. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.
+
+Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.
 
 ## Deliberate non-claims
 
@@ -38,6 +60,9 @@ The bounded history lookup intentionally permits organization name, exact full S
 Python owns downloading, hashing, decoding, structural admission and provenance. DuckDB/dbt SQL own promotion, exact-key transitions, contiguous observed spells, cohorts, diagnostics, reconciliation and every published metric. Power BI renders the governed output; it does not recreate business logic. No LLM sits between a source row and a published number.
 
 ## Architecture
+
+<details>
+<summary>Model architecture</summary>
 
 <!-- calico:architecture:start -->
 ```mermaid
@@ -78,7 +103,12 @@ flowchart LR
 An immediate-edge subset of the fixture graph. The full lineage below includes all source lists and publication paths. Fixture lineage proves architecture, not real-data figures.
 <!-- calico:architecture:end -->
 
+</details>
+
 ## Data grains
+
+<details>
+<summary>Data grains and owning relations</summary>
 
 <!-- calico:grains:start -->
 | Grain | Owning relation |
@@ -97,6 +127,8 @@ An immediate-edge subset of the fixture graph. The full lineage below includes a
 
 The [model-grain contracts](docs/model-grains.md) explain each owner and helper relation. Exact registration keys and full release identity prevent substring matching and revision/time-point confusion.
 
+</details>
+
 ## Source path
 
 California Attorney General [Registry reports](https://oag.ca.gov/charities/reports) supply the contracted registry lists. Landing verifies bytes before admission; current registry CSV decodes as CP1252 with QUOTE_NONE. The files contain no embedded record newlines; a newline-aware reader reproduces quote fusion. See the [capture runbook](docs/capture-runbook.md).
@@ -108,6 +140,9 @@ Accepted derived tables and provenance live on the [published-data branch](https
 **Fixture:** public, offline and reproducible; synthetic inputs reproduce the defect shapes without real identities. **Real:** explicit owner-controlled admitted store outside Git, verified against committed catalog anchors; the same SQL DAG and tests run after preflight. The raw archive is private, so the public checkout cannot rerun all historical real-data findings. See [build modes](docs/build-modes.md).
 
 ## Metric definitions
+
+<details>
+<summary>Metric definitions and finding provenance</summary>
 
 <!-- calico:metrics:start -->
 The published delinquent population uses exactly `Delinquent` and `Delinquent - Late Fees Due`.
@@ -134,13 +169,12 @@ Evidence: [governed claim contract](contracts/claim-support-v1.json), claim cont
 Release source fingerprints: `e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c13156ca5fb4096`, `7ad3ab19817a1313620f611713f58715b87734a0533d8e27e9ee71425602216f`, `903ca83cb4a17942e3daa5e02eb062a01c55609f888482a99b21c6036ead8876`; parser `registry-csv-contract-v1`. These are observed publication changes.
 <!-- calico:claims:end -->
 
-## Limitations
-
-The final three-release panel is bounded by the accepted identities below. It is a longitudinal history across those observations; continuing the series requires a compatible source. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.
-
-Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.
+</details>
 
 ## Accepted release and latest capture attempt
+
+<details>
+<summary>Accepted identities, hashes and latest capture status</summary>
 
 <!-- calico:identity:start -->
 Accepted identity is from the publication manifest and the committed input catalog, independently of capture outcome.
@@ -175,7 +209,12 @@ Report updates use a documented manual Power BI Refresh now step. The report is 
 
 See the [Power BI refresh runbook](docs/powerbi-refresh-runbook.md) for native manual refresh and official verification.
 
+</details>
+
 ## dbt lineage
+
+<details>
+<summary>Complete dbt lineage</summary>
 
 <!-- calico:lineage:start -->
 ```mermaid
@@ -281,11 +320,12 @@ flowchart LR
 Generated from the [safe fixture projection](docs/evidence/dbt-lineage-v1.json); source model hashes and immediate edges are checked offline. Raw dbt manifests, compiled SQL, profiles and runtime paths are not published.
 <!-- calico:lineage:end -->
 
-## Techniques demonstrated
-
-Window functions, deterministic revision promotion, exact-key adjacent-release joins and anti-joins, gaps-and-islands with observation censoring, conditional aggregation, denominator contracts, schema/reconciliation assertions, immutable source hashes and atomic publication. Complexity is not a target: each technique answers a bounded source question.
+</details>
 
 ## Annotated SQL excerpts
+
+<details>
+<summary>Annotated SQL and source hashes</summary>
 
 <!-- calico:excerpts:start -->
 **int_promoted_releases** — A matching promotion pointer wins first; otherwise the highest accepted revision wins for that date. Revisions never create a new time point.
@@ -378,6 +418,16 @@ island_numbering as (
 ```
 <!-- calico:excerpts:end -->
 
+</details>
+
+## Build, measure, retire
+
+Historical commercial investigation: built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.
+
+Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.
+
+Clarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.
+
 ## Why the investigation trail is here
 
 The [investigation trail](docs/provenance/) keeps the migration record, Gate A evidence and spikes because a reader should see which interpretations failed and which figures were corrected. Machine-parseable banners distinguish historical bodies from current authority; supersedes pairs preserve predecessors. The byte/hash chain is in the [provenance index](docs/provenance/index-v1.json), and cited authority IDs resolve through the [public decision register](docs/decisions/register.md).
@@ -402,7 +452,3 @@ python -m tools.privacy_scan --tree HEAD --history-all
 The docs check is offline and makes no edits. An intentional evidence refresh first fetches origin/published-data, then passes its full immutable commit to `python -m tools.docs_public inputs --published-ref <full-commit>`, followed by `python -m tools.docs_public generate`. Review, regenerate citations, test and privacy-scan before committing. See [build modes](docs/build-modes.md) for real-mode requirements.
 
 Code and documentation use the [MIT license](LICENSE). Registry-derived data comes from a California public record, attributed to the California Attorney General Registry of Charities and Fundraisers through the source link above. This does not assign a new data license or claim public-domain status. The code license provides no warranty for source-reported registry data; the monitor does not replace the current official record.
-
-<!-- calico:walkthrough:start -->
-Walkthrough: [Read the written walkthrough](docs/walkthrough.md).
-<!-- calico:walkthrough:end -->

@@ -105,8 +105,14 @@ class ReadmeContracts(unittest.TestCase):
                         "All decided README topics must be generated")
         text = api.generate_readme(ROOT)
         headings = [line for line in text.splitlines() if line.startswith("# ") or line.startswith("## ")]
-        self.assertEqual(headings, ["# California Charity Registry Monitor", *["## " + h for h in api.TOPICS[1:]]])
+        self.assertEqual(headings, [("# " if i == 0 else "## ") + api.TOPICS[i] for i in api.README_TOPIC_ORDER])
         self.assertEqual(len(headings), 18)
+        self.assertLess(text.index("## Report"), text.index("## Build, measure, retire"))
+        self.assertLess(text.index("<!-- calico:walkthrough:start -->"), text.index("## Architecture"))
+        self.assertEqual(text.count("<details>"), 6)
+        self.assertEqual(text.count("</details>"), 6)
+        self.assertIn("public access is pending final publication approval", text)
+        self.assertIn("**One observed finding:**", text)
         for required in ("**cali**fornia **c**harity **o**bservatory", "retrocat",
                 "no organization was interviewed about willingness to pay", "2026-09-02",
                 "final three-release panel", "pending verification", api.MANUAL_DISCLOSURE,

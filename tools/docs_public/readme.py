@@ -350,6 +350,7 @@ TOPICS = (
     "Techniques demonstrated", "Annotated SQL excerpts", "Why the investigation trail is here",
     "How to reproduce",
 )
+README_TOPIC_ORDER = (0, 3, 2, 14, 11, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 1, 16, 17)
 BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts", "walkthrough")
 WALKTHROUGH_LINK = "Walkthrough: [Read the written walkthrough](docs/walkthrough.md)."
 MIT_LICENSE = '''MIT License
@@ -499,12 +500,20 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
     table = grain_source.split("| Grain | Owning relation |\n", 1)[1].split("\n\n", 1)[0]
     grains = _block("grains", "| Grain | Owning relation |\n" + table)
     sections = [
-        "An automated longitudinal data pipeline for California's published charity registry population, with a historical analysis of three accepted releases. Python admits source files; DuckDB and dbt SQL model the history; Power BI presents governed output.\n\n"
-        "**Current scope:** v1 covers July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2, 2026. The capture workflow continues checking candidates against the source contract; incompatible files are rejected, preserving the accepted history. The three-release window reflects the end of that source series. Adopting the successor publication is future work requiring new source and metric contracts.\n\n"
+        "Calico preserves California's published charity registry releases and turns them into a reproducible history of reported status changes. It helps readers examine changes across the published registry population and inspect the recorded history of a selected organization. Python captures and verifies source files; DuckDB and dbt SQL model the history; Power BI presents the results.\n\n"
+        "**Current scope:** historical analysis of three accepted releases: July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2. Automated capture continues checking the source; incompatible candidates are rejected without changing the accepted history. Adopting the successor publication is future work requiring new source and metric contracts.\n\n"
         "`calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Registry Monitor.",
         "Historical commercial investigation: built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.\n\n"
         "Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.\n\nClarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.",
-        "[Phase 10 report URL slot]\n\nA Publish to web report URL and final owner acceptance belong to Phase 10. The written walkthrough is linked below.",
+        "Start with the written walkthrough: one observed finding, the SQL behind it, a source-reading correction and the limits of the data.\n\n"
+        + _walkthrough_block(base) + "\n\n"
+        "| Report page | What to explore |\n|---|---|\n"
+        "| Published registry change | Population coverage and observed status changes between releases. |\n"
+        "| Cohort persistence | What happened to a starting published delinquent population across observed endpoints. |\n"
+        "| Release quality | Source coverage, release checks and capture status. |\n"
+        "| Organization lookup | A selected organization's dated observations, with official verification. |\n\n"
+        "**Interactive report:** public access is pending final publication approval. The walkthrough is available now; an approved report screenshot will be added when available. Report updates use manual Power BI Refresh now.\n\n"
+        "<!-- [Phase 10 report URL slot] -->",
         "- How does the published registry population change between accepted releases?\n"
         "- Which observed cohorts remain in the published delinquent population?\n"
         "- What source-reported compliance history is available for a selected organization?\n"
@@ -522,7 +531,12 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.",
         _identity_block(inputs) + "\n\n" + _refresh_block(inputs) + "\n\nSee the [Power BI refresh runbook](docs/powerbi-refresh-runbook.md) for native manual refresh and official verification.",
         _block("lineage", "```mermaid\n" + render_mermaid(graph) + "```\n\nGenerated from the [safe fixture projection](" + LINEAGE + "); source model hashes and immediate edges are checked offline. Raw dbt manifests, compiled SQL, profiles and runtime paths are not published."),
-        "Window functions, deterministic revision promotion, exact-key adjacent-release joins and anti-joins, gaps-and-islands with observation censoring, conditional aggregation, denominator contracts, schema/reconciliation assertions, immutable source hashes and atomic publication. Complexity is not a target: each technique answers a bounded source question.",
+        "- **Source integrity:** verified source bytes, explicit parsing contracts and all-or-nothing release admission.\n"
+        "- **Longitudinal SQL modeling:** full-key joins, revision handling, observed status transitions and cohorts, with missing observations kept distinct.\n"
+        "- **Reproducibility:** a public synthetic fixture exercises the same analytical models and tests without exposing the private archive.\n"
+        "- **Operational controls:** scheduled capture, durable private preservation, CI checks and atomic publication boundaries.\n\n"
+        "**One observed finding:** " + inputs["claim"]["approved_wording"] + "\n\n"
+        "The source change also exercised the admission boundary: incompatible candidates were rejected while accepted release identity was preserved. The walkthrough and evidence sections below explain the findings and their limits.",
         _excerpts_block(excerpts),
         "The [investigation trail](docs/provenance/) keeps the migration record, Gate A evidence and spikes because a reader should see which interpretations failed and which figures were corrected. Machine-parseable banners distinguish historical bodies from current authority; supersedes pairs preserve predecessors. The byte/hash chain is in the [provenance index](docs/provenance/index-v1.json), and cited authority IDs resolve through the [public decision register](docs/decisions/register.md).\n\n"
         "Private planning is excluded: the [boundary decision](docs/decisions/planning-directory-not-published.md) explains the curated public surface. The archive and personal working record are not reproduction inputs.",
@@ -531,8 +545,17 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "The docs check is offline and makes no edits. An intentional evidence refresh first fetches origin/published-data, then passes its full immutable commit to `python -m tools.docs_public inputs --published-ref <full-commit>`, followed by `python -m tools.docs_public generate`. Review, regenerate citations, test and privacy-scan before committing. See [build modes](docs/build-modes.md) for real-mode requirements.\n\n"
         "Code and documentation use the [MIT license](LICENSE). Registry-derived data comes from a California public record, attributed to the California Attorney General Registry of Charities and Fundraisers through the source link above. This does not assign a new data license or claim public-domain status. The code license provides no warranty for source-reported registry data; the monitor does not replace the current official record.",
     ]
-    text = "\n\n".join(("# " if index == 0 else "## ") + TOPICS[index] + "\n\n" + section
-                            for index, section in enumerate(sections)) + "\n\n" + _walkthrough_block(base) + "\n"
+    expandable = {6: "Model architecture", 7: "Data grains and owning relations",
+                  10: "Metric definitions and finding provenance",
+                  12: "Accepted identities, hashes and latest capture status",
+                  13: "Complete dbt lineage", 15: "Annotated SQL and source hashes"}
+    rendered = []
+    for index in README_TOPIC_ORDER:
+        body = sections[index]
+        if index in expandable:
+            body = "<details>\n<summary>" + expandable[index] + "</summary>\n\n" + body + "\n\n</details>"
+        rendered.append(("# " if index == 0 else "## ") + TOPICS[index] + "\n\n" + body)
+    text = "\n\n".join(rendered) + "\n"
     if scan_text("README.md", text):
         _fail("readme.unsafe_readme")
     if write:
