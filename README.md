@@ -1,14 +1,18 @@
 # California Charity Registry Monitor
 
-A public, outside-in monitor of California's published charity registry population. Python admits source files; DuckDB and dbt SQL model the history; Power BI presents governed output.
+An automated longitudinal data pipeline for California's published charity registry population, with a historical analysis of three accepted releases. Python admits source files; DuckDB and dbt SQL model the history; Power BI presents governed output.
+
+**Current scope:** v1 covers July 15, August 5 and August 19, 2026. California retired the original four-file publication on September 2, 2026. The capture workflow continues checking candidates against the source contract; incompatible files are rejected, preserving the accepted history. The three-release window reflects the end of that source series. Adopting the successor publication is future work requiring new source and metric contracts.
 
 `calico` reads as **cali**fornia **c**harity **o**bservatory: a cat pun that also expands to the subject, following the same pattern as `retrocat`. The formal project name is California Charity Registry Monitor.
 
 ## Build, measure, retire
 
-Built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.
+Historical commercial investigation: built the system, then measured whether it should exist, and retired it on the evidence. The commercial investigation did not substantiate a forced platform event; amnesty response did not support intervention; observed unassisted resolutions weakened the value hypothesis; external segmentation did not establish a reliable targeting rule; and renewal costs constrained the commercial proposition. These are qualitative historical findings, not calculations from this monitor.
 
 Known limitation: no organization was interviewed about willingness to pay. The retained engineering artifact explains the measurements and their limits.
+
+Clarification: the retirement described here concerns the commercial proposition. The registry pipeline and its longitudinal history are retained; the source publication retirement described above separately ended new observations under the v1 contract.
 
 ## Report
 
@@ -132,7 +136,7 @@ Release source fingerprints: `e7d025f771be28d1508cb68ee796c301ffd326037840c95a2c
 
 ## Limitations
 
-The final three-release panel is bounded by the accepted identities below. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.
+The final three-release panel is bounded by the accepted identities below. It is a longitudinal history across those observations; continuing the series requires a compatible source. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.
 
 Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.
 

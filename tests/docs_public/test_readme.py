@@ -110,6 +110,8 @@ class ReadmeContracts(unittest.TestCase):
         for required in ("**cali**fornia **c**harity **o**bservatory", "retrocat",
                 "no organization was interviewed about willingness to pay", "2026-09-02",
                 "final three-release panel", "pending verification", api.MANUAL_DISCLOSURE,
+                "**Current scope:**", "Adopting the successor publication is future work",
+                "retirement described here concerns the commercial proposition",
                 "2026-08-19", "2026-10-01T03:56:55.950Z", "source_contract_mismatch",
                 "disappearance is not cure", "[Phase 10 report URL slot]", "CP1252", "QUOTE_NONE"):
             self.assertIn(required, text)
