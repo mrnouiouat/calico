@@ -5,6 +5,8 @@ import copy
 import json
 import os
 import tempfile
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 import unittest
@@ -332,6 +334,50 @@ class HostedReplayPrivacyTests(unittest.TestCase):
         self.assertTrue(token not in _checkpoint("published").to_json())
 
 
+class HostedReplayCliTests(unittest.TestCase):
+    def test_both_cli_schema_validators_accept_actual_closed_documents(self):
+        from tools import hosted_replay as replay
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            documents = {"driver": _checkpoint("accepted").to_dict(),
+                         "envelope": replay.collect_hosted_envelope(**_api_fixture()).to_dict()}
+            for kind, document in documents.items():
+                path = root / (kind + ".json")
+                path.write_text(json.dumps(document), encoding="utf-8")
+                result = subprocess.run([sys.executable, "-m", "tools.hosted_replay", "validate-" + kind,
+                    "--input", str(path)], capture_output=True, check=False)
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(json.loads(result.stdout), {"category": "replay." + kind + "_verified"})
+                self.assertEqual(result.stderr, b"")
+
+    def test_cli_fails_without_echoing_invalid_arguments_canaries_or_exception_details(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "private_path")
+        result = subprocess.run([sys.executable, "-m", "tools.hosted_replay", "validate-driver",
+            "--input", token], capture_output=True, check=False)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (1, b"", b"replay.failed\n"))
+
+    def test_collect_cli_rescans_raw_logs_and_removes_owned_contract_fixture_root(self):
+        from tools import hosted_replay as replay
+        fixture = _api_fixture()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            logs = fixture.pop("raw_logs")
+            directory = root / "logs"
+            directory.mkdir()
+            for name, raw in logs.items():
+                (directory / (name + ".log")).write_bytes(raw)
+            bundle = root / "bundle.json"
+            bundle.write_text(json.dumps(fixture), encoding="utf-8")
+            result = subprocess.run([sys.executable, "-m", "tools.hosted_replay", "collect-envelope",
+                "--input", str(bundle), "--logs-dir", str(directory)], capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stderr, b"")
+            doc = replay.validate_envelope(result.stdout)
+            self.assertEqual(doc["artifact_count"], 0)
+        self.assertFalse(root.exists())
+
+
 class HostedReplayTransactionFailureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -425,6 +471,26 @@ class HostedReplayTransactionFailureTests(unittest.TestCase):
             self.assertEqual(self.tip(), before)
         finally:
             path.write_bytes(raw)
+
+    def test_recursive_publication_audit_reads_carried_control_bytes(self):
+        replay = self.replay
+        path = self.workspace.repo / "authorization-probe-status.json"
+        original = path.read_bytes()
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "contact")
+        def advance(raw):
+            parent = self.tip()
+            replay._git(self.workspace.repo, "read-tree", parent)
+            path.write_bytes(raw)
+            replay._git(self.workspace.repo, "add", "authorization-probe-status.json")
+            tree = replay._git(self.workspace.repo, "write-tree")
+            commit = replay._git(self.workspace.repo, "commit-tree", tree, "-p", parent, "-m", "Controlled fixture byte audit")
+            replay._git(self.workspace.repo, "push", "origin", commit + ":refs/heads/published-data")
+        try:
+            advance(token.encode())
+            with self.assertRaises(replay.ReplayError):
+                replay.audit_bytes({"publication": replay._published_bytes(self.workspace)}, [token])
+        finally:
+            advance(original)
 
     def test_conflicting_nonforce_advances_never_install_candidate_exports(self):
         replay = self.replay

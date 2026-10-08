@@ -528,6 +528,26 @@ def _outcome(state, scenario, baseline):
         "prior_analytical_sha256": baseline.analytical}
 
 
+def _published_bytes(workspace):
+    """Read every actual recursive published blob, including carried controls."""
+    validate_replay_workspace(workspace)
+    tip = _git(workspace.repo, "ls-remote", "origin", "refs/heads/published-data").split()[0]
+    paths = _git(workspace.repo, "ls-tree", "-r", "--name-only", tip).splitlines()
+    allowlist = load_allowlist(_PRODUCT / "contracts/publication-exports-v3.json")
+    expected = sorted([*CARRIED_FORWARD_PATHS, "manifest/published-manifest-v1.json",
+                       *("exports/" + entry.file_name for entry in allowlist.exports)])
+    if paths != expected:
+        _fail("replay.invalid_publication_tree")
+    chunks = []
+    for name in paths:
+        completed = subprocess.run(["git", "show", tip + ":" + name], cwd=workspace.repo,
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+        if completed.returncode or not completed.stdout:
+            _fail("replay.invalid_publication_tree")
+        chunks.append(completed.stdout)
+    return b"".join(chunks)
+
+
 def _checkpoint(workspace, fixture, baseline, state, run_tuple, scenario, evidence, outcomes, stdout, stderr, authorized):
     parent = baseline.commit
     commit = _git(workspace.repo, "ls-remote", "origin", "refs/heads/published-data").split()[0]
@@ -537,7 +557,7 @@ def _checkpoint(workspace, fixture, baseline, state, run_tuple, scenario, eviden
     # Every actual publication file is audited; no raw/source bytes are selected.
     files = sorted([*state.staging.glob("exports/*.csv"), state.staging / "manifest/published-manifest-v1.json",
                     state.staging / "capture-status.json"])
-    raw_publication = b"".join(path.read_bytes() for path in files)
+    raw_publication = b"".join(path.read_bytes() for path in files) + _published_bytes(workspace)
     canaries = tuple(derive_replay_canary(run_tuple, name, category) for name in _JOBS for category in _CATEGORIES)
     document = {"schema_version": DRIVER_SCHEMA_VERSION, "evidence_class": evidence, "input_profile": "fixture",
         "run_tuple": run_tuple.to_dict(), "scenario": scenario, "input_digest": _input_digest(fixture),
