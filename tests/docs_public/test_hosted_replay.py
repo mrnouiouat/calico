@@ -41,7 +41,12 @@ def _envelope_bytes():
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     identity = driver.ReplayRunTuple("mrnouiouat/calico", 1, 1, head)
     with patch.object(fixtures, "_run_tuple", return_value=identity), patch.object(fixtures, "_CHECKPOINTS", {}):
-        return driver.collect_hosted_envelope(**fixtures._api_fixture()).to_json()
+        inputs = fixtures._api_fixture()
+        commit = inputs["historical_real_republish"]["published_data_commit"]
+        tree = subprocess.check_output(["git", "rev-parse", commit + "^{tree}"], cwd=ROOT, text=True).strip()
+        inputs["live_before"] = {**inputs["live_before"], "published_data_commit": commit, "published_data_tree": tree}
+        inputs["live_after"] = dict(inputs["live_before"])
+        return driver.collect_hosted_envelope(**inputs).to_json()
 
 
 def envelope():
@@ -213,6 +218,197 @@ class HostedReplayEvidenceClassTests(unittest.TestCase):
             changed["historical_real_republish"][key] = 2 if key == "run_id" else "0" * len(private[key])
             with self.assertRaises(module.HostedReplayPublicError):
                 module.decode_hosted_replay_public(changed)
+
+
+class HostedReplayGeneratedPairTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve())
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / "envelope.json"
+        self.json_path = self.root / "generated.json"
+        self.markdown_path = self.root / "generated.md"
+
+    def generate(self):
+        self.source.write_text(envelope().to_json(), encoding="utf-8")
+        public_module().generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+
+    def test_generation_and_check_authorities_exist_before_observation(self):
+        module = public_module()
+        self.assertTrue(callable(getattr(module, "generate_hosted_replay_pair", None)),
+                        "atomic pair generation authority is required before observation")
+        self.assertTrue(callable(getattr(module, "check_hosted_replay_pair", None)))
+
+    def test_exact_round_trip_checks_envelope_public_and_markdown(self):
+        self.generate()
+        module = public_module()
+        module.check_hosted_replay_pair(self.json_path, self.markdown_path)
+        module.check_hosted_replay_against_envelope(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertEqual(self.json_path.read_text(), module.project_hosted_replay_public(envelope()).to_json())
+        self.assertEqual(self.markdown_path.read_text(), module.render_hosted_replay_markdown(self.json_path.read_bytes()))
+
+    def test_drift_in_either_file_fails_without_repair(self):
+        self.generate()
+        module = public_module()
+        for path in (self.json_path, self.markdown_path):
+            original = path.read_bytes()
+            path.write_bytes(original + b"\n")
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.check_hosted_replay_pair(self.json_path, self.markdown_path)
+            self.assertEqual(path.read_bytes(), original + b"\n")
+            path.write_bytes(original)
+
+    def test_changed_job_digest_run_or_boundary_fails_before_writes(self):
+        self.generate()
+        module = public_module()
+        before = (self.json_path.read_bytes(), self.markdown_path.read_bytes())
+        candidates = []
+        changed = envelope().to_dict()
+        changed["jobs"][0]["conclusion"] = "failure"
+        candidates.append(changed)
+        changed = envelope().to_dict()
+        changed["checkpoints"][-1]["driver"]["input_digest"] = "0" * 64
+        candidates.append(changed)
+        changed = envelope().to_dict()
+        changed["live_after"]["published_data_tree"] = "0" * 40
+        candidates.append(changed)
+        for candidate in candidates:
+            self.source.write_text(json.dumps(candidate))
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+            self.assertEqual((self.json_path.read_bytes(), self.markdown_path.read_bytes()), before)
+
+    def test_semantically_valid_but_stale_pair_fails_against_envelope(self):
+        self.generate()
+        module = public_module()
+        original = envelope().to_dict()
+        for field in ("job", "audit", "boundary"):
+            changed = copy.deepcopy(original)
+            if field == "job":
+                changed["jobs"][0]["job_id"] += 100
+            elif field == "audit":
+                changed["raw_log_audits"][0]["audit"]["sha256"] = "0" * 64
+            else:
+                changed["live_before"]["archive_inventory_sha256"] = "0" * 64
+                changed["live_after"]["archive_inventory_sha256"] = "0" * 64
+            self.source.write_text(json.dumps(changed))
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.check_hosted_replay_against_envelope(self.source, self.json_path, self.markdown_path, root=ROOT)
+
+    def test_second_replace_failure_rolls_back_both_existing_outputs(self):
+        self.generate()
+        module = public_module()
+        self.json_path.write_bytes(b"prior-json\n")
+        self.markdown_path.write_bytes(b"prior-markdown\n")
+        original = os.replace
+        writes = []
+        def fail_second(source, destination):
+            writes.append(destination)
+            if len(writes) == 2:
+                raise OSError("controlled replacement failure")
+            return original(source, destination)
+        with patch.object(module.os, "replace", side_effect=fail_second):
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertEqual(self.json_path.read_bytes(), b"prior-json\n")
+        self.assertEqual(self.markdown_path.read_bytes(), b"prior-markdown\n")
+        self.assertFalse(list(self.root.glob(".hosted-replay-*.tmp")))
+
+    def test_new_pair_failure_leaves_neither_output(self):
+        module = public_module()
+        self.source.write_text(envelope().to_json())
+        original = os.replace
+        calls = []
+        def fail_second(source, destination):
+            calls.append(destination)
+            if len(calls) == 2:
+                raise OSError("controlled replacement failure")
+            return original(source, destination)
+        with patch.object(module.os, "replace", side_effect=fail_second):
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertFalse(self.json_path.exists())
+        self.assertFalse(self.markdown_path.exists())
+
+    def test_symlinks_aliases_and_wrong_variants_do_not_write(self):
+        module = public_module()
+        self.source.write_text(envelope().to_json())
+        target = self.root / "target.json"
+        target.write_bytes(b"preserved")
+        self.json_path.symlink_to(target)
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertEqual(target.read_bytes(), b"preserved")
+        self.assertFalse(self.markdown_path.exists())
+        self.json_path.unlink()
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.generate_hosted_replay_pair(self.source, self.source, self.markdown_path, root=ROOT)
+        self.source.write_text(module.project_hosted_replay_public(envelope()).to_json())
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+
+    def test_cli_round_trip_and_drift_have_category_only_diagnostics(self):
+        from tools.docs_public.__main__ import main
+        import contextlib
+        import io
+        self.source.write_text(envelope().to_json())
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            self.assertEqual(main(["hosted-replay-generate", "--envelope", str(self.source),
+                                   "--json-output", str(self.json_path), "--markdown-output", str(self.markdown_path)]), 0)
+            self.assertEqual(main(["hosted-replay-check", "--envelope", str(self.source),
+                                   "--json", str(self.json_path), "--markdown", str(self.markdown_path)]), 0)
+            self.markdown_path.write_bytes(self.markdown_path.read_bytes() + b"changed")
+            self.assertEqual(main(["hosted-replay-check", "--envelope", str(self.source),
+                                   "--json", str(self.json_path), "--markdown", str(self.markdown_path)]), 1)
+        self.assertNotIn(str(self.root), output.getvalue())
+        self.assertIn("hosted_replay.generated_drift", output.getvalue())
+
+
+class HostedReplayCitationTests(unittest.TestCase):
+    def test_citation_authority_exists(self):
+        from tools.citation_scan import scanner
+        self.assertTrue(callable(getattr(scanner, "check_hosted_replay_citations", None)),
+                        "exact hosted replay citation authority is required")
+
+    def test_safe_github_run_commit_and_repository_locators_are_accepted(self):
+        from tools.citation_scan import scanner
+        module = public_module()
+        public = module.project_hosted_replay_public(envelope())
+        scanner.check_hosted_replay_citations(ROOT, public, module.render_hosted_replay_markdown(public))
+
+    def test_private_raw_log_job_output_and_approval_locators_are_rejected(self):
+        from tools.citation_scan import scanner
+        module = public_module()
+        public = module.project_hosted_replay_public(envelope())
+        original = module.render_hosted_replay_markdown(public)
+        # Synthetic locators contain no identities, credentials or contact forms.
+        for suffix in ("/logs", "?job_outputs=excluded", "/private-approval", "/calico-build/.planning"):
+            changed = original + "\n[unapproved](https://github.com/mrnouiouat/calico" + suffix + ")\n"
+            with self.assertRaises(scanner.CitationError):
+                scanner.check_hosted_replay_citations(ROOT, public, changed)
+        changed = public.to_dict()
+        changed["run"]["repository"] = "fixture/unapproved"
+        with self.assertRaises(scanner.CitationError):
+            scanner.check_hosted_replay_citations(ROOT, changed, original)
+
+    def test_invented_future_head_and_self_sha_evidence_are_rejected(self):
+        from tools.citation_scan import scanner
+        module = public_module()
+        public = module.project_hosted_replay_public(envelope()).to_dict()
+        invented = copy.deepcopy(public)
+        invented["run"]["head_sha"] = "0" * 40
+        invented["run"]["commit_url"] = "https://github.com/mrnouiouat/calico/commit/" + "0" * 40
+        with self.assertRaises(scanner.CitationError):
+            scanner.check_hosted_replay_citations(ROOT, invented, module.render_hosted_replay_markdown(invented))
+        original_git = scanner.run_git
+        def deployment_already_contains_evidence(args, root):
+            if args[:2] == ["ls-tree", "--name-only"] and args[2] == public["run"]["head_sha"]:
+                return (module.JSON_PATH + "\n" + module.MARKDOWN_PATH + "\n").encode()
+            return original_git(args, root)
+        with patch.object(scanner, "run_git", side_effect=deployment_already_contains_evidence):
+            with self.assertRaises(scanner.CitationError):
+                scanner.check_hosted_replay_citations(ROOT, public, module.render_hosted_replay_markdown(public))
 
 
 if __name__ == "__main__":
