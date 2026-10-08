@@ -13,17 +13,30 @@ plan); this module proves only what committed YAML/Markdown text can prove.
 from __future__ import annotations
 
 import re
+import hashlib
+import json
+import os
+import tempfile
+import textwrap
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from calico_capture.orchestrator import SCHEDULE_CRON, retry_delays
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "capture-current.yml"
+ROUTE_PATH = REPO_ROOT / ".github" / "workflows" / "publication-route.yml"
 RUNBOOK_PATH = REPO_ROOT / "docs" / "capture-runbook.md"
 
 CHECKOUT_PIN = "3d3c42e5aac5ba805825da76410c181273ba90b1"
 SETUP_PYTHON_PIN = "5fda3b95a4ea91299a34e894583c3862153e4b97"
+LIVE_WORKER_HASHES = {
+    "capture": "f5c59e7b6f96ff60c77cf2dad36af3f5fcdd6625f434b63deebfd2ea0dc446fc",
+    "status": "28689e9aa8dc62b0e1b8c5ce38b90a159828c4f1c5321cb3e41f797fe568b208",
+    "publish": "cdea1035dc9f7d03adcdfb83eeb08e194bc1ac1761eb707dd97f13fc9379be1c",
+    "authorization-probe": "749b42b874900d642ac34083a5dd1923cac302a777607594710cf7ab6618abfa",
+}
 
 
 def _read(path: Path) -> str:
@@ -66,6 +79,129 @@ def _permissions_block(text: str) -> list[str]:
             break
         block.append(line.strip())
     return block
+
+
+class SharedPublicationRouteContractTests(unittest.TestCase):
+    """Offline source/validation contracts; GitHub evaluates the route at hosted proof."""
+
+    def _route(self):
+        self.assertTrue(ROUTE_PATH.is_file(), "shared hosted publication route must exist")
+        return _read(ROUTE_PATH)
+
+    def test_shared_publication_route_exists(self):
+        self._route()
+
+    def test_route_has_closed_typed_inputs_one_job_and_no_privileges(self):
+        import yaml
+        content = self._route()
+        document = yaml.safe_load(content)
+        call = document["on" if "on" in document else True]["workflow_call"]
+        self.assertEqual(set(call["inputs"]), {"calendar_result", "should_run", "mode",
+            "capture_result", "status_result", "status_json"})
+        self.assertTrue(all(value == {"type": "string", "required": True}
+                            for value in call["inputs"].values()))
+        self.assertEqual(set(document["jobs"]), {"route"})
+        self.assertEqual(document["permissions"], {"contents": "read"})
+        self.assertEqual(document["jobs"]["route"]["permissions"], {"contents": "read"})
+        self.assertEqual(call["outputs"]["should_publish"]["value"],
+                         "${{ jobs.route.outputs.should_publish }}")
+        for forbidden in ("secrets", "environment:", "contents: write", "upload-artifact",
+                          "pip install", "git push", "eval("):
+            self.assertNotIn(forbidden, content)
+        self.assertIn("persist-credentials: false", content)
+
+    def test_single_github_expression_and_output_are_exact(self):
+        content = self._route()
+        condition = next(line.strip() for line in content.splitlines() if line.strip().startswith("if:"))
+        self.assertEqual(condition, "if: ${{ !cancelled() && steps.validate.outputs.valid == 'true' && "
+            "inputs.calendar_result == 'success' && inputs.should_run == 'true' && "
+            "( ( inputs.mode == 'republish' && inputs.capture_result == 'skipped' && "
+            "inputs.status_result == 'skipped' ) || ( inputs.mode == 'capture' && "
+            "inputs.capture_result == 'success' && inputs.status_result == 'success' && "
+            "fromJSON(steps.validate.outputs.status_json).outcome == 'accepted' ) ) }}")
+        self.assertEqual(content.count("fromJSON("), 1)
+        self.assertIn("echo 'should_publish=true'", content)
+        self.assertIn("${{ steps.publish.outputs.should_publish == 'true' }}", content)
+
+    def test_live_caller_passes_actual_needs_and_only_consumes_route_output(self):
+        content = _read(WORKFLOW_PATH)
+        caller = _job_block(content, "publication-route")
+        self.assertIn("needs: [calendar-gate, capture, status]", caller)
+        self.assertIn("if: ${{ !cancelled() }}", caller)
+        self.assertIn("uses: ./.github/workflows/publication-route.yml", caller)
+        for name, reference in (("calendar_result", "needs.calendar-gate.result"),
+                ("should_run", "needs.calendar-gate.outputs.should_run"),
+                ("mode", "needs.calendar-gate.outputs.mode"),
+                ("capture_result", "needs.capture.result"), ("status_result", "needs.status.result"),
+                ("status_json", "needs.capture.outputs.status_json")):
+            self.assertIn(name + ": ${{ " + reference + " }}", caller)
+        self.assertNotIn("secrets", caller)
+        self.assertNotIn("environment:", caller)
+        self.assertNotIn("fromJSON(", content)
+        self.assertIn("if: ${{ !cancelled() && needs.publication-route.result == 'success' && "
+                      "needs.publication-route.outputs.should_publish == 'true' }}",
+                      _job_block(content, "publish"))
+
+    def _validate(self, **overrides):
+        from calico_capture.status import project_safe_status
+        status = project_safe_status(trigger="local", outcome="accepted", reason_category="none",
+            started_at_utc="2032-01-01T00:00:00Z", ended_at_utc="2032-01-01T00:00:01Z").to_json()
+        # Use the production inline validator itself. No Actions-to-Python expression translation.
+        values = dict(CALENDAR_RESULT="success", SHOULD_RUN="true", MODE="capture",
+                      CAPTURE_RESULT="success", STATUS_RESULT="success", STATUS_JSON=status)
+        values.update(overrides)
+        script = self._route().split("python - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            with patch.dict(os.environ, dict(values, GITHUB_OUTPUT=str(output))):
+                exec(compile(textwrap.dedent(script), str(ROUTE_PATH), "exec"), {"__name__": "__main__"})
+            return dict(line.split("=", 1) for line in output.read_text().splitlines())
+
+    def test_status_missing_null_malformed_or_unvalidated_is_never_accepted(self):
+        for value in ("", "null", "{", "[]", "false", '"accepted"', '{"outcome":"accepted"}',
+                      '{"outcome":"unknown"}'):
+            with self.subTest(status_kind=value):
+                result = self._validate(STATUS_JSON=value)
+                self.assertEqual(result, {"valid": "false", "status_json": "{}"})
+        self.assertEqual(self._validate()["valid"], "true")
+
+    def test_closed_outcomes_remain_data_for_github_to_evaluate(self):
+        from calico_capture.status import project_safe_status
+        for outcome, reason in (("accepted", "none"), ("no_new_release", "source_not_advanced"),
+                                ("rejected", "structural_rejection"), ("operational_error", "archive_failed")):
+            status = project_safe_status(trigger="local", outcome=outcome, reason_category=reason,
+                started_at_utc="2032-01-01T00:00:00Z", ended_at_utc="2032-01-01T00:00:01Z").to_json()
+            result = self._validate(STATUS_JSON=status)
+            self.assertEqual(result["valid"], "true")
+            self.assertEqual(json.loads(result["status_json"])["outcome"], outcome)
+
+    def test_closed_dependency_matrix_preserves_failure_and_skip_states(self):
+        import itertools
+        states = ("success", "skipped", "failure", "cancelled")
+        for calendar, capture, status in itertools.product(states, repeat=3):
+            result = self._validate(CALENDAR_RESULT=calendar, CAPTURE_RESULT=capture, STATUS_RESULT=status)
+            self.assertEqual(result["valid"], "true")
+        for field in ("CALENDAR_RESULT", "CAPTURE_RESULT", "STATUS_RESULT", "SHOULD_RUN", "MODE"):
+            for value in ("", "null", "unknown"):
+                self.assertEqual(self._validate(**{field: value})["valid"], "false")
+        self.assertEqual(self._validate(MODE="republish", CAPTURE_RESULT="skipped",
+                                      STATUS_RESULT="skipped", STATUS_JSON="")["valid"], "true")
+
+    def test_live_privileged_workers_are_byte_exact_except_route_wiring(self):
+        content = _read(WORKFLOW_PATH)
+        # Frozen hashes of the reviewed live workers; publication header alone is rewired.
+        expected = LIVE_WORKER_HASHES
+        for job, digest in expected.items():
+            block = _job_block(content, job)
+            if job == "publish":
+                block = block[block.index("    runs-on:"):]
+            self.assertEqual(hashlib.sha256(block.encode()).hexdigest(), digest, job)
+
+    def test_live_calendar_calls_stdlib_authority_without_controlled_date(self):
+        block = _job_block(_read(WORKFLOW_PATH), "calendar-gate")
+        self.assertIn("python calico_capture/calendar.py", block)
+        for forbidden in ("isoweekday", "today.day", "--observed-date", "CALICO_OBSERVED_DATE", "pip install"):
+            self.assertNotIn(forbidden, block)
 
 
 class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
