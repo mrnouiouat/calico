@@ -203,6 +203,21 @@ class SharedPublicationRouteContractTests(unittest.TestCase):
         for forbidden in ("isoweekday", "today.day", "--observed-date", "CALICO_OBSERVED_DATE", "pip install"):
             self.assertNotIn(forbidden, block)
 
+    def test_route_validation_is_stdlib_only_and_never_echoes_invalid_input(self):
+        import subprocess
+        import sys
+        script = self._route().split("python - <<'PY'\n", 1)[1].split("          PY", 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            env = dict(os.environ, CALENDAR_RESULT="success", SHOULD_RUN="true", MODE="capture",
+                CAPTURE_RESULT="success", STATUS_RESULT="success", GITHUB_OUTPUT=str(output),
+                STATUS_JSON="synthetic-private-sentinel\nshould_publish=true")
+            result = subprocess.run([sys.executable, "-S", "-c", textwrap.dedent(script)],
+                cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout + result.stderr, "")
+            self.assertEqual(output.read_text(), "valid=false\nstatus_json={}\n")
+
 
 class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
     """Test 1: exact cron, closed dispatch modes, 330-minute bound, constant
