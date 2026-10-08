@@ -14,7 +14,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import stat
 import subprocess
 import sys
@@ -49,10 +48,14 @@ _WORKSHOP = _PRODUCT.parent / "calico-build"
 _OWNED_ROOTS = {}
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _SCENARIOS = ("accepted", "repeat", "rejected")
-_JOBS = ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publication-accepted")
+_ROUTES = ("accepted", "repeat", "rejected", "calendar-refused", "failure", "cancelled")
+_JOBS = (*("prepare-" + scenario for scenario in _SCENARIOS),
+         *("route-" + scenario for scenario in _ROUTES),
+         *("publish-" + scenario for scenario in _ROUTES), "calendar-matrix", "audit-safe-evidence")
 _CATEGORIES = ("excluded_identifier", "street_address", "contact", "private_path", "exception")
 _SURFACES = ("stdout", "stderr", "status", "summary", "publication")
 _MAX_JSON = 65536
+_BLOCKED_GIT_CONFIG = r"^(credential\.|url\.|http\.|include\.|includeIf\.|init\.templateDir|core\.(sshCommand|hooksPath|gitProxy)|remote\..*\.(uploadpack|receivepack|proxy))"
 
 
 class ReplayError(Exception):
@@ -179,6 +182,8 @@ def _unlinked(path):
             meta = os.lstat(current)
         except FileNotFoundError:
             continue
+        except OSError:
+            _fail("replay.isolation_rejected")
         if stat.S_ISLNK(meta.st_mode) or getattr(meta, "st_file_attributes", 0) & 0x400:
             _fail("replay.isolation_rejected")
     if raw != raw.resolve():
@@ -198,8 +203,10 @@ def _credentials():
             _fail("replay.credentials_rejected")
         if key in {"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} and value != os.devnull:
             _fail("replay.credentials_rejected")
+        if key in {"GIT_TEMPLATE_DIR", "GIT_EXEC_PATH"}:
+            _fail("replay.credentials_rejected")
     completed = subprocess.run(["git", "config", "--get-regexp",
-        r"^(credential\.|url\.|http\.|core\.(sshCommand|hooksPath))"],
+        _BLOCKED_GIT_CONFIG],
         cwd=Path(tempfile.gettempdir()).resolve(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
     if completed.returncode != 1:
         _fail("replay.credentials_rejected")
@@ -222,7 +229,9 @@ def validate_replay_workspace(workspace):
     if not isinstance(workspace, ReplayWorkspace) or type(workspace.archive) is not FakeArchive:
         _fail("replay.isolation_rejected")
     root = _unlinked(workspace.root)
-    if _OWNED_ROOTS.get(root) != (root.stat().st_dev, root.stat().st_ino):
+    if root not in _OWNED_ROOTS or not root.is_dir():
+        _fail("replay.isolation_rejected")
+    if _OWNED_ROOTS[root] != (root.stat().st_dev, root.stat().st_ino):
         _fail("replay.isolation_rejected")
     if root.is_relative_to(_PRODUCT) or root.is_relative_to(_WORKSHOP):
         _fail("replay.isolation_rejected")
@@ -237,15 +246,27 @@ def validate_replay_workspace(workspace):
     for path in root.rglob("*"):
         _unlinked(path)
     if workspace.repo.exists():
+        if not (workspace.repo / ".git").is_dir():
+            _fail("replay.isolation_rejected")
         completed = subprocess.run(["git", "config", "--local", "--get-regexp",
-            r"^(credential\.|url\.|http\.|core\.(sshCommand|hooksPath))"],
+            _BLOCKED_GIT_CONFIG],
             cwd=workspace.repo, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
         if completed.returncode != 1:
             _fail("replay.credentials_rejected")
         if _git(workspace.repo, "remote", "get-url", "origin") != str(workspace.remote):
             _fail("replay.isolation_rejected")
+        if _git(workspace.repo, "remote", "get-url", "--push", "origin") != str(workspace.remote):
+            _fail("replay.isolation_rejected")
     if workspace.remote.exists() and _git(workspace.remote, "rev-parse", "--is-bare-repository") != "true":
         _fail("replay.isolation_rejected")
+    for repository, git_dir in ((workspace.repo, workspace.repo / ".git"), (workspace.remote, workspace.remote)):
+        if repository.exists():
+            configured = subprocess.run(["git", "config", "--local", "--get-regexp", _BLOCKED_GIT_CONFIG],
+                cwd=repository, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+            if configured.returncode != 1:
+                _fail("replay.credentials_rejected")
+            if any(path.is_file() and not path.name.endswith(".sample") for path in (git_dir / "hooks").glob("*")):
+                _fail("replay.isolation_rejected")
 
 
 @contextmanager
@@ -455,6 +476,8 @@ def _candidate(workspace, fixture, baseline, scenario):
 
 
 def derive_replay_canary(run_tuple, job_name, category):
+    if not isinstance(run_tuple, ReplayRunTuple):
+        _fail()
     schema = _decode((_PRODUCT / "contracts/hosted-replay-driver-v1.schema.json").read_bytes())
     _schema(run_tuple.to_dict(), schema["properties"]["run_tuple"])
     if job_name not in _JOBS or category not in _CATEGORIES:
@@ -471,12 +494,17 @@ def audit_bytes(surfaces, canaries):
         _fail("replay.invalid_audit")
     if not isinstance(canaries, (tuple, list)) or not canaries:
         _fail("replay.invalid_audit")
+    if any(type(token) is not str or re.fullmatch(r"CALICO_REPLAY_CANARY_[a-p]{64}", token) is None for token in canaries):
+        _fail("replay.invalid_audit")
     records = []
     for surface in sorted(surfaces):
         value = surfaces[surface]
         if isinstance(value, Path):
             _unlinked(value)
-            raw = value.read_bytes()
+            try:
+                raw = value.read_bytes()
+            except OSError:
+                _fail("replay.invalid_audit")
         elif type(value) is bytes:
             raw = value
         else:
@@ -484,6 +512,9 @@ def audit_bytes(surfaces, canaries):
         hits = sum(raw.count(token.encode()) for token in canaries)
         if hits:
             _fail("replay.canary_found")
+        from tools.privacy_scan.scanner import _scan_utf8_chunks
+        if _scan_utf8_chunks(surface, [raw]):
+            _fail("replay.privacy_failed")
         if surface in {"status", "summary", "publication"} and not raw:
             _fail("replay.empty_audit")
         records.append({"surface": surface, "byte_length": len(raw), "sha256": _digest(raw), "canary_hits": 0})
@@ -507,8 +538,7 @@ def _checkpoint(workspace, fixture, baseline, state, run_tuple, scenario, eviden
     files = sorted([*state.staging.glob("exports/*.csv"), state.staging / "manifest/published-manifest-v1.json",
                     state.staging / "capture-status.json"])
     raw_publication = b"".join(path.read_bytes() for path in files)
-    job = "publication-accepted" if authorized else "prepare-" + (scenario if scenario in _SCENARIOS else "accepted")
-    canaries = tuple(derive_replay_canary(run_tuple, job, category) for category in _CATEGORIES)
+    canaries = tuple(derive_replay_canary(run_tuple, name, category) for name in _JOBS for category in _CATEGORIES)
     document = {"schema_version": DRIVER_SCHEMA_VERSION, "evidence_class": evidence, "input_profile": "fixture",
         "run_tuple": run_tuple.to_dict(), "scenario": scenario, "input_digest": _input_digest(fixture),
         "provenance_digest": state.provenance, "policy_sha256": _digest(fixture.policy),
@@ -530,6 +560,10 @@ def validate_driver(document):
     schema = _decode((_PRODUCT / "contracts/hosted-replay-driver-v1.schema.json").read_bytes())
     _schema(document, schema)
     validate_capture_status_document(document["capture_status"])
+    identity = ReplayRunTuple(**document["run_tuple"])
+    fixture = _fixture_for(identity)
+    if document["input_digest"] != _input_digest(fixture) or document["policy_sha256"] != _digest(fixture.policy):
+        _fail()
     catalog = document["source_catalog"]
     identities = [(row["as_of_date"], row["release_revision"]) for row in catalog]
     exports = document["exports"]
@@ -544,6 +578,8 @@ def validate_driver(document):
             _fail()
         if compute_revision_fingerprint({row["source_list"]: row["sha256"] for row in sources}) != release["revision_fingerprint"]:
             _fail()
+    if document["provenance_digest"] != _digest(_json(catalog).encode() + fixture.policy):
+        _fail()
     expected_names = sorted(entry.export_name for entry in load_allowlist(_PRODUCT / "contracts/publication-exports-v3.json").exports)
     if names != expected_names or any(row["row_count"] <= 0 for row in exports if row["export_name"] in {
             "dim_public_organizations", "fct_public_status_observations"}):
@@ -558,6 +594,14 @@ def validate_driver(document):
             _fail()
         if row["byte_length"] == 0 and row["sha256"] != _digest(b""):
             _fail()
+    status_raw = (_json(document["capture_status"]) + "\n").encode()
+    if next(row["sha256"] for row in audits if row["surface"] == "status") != _digest(status_raw):
+        _fail()
+    final = document["outcomes"][-1]
+    if final["status_sha256"] != _digest(status_raw) or final["outcome"] != document["capture_status"]["outcome"]:
+        _fail()
+    if final["analytical_sha256"] != document["analytical_sha256"]:
+        _fail()
     for row in document["outcomes"]:
         expected = {"accepted": ("accepted", "none"), "repeat": ("no_new_release", "source_not_advanced"),
                     "rejected": ("rejected", "source_contract_mismatch")}[row["scenario"]]
@@ -613,7 +657,7 @@ def run_publication_worker(*, runner_temp, run_tuple, scenario, expected_input_d
         _fail("replay.route_not_authorized")
     if not all(type(value) is str and _SHA256.fullmatch(value) for value in (expected_input_digest, expected_provenance_digest)):
         _fail("replay.reconstruction_mismatch")
-    derive_replay_canary(run_tuple, "publication-accepted", _CATEGORIES[0])
+    derive_replay_canary(run_tuple, "publish-accepted", _CATEGORIES[0])
     if _input_digest(_fixture_for(run_tuple)) != expected_input_digest:
         _fail("replay.reconstruction_mismatch")
     return _run(runner_temp=runner_temp, run_tuple=run_tuple, scenario=scenario, worker=True,
@@ -625,3 +669,283 @@ def _fixture_for(run_tuple):
     # carry domain-separated text, unchanged across preparation/reconstruction.
     excluded = " ".join(derive_replay_canary(run_tuple, "prepare-accepted", category) for category in _CATEGORIES)
     return replace(hosted_replay_fixture(), excluded_value=excluded)
+
+
+def run_replay_sequence(*, runner_temp, scenario_set="accepted-repeat-rejected-v1"):
+    if scenario_set != "accepted-repeat-rejected-v1":
+        _fail("replay.invalid_scenario")
+    run_tuple = ReplayRunTuple("fixture/supporting-sequence", 1, 1, "a" * 40)
+    fixture = _fixture_for(run_tuple)
+    output, errors = io.StringIO(), io.StringIO()
+    with replay_workspace(runner_temp) as workspace:
+        with redirect_stdout(output), redirect_stderr(errors):
+            original = _seed(workspace, fixture, len(fixture.releases)-1)
+            state = _candidate(workspace, fixture, original, "accepted")
+            publication = _publish(workspace, state.staging)
+            state.publication_calls = 1
+            outcomes = [_outcome(state, "accepted", original)]
+            print(state.status.to_json())
+            manifest = state.staging / "manifest/published-manifest-v1.json"
+            seed_private_policy_bundle(workspace.archive, original.store,
+                published_manifest_path=manifest, published_data_commit=publication.commit_sha)
+            baseline = SimpleNamespace(store=original.store, staging=state.staging, catalog=state.catalog,
+                proof=state.proof, exports=state.exports, commit=publication.commit_sha, tree=publication.tree_sha,
+                analytical=state.analytical, binding=(_digest(manifest.read_bytes()), publication.commit_sha),
+                lineage=state.lineage)
+            for scenario in ("repeat", "rejected"):
+                state = _candidate(workspace, fixture, baseline, scenario)
+                outcomes.append(_outcome(state, scenario, baseline))
+                print(state.status.to_json())
+                if _git(workspace.repo, "ls-remote", "origin", "refs/heads/published-data").split()[0] != baseline.commit:
+                    _fail("replay.analytical_drift")
+            return _checkpoint(workspace, fixture, original, state, run_tuple, scenario_set,
+                "supporting_local_sequence", outcomes, output.getvalue().encode(), errors.getvalue().encode(), False)
+
+
+@dataclass(frozen=True)
+class HostedEnvelope:
+    document: dict
+
+    def to_dict(self):
+        return validate_envelope(self.document)
+
+    def to_json(self):
+        return _json(self.to_dict())
+
+    def __getitem__(self, key):
+        return self.document[key]
+
+
+def _api_list(document, key):
+    if not isinstance(document, dict) or type(document.get("total_count")) is not int:
+        _fail("replay.invalid_api_payload")
+    rows = document.get(key)
+    if type(rows) is not list or document["total_count"] != len(rows):
+        _fail("replay.invalid_api_payload")
+    return rows
+
+
+def _job_key(name):
+    if type(name) is not str or len(name) > 160:
+        _fail("replay.invalid_api_payload")
+    # Reusable workflow jobs have a host-supplied caller / callee name.
+    key = name.split(" / ")[0]
+    if key not in _JOBS:
+        _fail("replay.invalid_api_payload")
+    return key
+
+
+def _run_identity(run):
+    if not isinstance(run, dict) or run.get("status") != "completed" or run.get("conclusion") != "success" or run.get("event") != "workflow_dispatch":
+        _fail("replay.invalid_api_payload")
+    repository = run.get("repository")
+    if not isinstance(repository, dict):
+        _fail("replay.invalid_api_payload")
+    identity = ReplayRunTuple(repository.get("full_name"), run.get("id"), run.get("run_attempt"), run.get("head_sha"))
+    derive_replay_canary(identity, "audit-safe-evidence", _CATEGORIES[0])
+    return identity
+
+
+def validate_envelope(document):
+    if isinstance(document, (str, bytes)):
+        document = _decode(document)
+    schema = _decode((_PRODUCT / "contracts/hosted-replay-envelope-v1.schema.json").read_bytes())
+    _schema(document, schema)
+    if document["live_before"] != document["live_after"]:
+        _fail("replay.live_boundary_changed")
+    jobs = document["jobs"]
+    if [row["job_name"] for row in jobs] != sorted(_JOBS) or len({row["job_id"] for row in jobs}) != len(jobs):
+        _fail()
+    for row in jobs:
+        expected = "skipped" if row["job_name"].startswith("publish-") and row["job_name"] != "publish-accepted" else "success"
+        if row["conclusion"] != expected:
+            _fail()
+    matrix = document["worker_matrix"]
+    if [row["scenario"] for row in matrix] != list(_ROUTES):
+        _fail()
+    for row in matrix:
+        accepted = row["scenario"] == "accepted"
+        if row["should_publish"] is not accepted or row["worker_conclusion"] != ("success" if accepted else "skipped"):
+            _fail()
+    checkpoints = document["checkpoints"]
+    if [row["job_name"] for row in checkpoints] != ["prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"]:
+        _fail()
+    for row in checkpoints:
+        driver = validate_driver(row["driver"])
+        if driver["run_tuple"] != document["run_tuple"] or driver["evidence_class"] == "supporting_local_sequence":
+            _fail()
+        expected_evidence = "fresh_job_reconstruction" if row["job_name"] == "publish-accepted" else "staged_prepare"
+        if driver["evidence_class"] != expected_evidence or row["job_name"].split("-")[-1] != driver["scenario"]:
+            _fail()
+    before, after = checkpoints[0]["driver"], checkpoints[-1]["driver"]
+    for key in ("input_digest", "provenance_digest", "source_catalog", "exports", "analytical_sha256"):
+        if before[key] != after[key]:
+            _fail("replay.reconstruction_mismatch")
+    logs = document["raw_log_audits"]
+    executed = sorted(name for name in _JOBS if not name.startswith("publish-") or name == "publish-accepted")
+    if [row["job_name"] for row in logs] != executed:
+        _fail()
+    if any(row["audit"]["surface"] != "raw_log" or row["audit"]["byte_length"] <= 0 for row in logs):
+        _fail()
+    return document
+
+
+def collect_hosted_envelope(*, run, jobs, artifacts, raw_logs, safe_job_outputs,
+                            live_before, live_after, historical_real_republish):
+    identity = _run_identity(run)
+    rows = _api_list(jobs, "jobs")
+    job_records, job_ids = {}, set()
+    for row in rows:
+        if not isinstance(row, dict) or type(row.get("id")) is not int or row["id"] < 1 or row["id"] in job_ids:
+            _fail("replay.invalid_api_payload")
+        key = _job_key(row.get("name"))
+        if key in job_records or row.get("status") != "completed":
+            _fail("replay.invalid_api_payload")
+        if type(row.get("run_id")) is not int or row["run_id"] != identity.run_id or row.get("head_sha") != identity.head_sha:
+            _fail("replay.invalid_api_payload")
+        if "run_attempt" in row and (type(row["run_attempt"]) is not int or row["run_attempt"] != identity.run_attempt):
+            _fail("replay.invalid_api_payload")
+        steps = row.get("steps")
+        if type(steps) is not list or len(steps) > 40:
+            _fail("replay.invalid_api_payload")
+        numbers = set()
+        for step in steps:
+            if (type(step) is not dict or type(step.get("number")) is not int or step["number"] <= 0 or
+                step["number"] in numbers or step.get("status") != "completed" or step.get("conclusion") not in
+                {"success", "skipped"} or type(step.get("name")) is not str or not 0 < len(step["name"]) <= 256):
+                _fail("replay.invalid_api_payload")
+            numbers.add(step["number"])
+        job_ids.add(row["id"])
+        expected = "skipped" if key.startswith("publish-") and key != "publish-accepted" else "success"
+        if row.get("conclusion") != expected:
+            _fail("replay.job_conclusion_mismatch")
+        if expected == "success" and not steps:
+            _fail("replay.invalid_api_payload")
+        job_records[key] = row
+    if set(job_records) != set(_JOBS) or _api_list(artifacts, "artifacts"):
+        _fail("replay.invalid_api_payload")
+    output_names = {*("prepare-" + scenario for scenario in _SCENARIOS), "publish-accepted",
+                    *("route-" + scenario for scenario in _ROUTES), "audit-safe-evidence"}
+    if not isinstance(safe_job_outputs, dict) or set(safe_job_outputs) != output_names:
+        _fail("replay.invalid_job_output")
+    canaries = tuple(derive_replay_canary(identity, job, category) for job in _JOBS for category in _CATEGORIES)
+    documents = {}
+    for name, raw in safe_job_outputs.items():
+        if not isinstance(raw, (str, bytes)):
+            _fail("replay.invalid_job_output")
+        encoded = raw.encode() if isinstance(raw, str) else raw
+        audit_bytes({"stdout": encoded}, canaries)
+        doc = _decode(encoded)
+        if name.startswith("prepare-") or name == "publish-accepted":
+            documents[name] = validate_driver(doc)
+        elif name.startswith("route-"):
+            if type(doc) is not dict or set(doc) != {"should_publish"} or type(doc["should_publish"]) is not bool:
+                _fail("replay.invalid_job_output")
+            if doc["should_publish"] is not (name == "route-accepted"):
+                _fail("replay.job_conclusion_mismatch")
+            documents[name] = doc
+        else:
+            if doc != {"cleanup_verified": True} or type(doc.get("cleanup_verified")) is not bool:
+                _fail("replay.invalid_job_output")
+    executed = sorted(name for name in _JOBS if job_records[name]["conclusion"] != "skipped")
+    if not isinstance(raw_logs, dict) or sorted(raw_logs) != executed:
+        _fail("replay.invalid_audit")
+    audits = []
+    for name in executed:
+        raw = raw_logs[name]
+        if type(raw) is not bytes or not raw:
+            _fail("replay.invalid_audit")
+        record = audit_bytes({"raw_log": raw}, canaries)[0]
+        audits.append({"job_name": name, "audit": record})
+    document = {"schema_version": HOSTED_ENVELOPE_SCHEMA_VERSION, "evidence_class": "hosted_fixture_replay",
+        "run_tuple": identity.to_dict(), "event": "workflow_dispatch", "conclusion": "success",
+        "artifact_count": 0, "cleanup_verified": True, "result": "pass",
+        "jobs": [{"job_name": name, "job_id": job_records[name]["id"], "status": "completed",
+                  "conclusion": job_records[name]["conclusion"]} for name in sorted(_JOBS)],
+        "worker_matrix": [{"scenario": scenario, "should_publish": documents["route-" + scenario]["should_publish"],
+            "route_conclusion": job_records["route-" + scenario]["conclusion"],
+            "worker_conclusion": job_records["publish-" + scenario]["conclusion"]} for scenario in _ROUTES],
+        "checkpoints": [{"job_name": name, "driver": documents[name]} for name in
+            ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted")],
+        "raw_log_audits": audits, "live_before": live_before, "live_after": live_after,
+        "historical_real_republish": historical_real_republish,
+        "evidence_classes": {"hosted_fixture_replay": "measured", "live_source": "not_observed_by_replay",
+            "actual_schedule": "not_observed_by_replay", "historical_real_restore_republish": "preserved"}}
+    return HostedEnvelope(validate_envelope(document))
+
+
+class _SafeParser(argparse.ArgumentParser):
+    def error(self, message):
+        _fail("replay.invalid_arguments")
+
+
+def main(argv=None):
+    parser = _SafeParser(prog="tools.hosted_replay")
+    commands = parser.add_subparsers(dest="command", required=True, parser_class=_SafeParser)
+    for name in ("prepare-checkpoint", "publication-worker", "supporting-sequence"):
+        command = commands.add_parser(name)
+        command.add_argument("--runner-temp", type=Path,
+            default=Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())).resolve())
+        if name != "supporting-sequence":
+            command.add_argument("--repository", required=True)
+            command.add_argument("--run-id", type=int, required=True)
+            command.add_argument("--run-attempt", type=int, required=True)
+            command.add_argument("--head-sha", required=True)
+            command.add_argument("--scenario", choices=_SCENARIOS, required=True)
+        if name == "publication-worker":
+            command.add_argument("--expected-input-digest", required=True)
+            command.add_argument("--expected-provenance-digest", required=True)
+            command.add_argument("--route-authorized", choices=("true", "false"), required=True)
+    for name in ("validate-driver", "validate-envelope", "collect-envelope"):
+        command = commands.add_parser(name)
+        command.add_argument("--input", type=Path, required=True)
+        if name == "collect-envelope":
+            command.add_argument("--logs-dir", type=Path, required=True)
+    try:
+        args = parser.parse_args(argv)
+        if args.command == "supporting-sequence":
+            result = run_replay_sequence(runner_temp=args.runner_temp)
+        elif args.command in {"prepare-checkpoint", "publication-worker"}:
+            identity = ReplayRunTuple(args.repository, args.run_id, args.run_attempt, args.head_sha)
+            kwargs = dict(runner_temp=args.runner_temp, run_tuple=identity, scenario=args.scenario)
+            if args.command == "prepare-checkpoint":
+                result = prepare_hosted_checkpoint(**kwargs)
+            else:
+                result = run_publication_worker(**kwargs, route_authorized=args.route_authorized == "true",
+                    expected_input_digest=args.expected_input_digest, expected_provenance_digest=args.expected_provenance_digest)
+        else:
+            _unlinked(args.input)
+            raw = args.input.read_bytes()
+            if args.command == "validate-driver":
+                validate_driver(raw)
+                print(_json({"category": "replay.driver_verified"}))
+                return 0
+            if args.command == "validate-envelope":
+                validate_envelope(raw)
+                print(_json({"category": "replay.envelope_verified"}))
+                return 0
+            bundle = _decode(raw)
+            keys = {"run", "jobs", "artifacts", "safe_job_outputs", "live_before", "live_after", "historical_real_republish"}
+            if type(bundle) is not dict or set(bundle) != keys:
+                _fail()
+            directory = _runner_parent(args.logs_dir)
+            executed = [name for name in _JOBS if not name.startswith("publish-") or name == "publish-accepted"]
+            logs = {}
+            for name in executed:
+                path = _unlinked(directory / (name + ".log"))
+                logs[name] = path.read_bytes()
+            result = collect_hosted_envelope(**bundle, raw_logs=logs)
+        print(result.to_json())
+        return 0
+    except (ReplayError, OSError, ValueError, TypeError, KeyboardInterrupt):
+        print("replay.failed", file=sys.stderr)
+        return 1
+    except Exception:
+        # Production adapters have value-free errors, but an unexpected provider
+        # or test hook must also never reveal its exception or path here.
+        print("replay.failed", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

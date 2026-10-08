@@ -1,0 +1,780 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "run_tuple",
+    "event",
+    "conclusion",
+    "artifact_count",
+    "cleanup_verified",
+    "result",
+    "worker_matrix",
+    "checkpoints",
+    "raw_log_audits",
+    "live_before",
+    "live_after",
+    "historical_real_republish",
+    "evidence_classes",
+    "jobs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hosted-replay-envelope-v1"
+    },
+    "evidence_class": {
+      "const": "hosted_fixture_replay"
+    },
+    "run_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "run_id",
+        "run_attempt",
+        "head_sha"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "event": {
+      "const": "workflow_dispatch"
+    },
+    "conclusion": {
+      "const": "success"
+    },
+    "artifact_count": {
+      "const": 0
+    },
+    "cleanup_verified": {
+      "const": true
+    },
+    "result": {
+      "const": "pass"
+    },
+    "worker_matrix": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "should_publish",
+          "route_conclusion",
+          "worker_conclusion"
+        ],
+        "properties": {
+          "scenario": {
+            "enum": [
+              "accepted",
+              "repeat",
+              "rejected",
+              "calendar-refused",
+              "failure",
+              "cancelled"
+            ]
+          },
+          "should_publish": {
+            "type": "boolean"
+          },
+          "route_conclusion": {
+            "const": "success"
+          },
+          "worker_conclusion": {
+            "enum": [
+              "success",
+              "skipped"
+            ]
+          }
+        }
+      }
+    },
+    "checkpoints": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "driver"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "publish-accepted"
+            ]
+          },
+          "driver": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "evidence_class",
+              "input_profile",
+              "run_tuple",
+              "scenario",
+              "input_digest",
+              "provenance_digest",
+              "policy_sha256",
+              "reconstructed",
+              "baseline_label",
+              "route_authorized",
+              "dbt_model_count",
+              "dbt_test_count",
+              "source_catalog",
+              "exports",
+              "local_parent",
+              "local_commit",
+              "local_tree",
+              "baseline_analytical_sha256",
+              "analytical_sha256",
+              "outcomes",
+              "byte_audits",
+              "capture_status"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "hosted-replay-driver-v1"
+              },
+              "evidence_class": {
+                "enum": [
+                  "staged_prepare",
+                  "fresh_job_reconstruction",
+                  "supporting_local_sequence"
+                ]
+              },
+              "input_profile": {
+                "const": "fixture"
+              },
+              "run_tuple": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "repository",
+                  "run_id",
+                  "run_attempt",
+                  "head_sha"
+                ],
+                "properties": {
+                  "repository": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+                  },
+                  "run_id": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "run_attempt": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "head_sha": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  }
+                }
+              },
+              "scenario": {
+                "enum": [
+                  "accepted",
+                  "repeat",
+                  "rejected",
+                  "accepted-repeat-rejected-v1"
+                ]
+              },
+              "input_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "provenance_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "policy_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "reconstructed": {
+                "type": "boolean"
+              },
+              "baseline_label": {
+                "const": "isolated_fixture_baseline"
+              },
+              "route_authorized": {
+                "type": "boolean"
+              },
+              "dbt_model_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dbt_test_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_catalog": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "as_of_date",
+                    "release_revision",
+                    "revision_fingerprint",
+                    "revision_manifest_sha256",
+                    "source_objects"
+                  ],
+                  "properties": {
+                    "as_of_date": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "release_revision": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "revision_fingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "revision_manifest_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "source_objects": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "source_list",
+                          "sha256",
+                          "byte_size",
+                          "row_count"
+                        ],
+                        "properties": {
+                          "source_list": {
+                            "enum": [
+                              "charities-may-operate",
+                              "charities-not-operating",
+                              "charities-undetermined-status",
+                              "charities-may-not-operate"
+                            ]
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "byte_size": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "row_count": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "exports": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "export_name",
+                    "sha256",
+                    "row_count"
+                  ],
+                  "properties": {
+                    "export_name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "row_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "local_parent": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "local_commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "local_tree": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "baseline_analytical_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "analytical_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "outcomes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "scenario",
+                    "outcome",
+                    "reason_category",
+                    "build_calls",
+                    "publication_calls",
+                    "status_sha256",
+                    "analytical_sha256",
+                    "prior_analytical_sha256"
+                  ],
+                  "properties": {
+                    "scenario": {
+                      "enum": [
+                        "accepted",
+                        "repeat",
+                        "rejected"
+                      ]
+                    },
+                    "outcome": {
+                      "enum": [
+                        "accepted",
+                        "no_new_release",
+                        "rejected"
+                      ]
+                    },
+                    "reason_category": {
+                      "enum": [
+                        "none",
+                        "source_not_advanced",
+                        "source_contract_mismatch"
+                      ]
+                    },
+                    "build_calls": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "publication_calls": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "status_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "analytical_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "prior_analytical_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                }
+              },
+              "byte_audits": {
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 6,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "surface",
+                    "byte_length",
+                    "sha256",
+                    "canary_hits"
+                  ],
+                  "properties": {
+                    "surface": {
+                      "enum": [
+                        "stdout",
+                        "stderr",
+                        "status",
+                        "summary",
+                        "publication",
+                        "raw_log"
+                      ]
+                    },
+                    "byte_length": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "canary_hits": {
+                      "const": 0
+                    }
+                  }
+                }
+              },
+              "capture_status": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "title": "Calico capture status (v3)",
+                "description": "Supersedes capture-status-v2. Positive safe projection adds the upstream publication warning and explicit source policy; retirement is independent of attempt reason and never inferred from a clock.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema_version",
+                  "trigger",
+                  "outcome",
+                  "reason_category",
+                  "started_at_utc",
+                  "ended_at_utc",
+                  "last_accepted_as_of_date",
+                  "last_accepted_release_revision",
+                  "newer_attempt_not_accepted",
+                  "source_publication_state",
+                  "source_publication_retired_on"
+                ],
+                "properties": {
+                  "schema_version": {
+                    "const": 3
+                  },
+                  "trigger": {
+                    "enum": [
+                      "schedule",
+                      "workflow_dispatch",
+                      "local"
+                    ],
+                    "description": "Which of the three closed entry points invoked this capture attempt (D-06). Safe workflow metadata -- never a job name, run id, or actor identity."
+                  },
+                  "outcome": {
+                    "enum": [
+                      "accepted",
+                      "no_new_release",
+                      "rejected",
+                      "operational_error"
+                    ],
+                    "description": "The existing closed calico_landing.result.AdmissionResult outcome vocabulary, reused verbatim (D-07)."
+                  },
+                  "reason_category": {
+                    "enum": [
+                      "none",
+                      "source_not_advanced",
+                      "structural_rejection",
+                      "source_contract_mismatch",
+                      "source_transfer_error",
+                      "archive_error",
+                      "restore_error",
+                      "warehouse_build_error"
+                    ],
+                    "description": "A fixed, provider-neutral reason category -- never a raw exception string, path, or credential fragment. structural_rejection is a data-level rejection inside a candidate that still matches the source contract; source_contract_mismatch means the source did not supply the contracted object set in its contracted shape at all."
+                  },
+                  "started_at_utc": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+                    "description": "Timezone-aware actual UTC timestamp captured once at the start of this capture() call."
+                  },
+                  "ended_at_utc": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+                    "description": "Timezone-aware actual UTC timestamp captured once this call's outcome was decided."
+                  },
+                  "last_accepted_as_of_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                    "description": "The as-of date of the release this attempt confirms as accepted, populated only for the accepted/no_new_release outcomes; null for every rejected/operational_error outcome -- this attempt never advances or echoes a stale value on failure."
+                  },
+                  "last_accepted_release_revision": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "description": "The release revision of the same accepted/no_new_release release identity; null for every rejected/operational_error outcome."
+                  },
+                  "newer_attempt_not_accepted": {
+                    "type": "boolean"
+                  },
+                  "source_publication_state": {
+                    "enum": [
+                      "active",
+                      "retired"
+                    ]
+                  },
+                  "source_publication_retired_on": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                  }
+                }
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema"
+          }
+        }
+      }
+    },
+    "raw_log_audits": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "audit"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "route-accepted",
+              "route-repeat",
+              "route-rejected",
+              "route-calendar-refused",
+              "route-failure",
+              "route-cancelled",
+              "publish-accepted",
+              "publish-repeat",
+              "publish-rejected",
+              "publish-calendar-refused",
+              "publish-failure",
+              "publish-cancelled",
+              "calendar-matrix",
+              "audit-safe-evidence"
+            ]
+          },
+          "audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "surface",
+              "byte_length",
+              "sha256",
+              "canary_hits"
+            ],
+            "properties": {
+              "surface": {
+                "enum": [
+                  "stdout",
+                  "stderr",
+                  "status",
+                  "summary",
+                  "publication",
+                  "raw_log"
+                ]
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "canary_hits": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "live_before": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "published_data_commit",
+        "published_data_tree",
+        "archive_inventory_sha256"
+      ],
+      "properties": {
+        "published_data_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "published_data_tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "archive_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "live_after": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "published_data_commit",
+        "published_data_tree",
+        "archive_inventory_sha256"
+      ],
+      "properties": {
+        "published_data_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "published_data_tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "archive_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "historical_real_republish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "run_id",
+        "head_sha",
+        "published_data_commit",
+        "published_manifest_sha256"
+      ],
+      "properties": {
+        "evidence_class": {
+          "const": "historical_real_restore_republish"
+        },
+        "run_id": {
+          "const": 37726333085
+        },
+        "head_sha": {
+          "const": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677"
+        },
+        "published_data_commit": {
+          "const": "45cd920e3087a3f14d6bb196d15c49abc980f665"
+        },
+        "published_manifest_sha256": {
+          "const": "da4f4a3385f674adc4aea66044ad977a8f8dea86fdc10a7ca5607f918755e7ed"
+        }
+      }
+    },
+    "evidence_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hosted_fixture_replay",
+        "live_source",
+        "actual_schedule",
+        "historical_real_restore_republish"
+      ],
+      "properties": {
+        "hosted_fixture_replay": {
+          "const": "measured"
+        },
+        "live_source": {
+          "const": "not_observed_by_replay"
+        },
+        "actual_schedule": {
+          "const": "not_observed_by_replay"
+        },
+        "historical_real_restore_republish": {
+          "const": "preserved"
+        }
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "job_id",
+          "status",
+          "conclusion"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "route-accepted",
+              "route-repeat",
+              "route-rejected",
+              "route-calendar-refused",
+              "route-failure",
+              "route-cancelled",
+              "publish-accepted",
+              "publish-repeat",
+              "publish-rejected",
+              "publish-calendar-refused",
+              "publish-failure",
+              "publish-cancelled",
+              "calendar-matrix",
+              "audit-safe-evidence"
+            ]
+          },
+          "job_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "const": "completed"
+          },
+          "conclusion": {
+            "enum": [
+              "success",
+              "skipped"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
