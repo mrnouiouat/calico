@@ -122,3 +122,17 @@ class HostedReplayEvidenceContractTests(unittest.TestCase):
         self.assertFalse("BuildOutcome(" in source)
         self.assertFalse("eval(" in source)
         self.assertTrue('fixture_store_factory=captured_store' in source)
+
+
+class HostedReplaySequenceTests(unittest.TestCase):
+    def test_same_store_three_outcome_authority_exists(self):
+        from tools import hosted_replay as replay
+        self.assertTrue(callable(getattr(replay, "run_replay_sequence", None)),
+                        "same-store accepted/repeat/rejected integration authority is required")
+
+
+class HostedEnvelopeJobsApiTests(unittest.TestCase):
+    def test_closed_envelope_collector_exists(self):
+        from tools import hosted_replay as replay
+        self.assertTrue(callable(getattr(replay, "collect_hosted_envelope", None)),
+                        "Jobs API and actual-byte envelope authority is required")
