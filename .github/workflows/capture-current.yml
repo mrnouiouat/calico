@@ -20,7 +20,7 @@ on:
     # Wednesday" is never expressed as a single combined cron expression.
     # The `calendar-gate` job below applies the actual UTC day-of-month
     # window (1..7 or 15..21), mirroring
-    # `calico_capture.orchestrator.is_capture_day` exactly.
+    # the shared stdlib `calico_capture/calendar.py` authority.
     - cron: "17 17 * * 3"
   workflow_dispatch:
     inputs:
@@ -72,41 +72,7 @@ jobs:
         env:
           CALICO_DISPATCH_MODE: ${{ github.event.inputs.mode }}
         run: |
-          python - <<'PY'
-          import datetime
-          import os
-
-          # Deliberately duplicates the exact D-04 first/third-Wednesday
-          # window `calico_capture.orchestrator.is_capture_day` already
-          # implements and `tests.capture.test_schedule_contract` already
-          # proves over a ten-Gregorian-year span (this project's
-          # established local-constant-duplication precedent) -- kept
-          # dependency-free (stdlib only, no `calico_capture`/`calico_dbt`
-          # import) so this no-secret job never needs the dbt/B2 toolchain
-          # installed.
-          event_name = os.environ["GITHUB_EVENT_NAME"]
-          dispatch_mode = os.environ.get("CALICO_DISPATCH_MODE") or "capture"
-          trigger = "schedule" if event_name == "schedule" else "workflow_dispatch"
-          mode = "capture" if event_name == "schedule" else dispatch_mode
-
-          # Republish is allowed through the calendar gate. The production
-          # publication CLI restores the complete catalog and exact private
-          # policy from B2 before any build/export/transaction; missing or
-          # invalid policy fails closed. No local sidecar bypass exists.
-
-          if trigger == "schedule":
-              today = datetime.datetime.now(datetime.timezone.utc).date()
-              should_run = today.isoweekday() == 3 and (
-                  1 <= today.day <= 7 or 15 <= today.day <= 21
-              )
-          else:
-              should_run = True
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
-              handle.write(f"should_run={'true' if should_run else 'false'}\n")
-              handle.write(f"mode={mode}\n")
-              handle.write(f"trigger={trigger}\n")
-          PY
+          python calico_capture/calendar.py
 
   capture:
     name: Capture (B2 secrets, read-only checkout)
@@ -228,10 +194,24 @@ jobs:
               summary.write("\n".join(lines) + "\n")
           PY
 
+  publication-route:
+    needs: [calendar-gate, capture, status]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.calendar-gate.result }}
+      should_run: ${{ needs.calendar-gate.outputs.should_run }}
+      mode: ${{ needs.calendar-gate.outputs.mode }}
+      capture_result: ${{ needs.capture.result }}
+      status_result: ${{ needs.status.result }}
+      status_json: ${{ needs.capture.outputs.status_json }}
+
   publish:
     name: Publish (read-only archive restore, contents write)
-    needs: [calendar-gate, capture, status]
-    if: ${{ !cancelled() && needs.calendar-gate.result == 'success' && needs.calendar-gate.outputs.should_run == 'true' && ( ( needs.calendar-gate.outputs.mode == 'republish' && needs.capture.result == 'skipped' && needs.status.result == 'skipped' ) || ( needs.calendar-gate.outputs.mode == 'capture' && needs.capture.result == 'success' && needs.status.result == 'success' && needs.capture.outputs.status_json != '' && fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}
+    needs: [calendar-gate, capture, status, publication-route]
+    if: ${{ !cancelled() && needs.publication-route.result == 'success' && needs.publication-route.outputs.should_publish == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

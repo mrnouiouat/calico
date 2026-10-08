@@ -168,7 +168,7 @@ class SharedPublicationRouteContractTests(unittest.TestCase):
     def test_closed_outcomes_remain_data_for_github_to_evaluate(self):
         from calico_capture.status import project_safe_status
         for outcome, reason in (("accepted", "none"), ("no_new_release", "source_not_advanced"),
-                                ("rejected", "structural_rejection"), ("operational_error", "archive_failed")):
+                                ("rejected", "structural_rejection"), ("operational_error", "archive_error")):
             status = project_safe_status(trigger="local", outcome=outcome, reason_category=reason,
                 started_at_utc="2032-01-01T00:00:00Z", ended_at_utc="2032-01-01T00:00:01Z").to_json()
             result = self._validate(STATUS_JSON=status)
@@ -237,23 +237,22 @@ class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
         import sys
         import tempfile
         gate_block = _job_block(self._workflow(), "calendar-gate")
-        script = gate_block.split("python - <<'PY'\n", 1)[1].split("          PY", 1)[0]
-        import textwrap
+        self.assertIn("python calico_capture/calendar.py", gate_block)
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
-            result = subprocess.run([sys.executable, "-c", textwrap.dedent(script)],
+            result = subprocess.run([sys.executable, "-S", str(REPO_ROOT / "calico_capture/calendar.py")],
                 env=dict(os.environ, GITHUB_EVENT_NAME="workflow_dispatch",
                          CALICO_DISPATCH_MODE="republish", GITHUB_OUTPUT=str(output)),
                 capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, "republish gate must succeed")
-            self.assertEqual(output.read_text().splitlines(),
+            self.assertEqual(output.read_text().splitlines()[:3],
                 ["should_run=true", "mode=republish", "trigger=workflow_dispatch"])
             self.assertEqual(result.stdout + result.stderr, "")
 
     def test_republish_stays_a_documented_mode_rather_than_being_deleted(self) -> None:
         content = self._workflow()
         self.assertIn("- republish", content)
-        self.assertIn("needs.calendar-gate.outputs.mode == 'republish'", content)
+        self.assertIn("inputs.mode == 'republish'", _read(ROUTE_PATH))
 
     def test_capture_job_timeout_is_exactly_330_minutes(self) -> None:
         capture_block = _job_block(self._workflow(), "capture")
@@ -276,7 +275,8 @@ class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
             stripped = line.strip()
             if stripped.startswith("uses:"):
                 self.assertTrue(
-                    CHECKOUT_PIN in stripped or SETUP_PYTHON_PIN in stripped,
+                    CHECKOUT_PIN in stripped or SETUP_PYTHON_PIN in stripped
+                    or stripped == "uses: ./.github/workflows/publication-route.yml",
                     f"unpinned or unexpected action reference: {stripped}",
                 )
 
@@ -373,7 +373,7 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
     def test_publish_job_has_one_bounded_literal_publication_path(self) -> None:
         block = _job_block(self._workflow(), "publish")
         self.assertEqual(_permissions_block(block), ["contents: write"])
-        self.assertIn("needs: [calendar-gate, capture, status]", block)
+        self.assertIn("needs: [calendar-gate, capture, status, publication-route]", block)
         self.assertIn("--target-ref published-data", block)
         self.assertEqual(block.count("python -m calico_publish publish"), 1)
         for token in ("--force", "--delete", "push -f", "upload-artifact", "cache@", "continue-on-error", "set -x"):
@@ -416,14 +416,8 @@ class WorkflowSecretSeparationTests(unittest.TestCase):
         )
         self.assertEqual(
             condition,
-            "if: ${{ !cancelled() && needs.calendar-gate.result == 'success' && "
-            "needs.calendar-gate.outputs.should_run == 'true' && "
-            "( ( needs.calendar-gate.outputs.mode == 'republish' && "
-            "needs.capture.result == 'skipped' && needs.status.result == 'skipped' ) || "
-            "( needs.calendar-gate.outputs.mode == 'capture' && "
-            "needs.capture.result == 'success' && needs.status.result == 'success' && "
-            "needs.capture.outputs.status_json != '' && "
-            "fromJSON(needs.capture.outputs.status_json).outcome == 'accepted' ) ) }}",
+            "if: ${{ !cancelled() && needs.publication-route.result == 'success' && "
+            "needs.publication-route.outputs.should_publish == 'true' }}",
         )
 
 

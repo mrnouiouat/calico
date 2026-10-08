@@ -1,0 +1,90 @@
+name: Shared Publication Route
+
+on:
+  workflow_call:
+    inputs:
+      calendar_result:
+        type: string
+        required: true
+      should_run:
+        type: string
+        required: true
+      mode:
+        type: string
+        required: true
+      capture_result:
+        type: string
+        required: true
+      status_result:
+        type: string
+        required: true
+      status_json:
+        type: string
+        required: true
+    outputs:
+      should_publish:
+        description: Validated GitHub publication decision
+        value: ${{ jobs.route.outputs.should_publish }}
+
+permissions:
+  contents: read
+
+jobs:
+  route:
+    name: Validate inputs and evaluate the shared publication route
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_publish: ${{ steps.publish.outputs.should_publish == 'true' }}
+    steps:
+      - name: Checkout the reviewed validator without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate the closed inputs without echoing invalid values
+        id: validate
+        env:
+          CALENDAR_RESULT: ${{ inputs.calendar_result }}
+          SHOULD_RUN: ${{ inputs.should_run }}
+          MODE: ${{ inputs.mode }}
+          CAPTURE_RESULT: ${{ inputs.capture_result }}
+          STATUS_RESULT: ${{ inputs.status_result }}
+          STATUS_JSON: ${{ inputs.status_json }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import runpy
+
+          # Load the existing stdlib status authority directly; importing the
+          # capture package would install the unrelated analytical toolchain.
+          authority = runpy.run_path("calico_capture/status.py")
+          validate = authority["validate_capture_status_document"]
+          states = ("success", "skipped", "failure", "cancelled")
+          valid = (
+              all(os.environ.get(key) in states for key in
+                  ("CALENDAR_RESULT", "CAPTURE_RESULT", "STATUS_RESULT"))
+              and os.environ.get("SHOULD_RUN") in ("true", "false")
+              and os.environ.get("MODE") in ("capture", "republish", "authorization_probe")
+          )
+          status_json = "{}"
+          if valid and os.environ["MODE"] == "capture":
+              try:
+                  document = json.loads(os.environ.get("STATUS_JSON", ""))
+                  validate(document)
+                  status_json = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+              except (ValueError, TypeError, KeyError, authority["StatusError"]):
+                  valid = False
+          elif valid and os.environ.get("STATUS_JSON", "") != "":
+              valid = False
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"valid={'true' if valid else 'false'}\n")
+              handle.write(f"status_json={status_json}\n")
+          PY
+
+      - name: Evaluate the single publication expression in GitHub
+        id: publish
+        if: ${{ !cancelled() && steps.validate.outputs.valid == 'true' && inputs.calendar_result == 'success' && inputs.should_run == 'true' && ( ( inputs.mode == 'republish' && inputs.capture_result == 'skipped' && inputs.status_result == 'skipped' ) || ( inputs.mode == 'capture' && inputs.capture_result == 'success' && inputs.status_result == 'success' && fromJSON(steps.validate.outputs.status_json).outcome == 'accepted' ) ) }}
+        run: echo 'should_publish=true' >> "$GITHUB_OUTPUT"

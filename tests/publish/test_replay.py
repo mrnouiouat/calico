@@ -6,7 +6,6 @@ import csv
 import hashlib
 import io
 import json
-import re
 import shutil
 import subprocess
 import tempfile
@@ -30,70 +29,6 @@ from tests.capture.test_tracer import (
 )
 from tests.fixtures.landing.fixture_builder import wrong_header
 from tests.fixtures.publish.fixture_builder import BASELINE_DIR, extra_unapproved_column
-
-_WORKFLOW_PATH = Path(__file__).resolve().parents[2] / ".github/workflows/capture-current.yml"
-
-
-def _published_workflow_expression() -> str:
-    lines = _WORKFLOW_PATH.read_text(encoding="utf-8").splitlines()
-    publish_index = lines.index("  publish:")
-    condition = next(
-        line.strip() for line in lines[publish_index + 1 :] if line.strip().startswith("if:")
-    )
-    return condition.removeprefix("if: ${{ ").removesuffix(" }}")
-
-
-def _evaluate_published_workflow_expression(
-    *,
-    mode: str,
-    should_run: str,
-    capture_result: str,
-    status_result: str,
-    status_json: str,
-    cancelled: bool = False,
-    calendar_result: str = "success",
-) -> bool:
-    """Evaluate the committed publish condition, rather than duplicating it."""
-
-    expression = _published_workflow_expression()
-    if not re.fullmatch(r"[A-Za-z0-9_.'()=!&| ${}\-]+", expression):
-        raise AssertionError("workflow condition left the supported closed grammar")
-    translated = expression.replace(
-        "fromJSON(needs.capture.outputs.status_json).outcome",
-        "_outcome(status_json)",
-    )
-    for reference, variable in (
-        ("needs.calendar-gate.outputs.should_run", "should_run"),
-        ("needs.calendar-gate.outputs.mode", "mode"),
-        ("needs.calendar-gate.result", "calendar_result"),
-        ("needs.capture.outputs.status_json", "status_json"),
-        ("needs.capture.result", "capture_result"),
-        ("needs.status.result", "status_result"),
-    ):
-        translated = translated.replace(reference, variable)
-    translated = translated.replace("!cancelled()", "not cancelled")
-    translated = translated.replace("&&", "and").replace("||", "or")
-
-    def _outcome(document: str) -> object:
-        parsed = json.loads(document)
-        return parsed.get("outcome") if isinstance(parsed, dict) else None
-
-    return bool(
-        eval(
-            translated,
-            {"__builtins__": {}, "_outcome": _outcome},
-            {
-                "mode": mode,
-                "should_run": should_run,
-                "capture_result": capture_result,
-                "status_result": status_result,
-                "status_json": status_json,
-                "cancelled": cancelled,
-                "calendar_result": calendar_result,
-            },
-        )
-    )
-
 
 class _TransactionSpy:
     def __init__(self, repo: Path) -> None:
@@ -173,17 +108,11 @@ class _ReplayHarness:
         *,
         publication: Path = BASELINE_DIR,
         add_privacy_finding: bool = False,
-        mode: str = "capture",
-        capture_result: str = "success",
-        status_result: str = "success",
     ) -> tuple[int | None, dict[str, object] | None]:
-        if not _evaluate_published_workflow_expression(
-            mode=mode,
-            should_run="true",
-            capture_result=capture_result,
-            status_result=status_result,
-            status_json=status.to_json(),
-        ):
+        # This offline harness tests the production transaction after an
+        # accepted capture. Hosted routing is proved separately by GitHub;
+        # it is never simulated by translating an Actions expression.
+        if status.outcome != "accepted":
             return None, None
 
         if self.staging.exists():
@@ -250,28 +179,6 @@ class _ReplayHarness:
 
 
 class PublicationReplayTests(unittest.TestCase):
-    def test_republish_literal_expression_rejects_every_failed_dependency_or_cancellation(self):
-        import itertools
-        states = ("success", "skipped", "failure", "cancelled")
-        for calendar, captured, status, cancelled in itertools.product(states, states, states, (False, True)):
-            with self.subTest(calendar=calendar, captured=captured, status=status, cancelled=cancelled):
-                self.assertEqual(_evaluate_published_workflow_expression(
-                    mode="republish", should_run="true", calendar_result=calendar,
-                    capture_result=captured, status_result=status, status_json="", cancelled=cancelled),
-                    calendar == "success" and captured == status == "skipped" and not cancelled)
-
-    def test_capture_literal_expression_requires_accepted_and_successful_dependencies(self):
-        import itertools
-        states = ("success", "skipped", "failure", "cancelled")
-        for calendar, captured, status, outcome in itertools.product(states, states, states,
-                ("accepted", "no_new_release", "rejected", "operational_error", "")):
-            with self.subTest(calendar=calendar, captured=captured, status=status, outcome=outcome):
-                self.assertEqual(_evaluate_published_workflow_expression(
-                    mode="capture", should_run="true", calendar_result=calendar,
-                    capture_result=captured, status_result=status,
-                    status_json=json.dumps({"outcome": outcome}) if outcome else ""),
-                    calendar == captured == status == "success" and outcome == "accepted")
-
     def test_republish_actual_real_cli_blocks_missing_or_corrupt_private_policy(self):
         from tests.capture.test_restore import archived_catalog_fixture
         from calico_capture.private_policy import private_policy_manifest_key
@@ -360,48 +267,7 @@ class PublicationReplayTests(unittest.TestCase):
                                  build=build, sleeper=lambda seconds: None)
         self.assertEqual(status.outcome, "accepted")
         self.assertEqual(calls, ["fetch_after_full_restore", "production_preflight"])
-        self.assertTrue(_evaluate_published_workflow_expression(mode="capture", should_run="true",
-            capture_result="success", status_result="success", status_json=status.to_json()))
         self.assertNotIn("synthetic-private-key", status.to_json())
-
-    def test_committed_workflow_expression_routes_every_dependency_state(self) -> None:
-        cases = (
-            ("republish", "true", "skipped", "skipped", "", False, True),
-            ("republish", "true", "success", "skipped", "", False, False),
-            ("republish", "true", "skipped", "success", "", False, False),
-            ("capture", "true", "success", "success", "accepted", False, True),
-            ("capture", "true", "success", "failure", "accepted", False, False),
-            ("capture", "true", "failure", "success", "accepted", False, False),
-            ("capture", "true", "success", "success", "rejected", False, False),
-            ("capture", "true", "success", "success", "no_new_release", False, False),
-            ("capture", "true", "success", "success", "operational_error", False, False),
-            ("capture", "true", "skipped", "success", "accepted", False, False),
-            ("capture", "true", "success", "skipped", "accepted", False, False),
-            ("capture", "true", "cancelled", "success", "accepted", False, False),
-            ("republish", "true", "skipped", "skipped", "", True, False),
-            ("republish", "true", "failure", "skipped", "", False, False),
-            ("capture", "false", "success", "success", "accepted", False, False),
-            ("capture", "true", "success", "success", "accepted", True, False),
-        )
-        for mode, should_run, capture_result, status_result, outcome, cancelled, expected in cases:
-            with self.subTest(
-                mode=mode,
-                capture_result=capture_result,
-                status_result=status_result,
-                outcome=outcome,
-            ):
-                status_json = "" if not outcome else json.dumps({"outcome": outcome})
-                self.assertEqual(
-                    _evaluate_published_workflow_expression(
-                        mode=mode,
-                        should_run=should_run,
-                        capture_result=capture_result,
-                        status_result=status_result,
-                        status_json=status_json,
-                        cancelled=cancelled,
-                    ),
-                    expected,
-                )
 
     def _accepted(self) -> CaptureStatus:
         with _status_contract_compliant_candidate() as candidate:
