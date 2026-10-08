@@ -14,8 +14,6 @@ scheduler is ever contacted.
 from __future__ import annotations
 
 import datetime
-import importlib.util
-import json
 import subprocess
 import sys
 import unittest

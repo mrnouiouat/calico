@@ -64,6 +64,7 @@ from pathlib import Path
 from typing import Callable
 
 from calico_capture.archive import Archive, synchronize_verified_transaction
+from calico_capture.calendar import SCHEDULE_CRON, is_capture_day
 from calico_capture.status import CaptureStatus, project_safe_status
 from calico_landing.admission import admit, load_default_status_contract
 from calico_landing.attempts import utc_now_iso
@@ -113,14 +114,6 @@ RestoreFn = Callable[[Path], None]
 #: dependency and no fourth attempt.
 retry_delays: tuple[int, int, int] = (0, 90 * 60, 180 * 60)
 
-#: The weekly cron expression `is_capture_day` narrows to first/third
-#: Wednesdays (06-RESEARCH.md Pattern 3). `17:17 UTC` is `09:17`/`10:17`
-#: Pacific standard/daylight time, both after the source's documented usual
-#: `08:15 Pacific` publication time and away from the top of the hour (D-04).
-#: A later plan's deployed workflow file must use this exact literal value.
-SCHEDULE_CRON = "17 17 * * 3"
-
-
 class CaptureError(Exception):
     """Raised internally to unify every capture-layer failure into one
     fixed safe `category` matching `calico_capture.status`'s closed reason
@@ -152,33 +145,6 @@ def _default_fetch_candidate() -> "str | Path":
     from calico_capture.source import fetch_candidate as _fetch_candidate
 
     return _fetch_candidate()
-
-
-def is_capture_day(when: date, trigger: str) -> bool:
-    """The D-04 calendar gate.
-
-    `trigger="schedule"` is admitted only on the first or third Wednesday
-    of `when`'s calendar month: ISO weekday `3` (Wednesday) and a
-    day-of-month in `1..7` or `15..21`. `"workflow_dispatch"` and `"local"`
-    always return `True` -- both bypass the calendar entirely, matching the
-    mandatory manual-recovery path (D-06). Every other `trigger` value is
-    also treated as an unconditional bypass rather than raising, since this
-    is a pure scheduling filter, not a `capture()`-style closed-vocabulary
-    boundary; `capture()` itself is what enforces the closed trigger
-    vocabulary on its own `trigger` parameter via `CaptureStatus`.
-
-    POSIX cron's day-of-month/day-of-week fields are evaluated with OR
-    semantics, so a single combined restricted cron expression cannot
-    express "first and third Wednesday" -- `SCHEDULE_CRON` fires weekly and
-    this function is the actual date decision a caller (a later plan's
-    no-secret calendar-gate job) applies before ever invoking `capture()`.
-    """
-
-    if trigger != "schedule":
-        return True
-    if when.isoweekday() != 3:
-        return False
-    return 1 <= when.day <= 7 or 15 <= when.day <= 21
 
 
 def _restore_before_capture(archive: Archive, destination_root: Path) -> None:
