@@ -1,0 +1,530 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "input_profile",
+    "run",
+    "jobs",
+    "worker_matrix",
+    "checkpoints",
+    "log_audit_commitments",
+    "live_boundary",
+    "live_boundary_unchanged",
+    "artifact_count",
+    "cleanup_verified",
+    "result",
+    "historical_real_republish",
+    "evidence_classes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hosted-replay-public-v1"
+    },
+    "evidence_class": {
+      "const": "fixture_hosted_replay"
+    },
+    "input_profile": {
+      "const": "fixture"
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "run_id",
+        "run_attempt",
+        "head_sha",
+        "event",
+        "conclusion",
+        "run_url",
+        "commit_url"
+      ],
+      "properties": {
+        "repository": {
+          "const": "mrnouiouat/calico"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "event": {
+          "const": "workflow_dispatch"
+        },
+        "conclusion": {
+          "const": "success"
+        },
+        "run_url": {
+          "type": "string",
+          "pattern": "^https:\\/\\/github\\.com\\/mrnouiouat\\/calico\\/actions\\/runs\\/[1-9][0-9]*\\/attempts\\/[1-9][0-9]*$"
+        },
+        "commit_url": {
+          "type": "string",
+          "pattern": "^https:\\/\\/github\\.com\\/mrnouiouat\\/calico\\/commit\\/[a-f0-9]{40}$"
+        }
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "job_id",
+          "status",
+          "conclusion"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "route-accepted",
+              "route-repeat",
+              "route-rejected",
+              "route-calendar-refused",
+              "route-failure",
+              "route-cancelled",
+              "publish-accepted",
+              "publish-repeat",
+              "publish-rejected",
+              "publish-calendar-refused",
+              "publish-failure",
+              "publish-cancelled",
+              "calendar-matrix",
+              "audit-safe-evidence"
+            ]
+          },
+          "job_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "const": "completed"
+          },
+          "conclusion": {
+            "enum": [
+              "success",
+              "skipped"
+            ]
+          }
+        }
+      }
+    },
+    "worker_matrix": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "should_publish",
+          "route_conclusion",
+          "worker_conclusion"
+        ],
+        "properties": {
+          "scenario": {
+            "enum": [
+              "accepted",
+              "repeat",
+              "rejected",
+              "calendar-refused",
+              "failure",
+              "cancelled"
+            ]
+          },
+          "should_publish": {
+            "type": "boolean"
+          },
+          "route_conclusion": {
+            "const": "success"
+          },
+          "worker_conclusion": {
+            "enum": [
+              "success",
+              "skipped"
+            ]
+          }
+        }
+      }
+    },
+    "checkpoints": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "evidence_class",
+          "scenario",
+          "input_digest",
+          "provenance_digest",
+          "reconstructed",
+          "dbt_model_count",
+          "dbt_test_count",
+          "baseline_analytical_sha256",
+          "analytical_sha256",
+          "exports",
+          "outcomes",
+          "byte_audits"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "publish-accepted"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "staged_prepare",
+              "fresh_job_reconstruction"
+            ]
+          },
+          "scenario": {
+            "enum": [
+              "accepted",
+              "repeat",
+              "rejected"
+            ]
+          },
+          "input_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "provenance_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reconstructed": {
+            "type": "boolean"
+          },
+          "dbt_model_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dbt_test_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "baseline_analytical_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "analytical_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "exports": {
+            "type": "array",
+            "minItems": 12,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "export_name",
+                "sha256",
+                "row_count"
+              ],
+              "properties": {
+                "export_name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "row_count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scenario",
+                "outcome",
+                "reason_category",
+                "build_calls",
+                "publication_calls",
+                "status_sha256",
+                "analytical_sha256",
+                "prior_analytical_sha256"
+              ],
+              "properties": {
+                "scenario": {
+                  "enum": [
+                    "accepted",
+                    "repeat",
+                    "rejected"
+                  ]
+                },
+                "outcome": {
+                  "enum": [
+                    "accepted",
+                    "no_new_release",
+                    "rejected"
+                  ]
+                },
+                "reason_category": {
+                  "enum": [
+                    "none",
+                    "source_not_advanced",
+                    "source_contract_mismatch"
+                  ]
+                },
+                "build_calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "publication_calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "status_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "analytical_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "prior_analytical_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "byte_audits": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "surface",
+                "byte_length",
+                "sha256",
+                "canary_hits"
+              ],
+              "properties": {
+                "surface": {
+                  "enum": [
+                    "stdout",
+                    "stderr",
+                    "status",
+                    "summary",
+                    "publication",
+                    "raw_log"
+                  ]
+                },
+                "byte_length": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "canary_hits": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "log_audit_commitments": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_name",
+          "audit"
+        ],
+        "properties": {
+          "job_name": {
+            "enum": [
+              "prepare-accepted",
+              "prepare-repeat",
+              "prepare-rejected",
+              "route-accepted",
+              "route-repeat",
+              "route-rejected",
+              "route-calendar-refused",
+              "route-failure",
+              "route-cancelled",
+              "publish-accepted",
+              "publish-repeat",
+              "publish-rejected",
+              "publish-calendar-refused",
+              "publish-failure",
+              "publish-cancelled",
+              "calendar-matrix",
+              "audit-safe-evidence"
+            ]
+          },
+          "audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "surface",
+              "byte_length",
+              "sha256",
+              "canary_hits"
+            ],
+            "properties": {
+              "surface": {
+                "enum": [
+                  "stdout",
+                  "stderr",
+                  "status",
+                  "summary",
+                  "publication",
+                  "raw_log"
+                ]
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "canary_hits": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "live_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "published_data_commit",
+        "published_data_tree",
+        "archive_inventory_sha256"
+      ],
+      "properties": {
+        "published_data_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "published_data_tree": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "archive_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "live_boundary_unchanged": {
+      "const": true
+    },
+    "artifact_count": {
+      "const": 0
+    },
+    "cleanup_verified": {
+      "const": true
+    },
+    "result": {
+      "const": "pass"
+    },
+    "historical_real_republish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "run_id",
+        "head_sha",
+        "published_data_commit",
+        "published_manifest_sha256"
+      ],
+      "properties": {
+        "evidence_class": {
+          "const": "real_restore_republish_observation"
+        },
+        "run_id": {
+          "const": 37726333085
+        },
+        "head_sha": {
+          "const": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677"
+        },
+        "published_data_commit": {
+          "const": "45cd920e3087a3f14d6bb196d15c49abc980f665"
+        },
+        "published_manifest_sha256": {
+          "const": "da4f4a3385f674adc4aea66044ad977a8f8dea86fdc10a7ca5607f918755e7ed"
+        }
+      }
+    },
+    "evidence_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_hosted_replay",
+        "live_source_observation",
+        "actual_schedule_observation",
+        "real_restore_republish_observation"
+      ],
+      "properties": {
+        "fixture_hosted_replay": {
+          "const": "measured"
+        },
+        "live_source_observation": {
+          "const": "not_observed_by_replay"
+        },
+        "actual_schedule_observation": {
+          "const": "not_observed_by_replay"
+        },
+        "real_restore_republish_observation": {
+          "const": "preserved"
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Public hosted fixture replay projection",
+  "description": "A smaller closed projection of validated hosted evidence; driver checkpoints and private envelopes are different contracts."
+}

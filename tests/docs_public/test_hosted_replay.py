@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from functools import cache
@@ -34,12 +35,18 @@ def tearDownModule():
 
 
 @cache
-def envelope():
+def _envelope_bytes():
     from tools import hosted_replay as driver
     from tests import test_hosted_replay as fixtures
-    identity = driver.ReplayRunTuple("mrnouiouat/calico", 1, 1, "a" * 40)
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    identity = driver.ReplayRunTuple("mrnouiouat/calico", 1, 1, head)
     with patch.object(fixtures, "_run_tuple", return_value=identity), patch.object(fixtures, "_CHECKPOINTS", {}):
-        return driver.collect_hosted_envelope(**fixtures._api_fixture())
+        return driver.collect_hosted_envelope(**fixtures._api_fixture()).to_json()
+
+
+def envelope():
+    from tools import hosted_replay as driver
+    return driver.HostedEnvelope(driver.validate_envelope(_envelope_bytes()))
 
 
 def public_module():
@@ -152,6 +159,24 @@ class HostedReplayProjectionContractTests(unittest.TestCase):
             changed[field] = "unapproved"
             with self.assertRaises(module.HostedReplayPublicError):
                 module.decode_hosted_replay_public(changed)
+
+    def test_reordered_lists_and_empty_audits_fail_closed(self):
+        module = public_module()
+        original = module.project_hosted_replay_public(envelope()).to_dict()
+        for key in ("jobs", "worker_matrix", "checkpoints", "log_audit_commitments"):
+            changed = copy.deepcopy(original)
+            changed[key].reverse()
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.decode_hosted_replay_public(changed)
+        for key in ("exports", "byte_audits"):
+            changed = copy.deepcopy(original)
+            changed["checkpoints"][0][key].reverse()
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.decode_hosted_replay_public(changed)
+        changed = copy.deepcopy(original)
+        changed["log_audit_commitments"][0]["audit"]["byte_length"] = 0
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.decode_hosted_replay_public(changed)
 
 
 class HostedReplayEvidenceClassTests(unittest.TestCase):
