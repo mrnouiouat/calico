@@ -14,7 +14,12 @@ scheduler is ever contacted.
 from __future__ import annotations
 
 import datetime
+import importlib.util
+import json
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 
 from calico_capture.orchestrator import SCHEDULE_CRON, is_capture_day, retry_delays
 
@@ -100,6 +105,88 @@ class RetryPolicyConstantsTests(unittest.TestCase):
         # restricted cron expression -- is what actually narrows this
         # always-weekly trigger to first/third Wednesdays.
         self.assertEqual(SCHEDULE_CRON, "17 17 * * 3")
+
+
+class CalendarBoundaryDateTests(unittest.TestCase):
+    def _calendar(self):
+        path = Path(__file__).resolve().parents[2] / "calico_capture/calendar.py"
+        self.assertTrue(path.is_file(), "shared stdlib calendar authority must exist")
+        from calico_capture import calendar
+        return calendar
+
+    def test_shared_calendar_authority_exists(self):
+        self._calendar()
+
+    def test_exact_wednesday_boundaries(self):
+        calendar = self._calendar()
+        for day, month, expected in ((1, 7, True), (7, 10, True), (8, 7, False),
+                                     (15, 7, True), (21, 10, True), (22, 7, False)):
+            when = datetime.date(2026, month, day)
+            self.assertEqual(when.isoweekday(), 3)
+            decision = calendar.decide_calendar(event_name="schedule", dispatch_mode=None,
+                                                observed_date=when)
+            self.assertEqual(decision.should_run, expected)
+            self.assertEqual((decision.mode, decision.trigger, decision.observed_date),
+                             ("capture", "schedule", when.isoformat()))
+
+    def test_schedule_decision_matches_ten_year_gate(self):
+        calendar = self._calendar()
+        for when in _iter_span():
+            self.assertEqual(calendar.decide_calendar(event_name="schedule", dispatch_mode=None,
+                             observed_date=when).should_run, is_capture_day(when, "schedule"))
+        self.assertIs(calendar.is_capture_day, is_capture_day)
+
+    def test_dispatch_and_local_bypass_with_closed_modes(self):
+        calendar = self._calendar()
+        for event in ("workflow_dispatch", "local"):
+            for mode in ("capture", "republish", "authorization_probe"):
+                decision = calendar.decide_calendar(event_name=event, dispatch_mode=mode,
+                    observed_date=datetime.date(2026, 10, 8))
+                self.assertEqual((decision.should_run, decision.mode, decision.trigger),
+                                 (True, mode, event))
+
+    def test_unknown_and_null_inputs_fail_closed_without_echo(self):
+        calendar = self._calendar()
+        for event, mode, when in ((None, None, datetime.date(2026, 10, 7)),
+                ("unknown", "capture", datetime.date(2026, 10, 7)),
+                ("workflow_dispatch", None, datetime.date(2026, 10, 7)),
+                ("workflow_dispatch", "unknown", datetime.date(2026, 10, 7)),
+                ("schedule", "unknown", datetime.date(2026, 10, 7)),
+                ("schedule", None, None), ("schedule", None, "2026-10-07")):
+            with self.subTest(event=event, mode=mode):
+                with self.assertRaisesRegex(ValueError, "^calendar.invalid_input$"):
+                    calendar.decide_calendar(event_name=event, dispatch_mode=mode, observed_date=when)
+        self.assertFalse(calendar.is_capture_day(datetime.date(2026, 10, 7), "unknown"))
+
+    def test_frozen_decision_and_canonical_rendering(self):
+        from dataclasses import FrozenInstanceError
+        decision = self._calendar().decide_calendar(event_name="schedule", dispatch_mode=None,
+                                                   observed_date=datetime.date(2026, 10, 7))
+        self.assertEqual(decision.to_json(), '{"mode":"capture","observed_date":"2026-10-07",'
+                         '"should_run":true,"trigger":"schedule"}')
+        self.assertEqual(decision.to_outputs(), "should_run=true\nmode=capture\ntrigger=schedule\n"
+                         "observed_date=2026-10-07\n")
+        with self.assertRaises(FrozenInstanceError):
+            decision.mode = "republish"
+
+    def test_live_cli_is_stdlib_only_and_rejects_date_override(self):
+        import os
+        import tempfile
+        path = Path(__file__).resolve().parents[2] / "calico_capture/calendar.py"
+        self._calendar()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            env = dict(os.environ, GITHUB_EVENT_NAME="workflow_dispatch", CALICO_DISPATCH_MODE="republish",
+                       GITHUB_OUTPUT=str(output), CALICO_OBSERVED_DATE="1900-01-01")
+            result = subprocess.run([sys.executable, "-S", str(path)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout + result.stderr, "")
+            self.assertIn("observed_date=" + datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+                          output.read_text())
+            result = subprocess.run([sys.executable, "-S", str(path), "--observed-date", "1900-01-01"],
+                                    env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stderr, "calendar.invalid_input\n")
 
 
 if __name__ == "__main__":
