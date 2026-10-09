@@ -308,6 +308,57 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
             self.assertIn('REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"', step["run"])
             self.assertIn('REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"', step["run"])
 
+    def test_runner_metadata_adapter_removes_only_the_observed_extension_directory(self):
+        import shlex
+        _, doc = self._workflow()
+        invocations = []
+        for name, job in doc["jobs"].items():
+            for step in job.get("steps", []):
+                for line in step.get("run", "").splitlines():
+                    if line.strip().startswith("env "):
+                        words = shlex.split(line.strip().removesuffix("\\"))
+                        invocations.append((name, words))
+        expected = {"prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"}
+        self.assertEqual({name for name, _ in invocations}, expected)
+        self.assertEqual(len(invocations), 4)
+        for name, words in invocations:
+            command = "publication-worker" if name == "publish-accepted" else "prepare-checkpoint"
+            self.assertEqual(words, ["env", "-u", "AZURE_EXTENSION_DIR", "python", "-m",
+                                     "tools.hosted_replay", command])
+
+    def test_observed_metadata_adapter_preserves_other_credential_rejections(self):
+        import shlex
+        import subprocess
+        import sys
+        _, doc = self._workflow()
+        script = "from tools.hosted_replay import _credentials; _credentials()"
+        environment = {"PATH": os.environ["PATH"], "TMPDIR": str(Path(tempfile.gettempdir()).resolve()),
+                       "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
+                       "GIT_CONFIG_NOSYSTEM": "1", "AZURE_EXTENSION_DIR": "synthetic-directory"}
+        cases = ((None, None), ("AZURE_HTTP_USER_AGENT", "azure_user_agent"),
+                 ("AZURE_CLIENT_SECRET", "azure_environment"), ("AZURE_UNRECOGNIZED", "azure_environment"),
+                 ("AWS_ACCESS_KEY_ID", "aws_environment"), ("GH_TOKEN", "token_environment"),
+                 ("GITHUB_TOKEN", "token_environment"), ("SSH_AUTH_SOCK", "ssh_environment"),
+                 ("GIT_ASKPASS", "ssh_environment"), ("GIT_CONFIG_GLOBAL", "git_config_path"))
+        for name in ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"):
+            line = next(line for line in doc["jobs"][name]["steps"][-1]["run"].splitlines()
+                        if "tools.hosted_replay prepare-checkpoint" in line or
+                           "tools.hosted_replay publication-worker" in line)
+            words = shlex.split(line.strip().removesuffix("\\"))
+            self.assertEqual(words[:4], ["env", "-u", "AZURE_EXTENSION_DIR", "python"])
+            for key, reason in cases:
+                env = dict(environment)
+                if key:
+                    env[key] = "synthetic-blocked-setting"
+                result = subprocess.run([*words[:3], sys.executable, "-c", script],
+                                        cwd=REPO_ROOT, env=env, capture_output=True)
+                self.assertEqual(result.returncode == 0, reason is None,
+                                 "only observed metadata may bypass the unchanged guard")
+                self.assertTrue(result.stdout == b"", "guard must not print inherited settings")
+                if reason:
+                    self.assertIn(("replay.credential_reason." + reason).encode(), result.stderr)
+                    self.assertNotIn(b"synthetic-blocked-setting", result.stderr)
+
     def test_failed_commands_emit_only_bounded_diagnostics_and_always_remove_roots(self):
         import subprocess
         import sys
