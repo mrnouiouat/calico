@@ -219,6 +219,95 @@ class SharedPublicationRouteContractTests(unittest.TestCase):
             self.assertEqual(output.read_text(), "valid=false\nstatus_json={}\n")
 
 
+class HostedReplayWorkflowContractTests(unittest.TestCase):
+    """Freeze the isolated hosted boundary; only observed Jobs API proves execution."""
+
+    def _workflow(self):
+        path = REPO_ROOT / ".github/workflows/hosted-replay.yml"
+        self.assertTrue(path.is_file(), "isolated hosted replay workflow must exist")
+        import yaml
+        text = _read(path)
+        return text, yaml.safe_load(text)
+
+    def test_dispatch_only_readonly_without_live_or_artifact_surfaces(self):
+        text, doc = self._workflow()
+        self.assertEqual(doc.get("on", doc.get(True)), {"workflow_dispatch": None})
+        self.assertEqual(doc["permissions"], {"contents": "read"})
+        for forbidden in ("secrets", "environment:", "contents: write", "upload-artifact",
+                "actions/cache", "git push", "supporting-sequence", "run_replay_sequence", "B2_",
+                "persist-credentials: true", "cache:"):
+            self.assertNotIn(forbidden, text)
+        for job in doc["jobs"].values():
+            self.assertEqual(job["permissions"], {"contents": "read"})
+            for step in job.get("steps", []):
+                if "uses" in step:
+                    pin = step["uses"]
+                    self.assertIn(pin, ("actions/checkout@" + CHECKOUT_PIN,
+                        "actions/setup-python@" + SETUP_PYTHON_PIN))
+                    if pin.startswith("actions/checkout@"):
+                        self.assertIs(step["with"]["persist-credentials"], False)
+
+    def test_closed_job_names_and_shared_route_status_inputs(self):
+        _, doc = self._workflow()
+        scenarios = ("accepted", "repeat", "rejected")
+        routes = (*scenarios, "calendar-refused", "failure", "cancelled")
+        expected = {*('prepare-' + s for s in scenarios), *('route-' + s for s in routes),
+                    *('publish-' + s for s in routes), "calendar-matrix", "audit-safe-evidence"}
+        self.assertEqual(set(doc["jobs"]), expected)
+        for name, job in doc["jobs"].items():
+            self.assertEqual(job["name"], name)
+        for scenario in scenarios:
+            job = doc["jobs"]["route-" + scenario]
+            self.assertEqual(job["uses"], "./.github/workflows/publication-route.yml")
+            self.assertIn("prepare-" + scenario, job["needs"])
+            self.assertEqual(job["with"]["status_json"],
+                "${{ needs.prepare-" + scenario + ".outputs.status_json }}")
+            for key in ("capture_result", "status_result"):
+                self.assertEqual(job["with"][key], "${{ needs.prepare-" + scenario + ".result }}")
+        for scenario in routes:
+            job = doc["jobs"]["publish-" + scenario]
+            self.assertIn("route-" + scenario, job["needs"])
+            self.assertEqual(job["if"], "${{ !cancelled() && needs.route-" + scenario +
+                ".result == 'success' && needs.route-" + scenario + ".outputs.should_publish == 'true' }}")
+
+    def test_staged_workers_bound_outputs_and_cleanup(self):
+        text, doc = self._workflow()
+        for scenario in ("accepted", "repeat", "rejected"):
+            block = _job_block(text, "prepare-" + scenario)
+            self.assertIn("prepare-checkpoint", block)
+            self.assertIn("--scenario " + scenario, block)
+            self.assertIn("validate-driver", block)
+            self.assertIn("65536", block)
+            self.assertIn("GITHUB_OUTPUT", block)
+            self.assertIn("trap", block)
+            self.assertIn("RUNNER_TEMP", block)
+            self.assertIn("requirements-dbt.txt", block)
+        accepted = _job_block(text, "publish-accepted")
+        for required in ("publication-worker", "--route-authorized", "--expected-input-digest",
+                         "--expected-provenance-digest", "validate-driver", "trap"):
+            self.assertIn(required, accepted)
+        audit = doc["jobs"]["audit-safe-evidence"]
+        self.assertEqual(audit["if"], "${{ always() }}")
+        self.assertEqual(set(audit["needs"]), set(doc["jobs"]) - {"audit-safe-evidence"})
+        self.assertIn("cleanup_verified", _job_block(text, "audit-safe-evidence"))
+        self.assertIn("GITHUB_STEP_SUMMARY", _job_block(text, "audit-safe-evidence"))
+
+    def test_negative_routes_and_controlled_calendar_are_explicit(self):
+        text, doc = self._workflow()
+        for scenario, state in (("failure", "failure"), ("cancelled", "cancelled")):
+            values = doc["jobs"]["route-" + scenario]["with"]
+            self.assertEqual(values["capture_result"], state)
+            self.assertEqual(values["status_result"], state)
+            self.assertEqual(values["status_json"], "")
+        calendar = _job_block(text, "calendar-matrix")
+        self.assertIn("runpy.run_path", calendar)
+        self.assertIn("(1, 7, 8, 15, 21, 22)", calendar)
+        self.assertIn("workflow_dispatch", calendar)
+        self.assertIn("controlled_schedule", calendar)
+        self.assertEqual(doc["jobs"]["route-calendar-refused"]["with"]["should_run"],
+                         "${{ needs.calendar-matrix.outputs.refused }}")
+
+
 class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
     """Test 1: exact cron, closed dispatch modes, 330-minute bound, constant
     concurrency, cancel-in-progress false, pinned actions, no-secret gate."""
