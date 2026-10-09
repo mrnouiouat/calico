@@ -1,0 +1,533 @@
+name: Isolated Hosted Replay
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calico-isolated-hosted-replay
+  cancel-in-progress: false
+
+jobs:
+  prepare-accepted:
+    name: prepare-accepted
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      driver_json: ${{ steps.checkpoint.outputs.driver_json }}
+      status_json: ${{ steps.checkpoint.outputs.status_json }}
+      cleanup_verified: ${{ steps.checkpoint.outputs.cleanup_verified }}
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up the pinned Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13.15"
+      - name: Install the existing analytical requirements
+        run: python -m pip install -r requirements-dbt.txt
+      - name: Reconstruct and audit the isolated checkpoint
+        id: checkpoint
+        env:
+          REPLAY_REPOSITORY: ${{ github.repository }}
+          REPLAY_RUN_ID: ${{ github.run_id }}
+          REPLAY_ATTEMPT: ${{ github.run_attempt }}
+          REPLAY_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
+          export REPLAY_ROOT
+          trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          python -m tools.hosted_replay prepare-checkpoint \
+            --runner-temp "$REPLAY_ROOT" --scenario accepted \
+            --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
+            --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
+            > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from tools.hosted_replay import ReplayRunTuple, audit_bytes, derive_replay_canary, validate_driver
+          root = Path(os.environ["REPLAY_ROOT"])
+          raw = root.joinpath("driver.json").read_bytes()
+          document = validate_driver(raw)
+          identity = ReplayRunTuple(**document["run_tuple"])
+          # Scan actual transport streams separately from the production driver's byte audits.
+          from tools.hosted_replay import _CATEGORIES, _JOBS
+          canaries = tuple(derive_replay_canary(identity, job, category)
+                           for job in _JOBS for category in _CATEGORIES)
+          audit_bytes({"stdout": raw, "stderr": root.joinpath("command.stderr").read_bytes()}, canaries)
+          compact = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          status = json.dumps(document["capture_status"], sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          assert 0 < len(compact.encode()) <= 65536
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("driver_json=" + compact + "\nstatus_json=" + status + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_DRIVER=" + compact)
+          PY
+          rm -rf -- "$REPLAY_ROOT"
+          test ! -e "$REPLAY_ROOT"
+          echo 'cleanup_verified=true' >> "$GITHUB_OUTPUT"
+
+  prepare-repeat:
+    name: prepare-repeat
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      driver_json: ${{ steps.checkpoint.outputs.driver_json }}
+      status_json: ${{ steps.checkpoint.outputs.status_json }}
+      cleanup_verified: ${{ steps.checkpoint.outputs.cleanup_verified }}
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up the pinned Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13.15"
+      - name: Install the existing analytical requirements
+        run: python -m pip install -r requirements-dbt.txt
+      - name: Reconstruct and audit the isolated checkpoint
+        id: checkpoint
+        env:
+          REPLAY_REPOSITORY: ${{ github.repository }}
+          REPLAY_RUN_ID: ${{ github.run_id }}
+          REPLAY_ATTEMPT: ${{ github.run_attempt }}
+          REPLAY_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
+          export REPLAY_ROOT
+          trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          python -m tools.hosted_replay prepare-checkpoint \
+            --runner-temp "$REPLAY_ROOT" --scenario repeat \
+            --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
+            --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
+            > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from tools.hosted_replay import ReplayRunTuple, audit_bytes, derive_replay_canary, validate_driver
+          root = Path(os.environ["REPLAY_ROOT"])
+          raw = root.joinpath("driver.json").read_bytes()
+          document = validate_driver(raw)
+          identity = ReplayRunTuple(**document["run_tuple"])
+          # Scan actual transport streams separately from the production driver's byte audits.
+          from tools.hosted_replay import _CATEGORIES, _JOBS
+          canaries = tuple(derive_replay_canary(identity, job, category)
+                           for job in _JOBS for category in _CATEGORIES)
+          audit_bytes({"stdout": raw, "stderr": root.joinpath("command.stderr").read_bytes()}, canaries)
+          compact = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          status = json.dumps(document["capture_status"], sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          assert 0 < len(compact.encode()) <= 65536
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("driver_json=" + compact + "\nstatus_json=" + status + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_DRIVER=" + compact)
+          PY
+          rm -rf -- "$REPLAY_ROOT"
+          test ! -e "$REPLAY_ROOT"
+          echo 'cleanup_verified=true' >> "$GITHUB_OUTPUT"
+
+  prepare-rejected:
+    name: prepare-rejected
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      driver_json: ${{ steps.checkpoint.outputs.driver_json }}
+      status_json: ${{ steps.checkpoint.outputs.status_json }}
+      cleanup_verified: ${{ steps.checkpoint.outputs.cleanup_verified }}
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up the pinned Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13.15"
+      - name: Install the existing analytical requirements
+        run: python -m pip install -r requirements-dbt.txt
+      - name: Reconstruct and audit the isolated checkpoint
+        id: checkpoint
+        env:
+          REPLAY_REPOSITORY: ${{ github.repository }}
+          REPLAY_RUN_ID: ${{ github.run_id }}
+          REPLAY_ATTEMPT: ${{ github.run_attempt }}
+          REPLAY_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
+          export REPLAY_ROOT
+          trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          python -m tools.hosted_replay prepare-checkpoint \
+            --runner-temp "$REPLAY_ROOT" --scenario rejected \
+            --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
+            --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
+            > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from tools.hosted_replay import ReplayRunTuple, audit_bytes, derive_replay_canary, validate_driver
+          root = Path(os.environ["REPLAY_ROOT"])
+          raw = root.joinpath("driver.json").read_bytes()
+          document = validate_driver(raw)
+          identity = ReplayRunTuple(**document["run_tuple"])
+          # Scan actual transport streams separately from the production driver's byte audits.
+          from tools.hosted_replay import _CATEGORIES, _JOBS
+          canaries = tuple(derive_replay_canary(identity, job, category)
+                           for job in _JOBS for category in _CATEGORIES)
+          audit_bytes({"stdout": raw, "stderr": root.joinpath("command.stderr").read_bytes()}, canaries)
+          compact = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          status = json.dumps(document["capture_status"], sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          assert 0 < len(compact.encode()) <= 65536
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("driver_json=" + compact + "\nstatus_json=" + status + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_DRIVER=" + compact)
+          PY
+          rm -rf -- "$REPLAY_ROOT"
+          test ! -e "$REPLAY_ROOT"
+          echo 'cleanup_verified=true' >> "$GITHUB_OUTPUT"
+
+  route-accepted:
+    name: route-accepted
+    needs: [prepare-accepted]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.prepare-accepted.result }}
+      should_run: "true"
+      mode: capture
+      capture_result: ${{ needs.prepare-accepted.result }}
+      status_result: ${{ needs.prepare-accepted.result }}
+      status_json: ${{ needs.prepare-accepted.outputs.status_json }}
+
+  route-repeat:
+    name: route-repeat
+    needs: [prepare-repeat]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.prepare-repeat.result }}
+      should_run: "true"
+      mode: capture
+      capture_result: ${{ needs.prepare-repeat.result }}
+      status_result: ${{ needs.prepare-repeat.result }}
+      status_json: ${{ needs.prepare-repeat.outputs.status_json }}
+
+  route-rejected:
+    name: route-rejected
+    needs: [prepare-rejected]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.prepare-rejected.result }}
+      should_run: "true"
+      mode: capture
+      capture_result: ${{ needs.prepare-rejected.result }}
+      status_result: ${{ needs.prepare-rejected.result }}
+      status_json: ${{ needs.prepare-rejected.outputs.status_json }}
+
+  route-calendar-refused:
+    name: route-calendar-refused
+    needs: [calendar-matrix]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.calendar-matrix.result }}
+      should_run: ${{ needs.calendar-matrix.outputs.refused }}
+      mode: capture
+      capture_result: "skipped"
+      status_result: "skipped"
+      status_json: ""
+
+  route-failure:
+    name: route-failure
+    needs: [calendar-matrix]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.calendar-matrix.result }}
+      should_run: "true"
+      mode: capture
+      capture_result: "failure"
+      status_result: "failure"
+      status_json: ""
+
+  route-cancelled:
+    name: route-cancelled
+    needs: [calendar-matrix]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publication-route.yml
+    with:
+      calendar_result: ${{ needs.calendar-matrix.result }}
+      should_run: "true"
+      mode: capture
+      capture_result: "cancelled"
+      status_result: "cancelled"
+      status_json: ""
+
+  publish-accepted:
+    name: publish-accepted
+    needs: [prepare-accepted, route-accepted]
+    if: ${{ !cancelled() && needs.route-accepted.result == 'success' && needs.route-accepted.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      driver_json: ${{ steps.checkpoint.outputs.driver_json }}
+      status_json: ${{ steps.checkpoint.outputs.status_json }}
+      cleanup_verified: ${{ steps.checkpoint.outputs.cleanup_verified }}
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up the pinned Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13.15"
+      - name: Install the existing analytical requirements
+        run: python -m pip install -r requirements-dbt.txt
+      - name: Reconstruct and audit the isolated checkpoint
+        id: checkpoint
+        env:
+          REPLAY_REPOSITORY: ${{ github.repository }}
+          REPLAY_RUN_ID: ${{ github.run_id }}
+          REPLAY_ATTEMPT: ${{ github.run_attempt }}
+          REPLAY_HEAD: ${{ github.sha }}
+          EXPECTED_INPUT: ${{ fromJSON(needs.prepare-accepted.outputs.driver_json).input_digest }}
+          EXPECTED_PROVENANCE: ${{ fromJSON(needs.prepare-accepted.outputs.driver_json).provenance_digest }}
+        run: |
+          set -euo pipefail
+          REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
+          export REPLAY_ROOT
+          trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          python -m tools.hosted_replay publication-worker \
+            --runner-temp "$REPLAY_ROOT" --scenario accepted \
+            --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
+            --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
+            --route-authorized true --expected-input-digest "$EXPECTED_INPUT" \
+            --expected-provenance-digest "$EXPECTED_PROVENANCE" \
+            > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from tools.hosted_replay import ReplayRunTuple, audit_bytes, derive_replay_canary, validate_driver
+          root = Path(os.environ["REPLAY_ROOT"])
+          raw = root.joinpath("driver.json").read_bytes()
+          document = validate_driver(raw)
+          identity = ReplayRunTuple(**document["run_tuple"])
+          # Scan actual transport streams separately from the production driver's byte audits.
+          from tools.hosted_replay import _CATEGORIES, _JOBS
+          canaries = tuple(derive_replay_canary(identity, job, category)
+                           for job in _JOBS for category in _CATEGORIES)
+          audit_bytes({"stdout": raw, "stderr": root.joinpath("command.stderr").read_bytes()}, canaries)
+          compact = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          status = json.dumps(document["capture_status"], sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          assert 0 < len(compact.encode()) <= 65536
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("driver_json=" + compact + "\nstatus_json=" + status + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_DRIVER=" + compact)
+          PY
+          rm -rf -- "$REPLAY_ROOT"
+          test ! -e "$REPLAY_ROOT"
+          echo 'cleanup_verified=true' >> "$GITHUB_OUTPUT"
+
+  publish-repeat:
+    name: publish-repeat
+    needs: [route-repeat]
+    if: ${{ !cancelled() && needs.route-repeat.result == 'success' && needs.route-repeat.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse unexpected negative publication authorization
+        run: exit 1
+
+  publish-rejected:
+    name: publish-rejected
+    needs: [route-rejected]
+    if: ${{ !cancelled() && needs.route-rejected.result == 'success' && needs.route-rejected.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse unexpected negative publication authorization
+        run: exit 1
+
+  publish-calendar-refused:
+    name: publish-calendar-refused
+    needs: [route-calendar-refused]
+    if: ${{ !cancelled() && needs.route-calendar-refused.result == 'success' && needs.route-calendar-refused.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse unexpected negative publication authorization
+        run: exit 1
+
+  publish-failure:
+    name: publish-failure
+    needs: [route-failure]
+    if: ${{ !cancelled() && needs.route-failure.result == 'success' && needs.route-failure.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse unexpected negative publication authorization
+        run: exit 1
+
+  publish-cancelled:
+    name: publish-cancelled
+    needs: [route-cancelled]
+    if: ${{ !cancelled() && needs.route-cancelled.result == 'success' && needs.route-cancelled.outputs.should_publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse unexpected negative publication authorization
+        run: exit 1
+
+  calendar-matrix:
+    name: calendar-matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      refused: ${{ steps.calendar.outputs.refused }}
+      calendar_json: ${{ steps.calendar.outputs.calendar_json }}
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check controlled dates with the shared stdlib calendar
+        id: calendar
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import runpy
+          from datetime import date
+          decide = runpy.run_path("calico_capture/calendar.py")["decide_calendar"]
+          # Separate controlled first/third-Wednesday edge dates from the actual dispatch.
+          dates = {1: date(2031, 1, 1), 7: date(2031, 5, 7), 8: date(2031, 1, 8),
+                   15: date(2031, 1, 15), 21: date(2031, 5, 21), 22: date(2031, 1, 22)}
+          rows = []
+          for day in (1, 7, 8, 15, 21, 22):
+              result = decide(event_name="schedule", dispatch_mode=None, observed_date=dates[day])
+              assert result.should_run is (day in (1, 7, 15, 21))
+              rows.append({"label": "controlled_schedule", "date": result.observed_date,
+                           "should_run": result.should_run})
+          dispatched = decide(event_name="workflow_dispatch", dispatch_mode="capture",
+                              observed_date=date(2031, 1, 8))
+          assert dispatched.should_run
+          document = {"actual_event": "workflow_dispatch", "controlled_schedule": rows}
+          compact = json.dumps(document, sort_keys=True, separators=(",", ":"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("refused=false\ncalendar_json=" + compact + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_CALENDAR=" + compact)
+          PY
+
+  audit-safe-evidence:
+    name: audit-safe-evidence
+    needs: [prepare-accepted, prepare-repeat, prepare-rejected, route-accepted, route-repeat, route-rejected, route-calendar-refused, route-failure, route-cancelled, publish-accepted, publish-repeat, publish-rejected, publish-calendar-refused, publish-failure, publish-cancelled, calendar-matrix]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the reviewed code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up the pinned Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13.15"
+      - name: Install the existing analytical requirements
+        run: python -m pip install -r requirements-dbt.txt
+      - name: Validate bounded checkpoint outputs and cleanup before recording the safe seed
+        env:
+          REPLAY_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from tools.hosted_replay import ReplayRunTuple, audit_bytes, derive_replay_canary, validate_driver
+          from tools.hosted_replay import _CATEGORIES, _JOBS
+          needs = json.loads(os.environ["REPLAY_NEEDS"])
+          seed = {}
+          drivers = ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted")
+          for name in drivers:
+              job = needs[name]
+              assert job["result"] == "success"
+              assert job["outputs"]["cleanup_verified"] == "true"
+              raw = job["outputs"]["driver_json"]
+              assert 0 < len(raw.encode()) <= 65536
+              seed[name] = json.dumps(validate_driver(raw), sort_keys=True, separators=(",", ":"))
+          for scenario in ("accepted", "repeat", "rejected", "calendar-refused", "failure", "cancelled"):
+              route = needs["route-" + scenario]
+              assert route["result"] == "success"
+              authorized = route["outputs"]["should_publish"] == "true"
+              assert authorized is (scenario == "accepted")
+              assert needs["publish-" + scenario]["result"] == ("success" if authorized else "skipped")
+              seed["route-" + scenario] = json.dumps({"should_publish": authorized}, separators=(",", ":"))
+          assert needs["calendar-matrix"]["result"] == "success"
+          calendar = json.loads(needs["calendar-matrix"]["outputs"]["calendar_json"])
+          assert calendar["actual_event"] == "workflow_dispatch"
+          seed["audit-safe-evidence"] = '{"cleanup_verified":true}'
+          before = json.loads(seed["prepare-accepted"])
+          after = json.loads(seed["publish-accepted"])
+          for key in ("input_digest", "provenance_digest", "source_catalog", "exports", "analytical_sha256"):
+              assert before[key] == after[key]
+          identity = ReplayRunTuple(**before["run_tuple"])
+          canaries = tuple(derive_replay_canary(identity, job, category)
+                           for job in _JOBS for category in _CATEGORIES)
+          compact = json.dumps(seed, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+          assert 0 < len(compact.encode()) <= 262144
+          audit_bytes({"summary": compact.encode()}, canaries)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(compact + "\n")
+          print("CALICO_REPLAY_SEED=" + compact)
+          PY

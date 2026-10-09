@@ -307,6 +307,47 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         self.assertEqual(doc["jobs"]["route-calendar-refused"]["with"]["should_run"],
                          "${{ needs.calendar-matrix.outputs.refused }}")
 
+    def test_inline_scripts_compile_and_calendar_executes_actual_boundary_cases(self):
+        import subprocess
+        import sys
+        _, doc = self._workflow()
+        for job in doc["jobs"].values():
+            for step in job.get("steps", []):
+                script = step.get("run", "")
+                if "python - <<'PY'\n" in script:
+                    inline = script.split("python - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
+                    compile(inline, "hosted-replay-inline", "exec")
+        script = doc["jobs"]["calendar-matrix"]["steps"][-1]["run"]
+        with tempfile.TemporaryDirectory() as directory:
+            output, summary = Path(directory) / "output", Path(directory) / "summary"
+            result = subprocess.run(["bash", "-e", "-c", script], cwd=REPO_ROOT,
+                env=dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary),
+                         PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]),
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, "controlled calendar execution must succeed")
+            values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+            self.assertEqual(values["refused"], "false")
+            calendar = json.loads(values["calendar_json"])
+            self.assertEqual(calendar["actual_event"], "workflow_dispatch")
+            self.assertEqual([row["should_run"] for row in calendar["controlled_schedule"]],
+                             [True, True, False, True, True, False])
+            self.assertEqual(json.loads(summary.read_text()), calendar)
+
+    def test_reconstruction_arguments_are_from_the_prepared_driver_and_seed_is_bounded(self):
+        text, doc = self._workflow()
+        worker = doc["jobs"]["publish-accepted"]["steps"][-1]
+        self.assertEqual(worker["env"]["EXPECTED_INPUT"],
+            "${{ fromJSON(needs.prepare-accepted.outputs.driver_json).input_digest }}")
+        self.assertEqual(worker["env"]["EXPECTED_PROVENANCE"],
+            "${{ fromJSON(needs.prepare-accepted.outputs.driver_json).provenance_digest }}")
+        self.assertIn('test ! -e "$REPLAY_ROOT"', worker["run"])
+        self.assertIn('"cleanup_verified"', _job_block(text, "audit-safe-evidence"))
+        self.assertIn("262144", _job_block(text, "audit-safe-evidence"))
+        self.assertIn("audit_bytes", _job_block(text, "audit-safe-evidence"))
+        for scenario in ("accepted", "repeat", "rejected"):
+            self.assertIn('2> "$REPLAY_ROOT/command.stderr"',
+                          doc["jobs"]["prepare-" + scenario]["steps"][-1]["run"])
+
 
 class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
     """Test 1: exact cron, closed dispatch modes, 330-minute bound, constant
