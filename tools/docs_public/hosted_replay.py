@@ -7,10 +7,15 @@ projected. Run/job observations and byte commitments retain their provenance.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
+import subprocess
+import tempfile
 
 from tools.hosted_replay import HostedEnvelope, ReplayError, validate_envelope
 
@@ -285,3 +290,201 @@ def render_hosted_replay_markdown(document: object) -> str:
         f'Run: [historical observation]({prefix}/actions/runs/{historical["run_id"]}); head: [historical commit]({prefix}/commit/{historical["head_sha"]}).',
         f'Published-data commit: `{historical["published_data_commit"]}`; manifest SHA-256: `{historical["published_manifest_sha256"]}`.', ""])
     return "\n".join(parts)
+
+
+def _path(value):
+    """Reject links, noncanonical aliases and nonordinary existing files."""
+    try:
+        path = Path(os.path.abspath(value))
+        cursor = Path(path.anchor)
+        for part in path.parts[1:]:
+            cursor /= part
+            if cursor.is_symlink():
+                _fail("hosted_replay.unsafe_path")
+        if path != path.resolve():
+            _fail("hosted_replay.unsafe_path")
+        if path.exists():
+            meta = path.stat()
+            if not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1 or getattr(meta, "st_file_attributes", 0) & 0x400:
+                _fail("hosted_replay.unsafe_path")
+        return path
+    except (ValueError, TypeError, OSError):
+        _fail("hosted_replay.unsafe_path")
+
+
+def _read(path):
+    path = _path(path)
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, "rb") as handle:
+            data = handle.read(_MAX_BYTES + 1)
+        if len(data) > _MAX_BYTES:
+            _fail("hosted_replay.oversize")
+        return data
+    except OSError:
+        _fail("hosted_replay.unreadable")
+
+
+@contextmanager
+def _pair_lock(json_path, markdown_path):
+    common = Path(os.path.commonpath([json_path.parent, markdown_path.parent]))
+    while not common.is_dir():
+        common = common.parent
+    result = subprocess.run(["git", "rev-parse", "--git-path", "hosted-replay-docs.lock"], cwd=common,
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False, text=True)
+    lock = Path(result.stdout.strip()) if result.returncode == 0 else common / ".hosted-replay-docs.lock"
+    if not lock.is_absolute():
+        lock = common / lock
+    lock = _path(lock)
+    try:
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        handle = os.fdopen(fd, "a+b")
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            if not handle.read(1):
+                handle.write(b"0")
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        if "handle" in locals():
+            handle.close()
+        _fail("hosted_replay.lock_busy")
+    try:
+        yield
+    finally:
+        handle.close()
+
+
+def _checked_pair(json_path, markdown_path):
+    raw = _read(json_path)
+    public = decode_hosted_replay_public(raw)
+    markdown = _read(markdown_path)
+    if raw != public.encoded or markdown != render_hosted_replay_markdown(public).encode("utf-8"):
+        _fail("hosted_replay.generated_drift")
+    return public, markdown
+
+
+def check_hosted_replay_pair(json_path: Path, markdown_path: Path) -> None:
+    """Offline, read-only canonical public JSON/Markdown equality check."""
+    json_path, markdown_path = _path(json_path), _path(markdown_path)
+    if json_path == markdown_path:
+        _fail("hosted_replay.unsafe_path")
+    with _pair_lock(json_path, markdown_path):
+        _checked_pair(json_path, markdown_path)
+
+
+def _citations(root, public, markdown):
+    from tools.citation_scan.scanner import CitationError, check_hosted_replay_citations
+    try:
+        check_hosted_replay_citations(root, public, markdown.decode("utf-8"))
+    except (CitationError, UnicodeError):
+        _fail("hosted_replay.invalid_citations")
+
+
+def check_hosted_replay_against_envelope(envelope_path, json_path, markdown_path, *, root):
+    expected = project_hosted_replay_public(decode_hosted_replay_envelope(_read(envelope_path)))
+    json_path, markdown_path = _path(json_path), _path(markdown_path)
+    if json_path == markdown_path:
+        _fail("hosted_replay.unsafe_path")
+    with _pair_lock(json_path, markdown_path):
+        public, markdown = _checked_pair(json_path, markdown_path)
+        if public != expected:
+            _fail("hosted_replay.envelope_drift")
+        _citations(root, public, markdown)
+
+
+def _stage(path, raw):
+    fd, name = tempfile.mkstemp(prefix=".hosted-replay-", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        return temporary
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _write_pair(outputs):
+    """Stage both bytes first and roll back either replacement on failure.
+
+    Cooperative readers hold the same lock. An interrupted process can only
+    leave a pair that the canonical checker rejects, never silently approves.
+    """
+    staged, backups, replaced = {}, {}, []
+    try:
+        for path, data in outputs:
+            _path(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                backups[path] = _stage(path, _read(path))
+            else:
+                backups[path] = None
+            staged[path] = _stage(path, data)
+        if any(_read(staged[path]) != data for path, data in outputs):
+            _fail("hosted_replay.staged_drift")
+        for path, _ in outputs:
+            expected = next(raw for target, raw in outputs if target == path)
+            if _read(staged[path]) != expected:
+                _fail("hosted_replay.staged_drift")
+            _path(path)
+            os.replace(staged[path], path)
+            replaced.append(path)
+        if any(_read(path) != data for path, data in outputs):
+            _fail("hosted_replay.generated_drift")
+    except BaseException as error:
+        try:
+            for path in reversed(replaced):
+                if backups[path] is None:
+                    path.unlink()
+                else:
+                    os.replace(backups[path], path)
+        except OSError:
+            _fail("hosted_replay.rollback_failed")
+        if isinstance(error, HostedReplayPublicError):
+            raise
+        _fail("hosted_replay.write_failed")
+    finally:
+        for path in (*staged.values(), *backups.values()):
+            if path is not None:
+                path.unlink(missing_ok=True)
+
+
+def generate_hosted_replay_pair(envelope_path, json_path, markdown_path, *, root):
+    source = _path(envelope_path)
+    json_path, markdown_path = _path(json_path), _path(markdown_path)
+    if len({source, json_path, markdown_path}) != 3:
+        _fail("hosted_replay.unsafe_path")
+    public = project_hosted_replay_public(decode_hosted_replay_envelope(_read(source)))
+    markdown = render_hosted_replay_markdown(public).encode("utf-8")
+    # Validate citations and privacy before staging either destination.
+    _citations(root, public, markdown)
+    from tools.privacy_scan.scanner import scan_text
+    try:
+        if scan_text("hosted_replay_json", public.to_json()) or scan_text("hosted_replay_markdown", markdown.decode("utf-8")):
+            _fail("hosted_replay.privacy_failed")
+    except ValueError:
+        _fail("hosted_replay.privacy_failed")
+    with _pair_lock(json_path, markdown_path):
+        _write_pair(((json_path, public.encoded), (markdown_path, markdown)))
+        _checked_pair(json_path, markdown_path)
+
+
+def check_repository_hosted_replay(root):
+    """Integrate the future generated paths without creating observations now."""
+    root = Path(root)
+    paths = (root / JSON_PATH, root / MARKDOWN_PATH)
+    if not any(path.exists() or path.is_symlink() for path in paths):
+        return
+    if not all(path.is_file() for path in paths):
+        _fail("hosted_replay.incomplete_pair")
+    with _pair_lock(*paths):
+        public, markdown = _checked_pair(*paths)
+        _citations(root, public, markdown)

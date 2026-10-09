@@ -330,6 +330,41 @@ class HostedReplayGeneratedPairTests(unittest.TestCase):
         self.assertFalse(self.json_path.exists())
         self.assertFalse(self.markdown_path.exists())
 
+    def test_post_scan_staged_byte_change_never_publishes_pair(self):
+        module = public_module()
+        self.source.write_text(envelope().to_json())
+        original = module._stage
+        def changed_staged_bytes(path, raw):
+            temporary = original(path, raw)
+            temporary.write_bytes(b"changed after validation")
+            return temporary
+        with patch.object(module, "_stage", side_effect=changed_staged_bytes):
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertFalse(self.json_path.exists())
+        self.assertFalse(self.markdown_path.exists())
+
+    def test_readers_reject_an_in_progress_pair(self):
+        self.generate()
+        module = public_module()
+        with module._pair_lock(self.json_path, self.markdown_path):
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.check_hosted_replay_pair(self.json_path, self.markdown_path)
+
+    def test_existing_repository_scans_reject_invalid_generated_evidence(self):
+        from tools.citation_scan import scanner
+        module = public_module()
+        public_path = self.root / module.JSON_PATH
+        markdown_path = self.root / module.MARKDOWN_PATH
+        public_path.parent.mkdir(parents=True)
+        markdown_path.parent.mkdir(parents=True)
+        public_path.write_bytes(b"{}")
+        markdown_path.write_bytes(b"unapproved")
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.check_repository_hosted_replay(self.root)
+        with self.assertRaises(scanner.CitationError):
+            scanner.scan_citations(self.root)
+
     def test_symlinks_aliases_and_wrong_variants_do_not_write(self):
         module = public_module()
         self.source.write_text(envelope().to_json())

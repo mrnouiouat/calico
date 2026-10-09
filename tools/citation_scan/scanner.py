@@ -42,6 +42,10 @@ TRANSITIONS_PATH = "docs/provenance/citation-transitions-v2.json"
 REGISTER_PATH = "docs/decisions/register.md"
 BOUNDARY_PATH = "docs/decisions/planning-directory-not-published.md"
 GENERATED = frozenset({INVENTORY_PATH, LEGACY_TRANSITIONS_PATH, TRANSITIONS_PATH})
+# Independently checked generated pairs do not enter the legacy local-path
+# inventory. Their external run/head citations have a stricter authority.
+HOSTED_REPLAY_GENERATED = frozenset({"docs/evidence/gate-e/hosted-replay-v1.json",
+                                    "docs/provenance/HOSTED-REPLAY-EVIDENCE.md"})
 KINDS = frozenset({"markdown_link", "markdown_image", "reference_definition", "reference_link",
                    "backtick_path", "private_path", "command_syntax", "glob_syntax", "api_syntax",
                    "extension_syntax"})
@@ -192,7 +196,7 @@ def load_document(path: Path):
 
 
 def _documents(root: Path, paths: tuple[str, ...]) -> dict[str, str]:
-    return {p: _read(root, p) for p in paths if p not in GENERATED and p.endswith((".md", ".json"))}
+    return {p: _read(root, p) for p in paths if p not in GENERATED | HOSTED_REPLAY_GENERATED and p.endswith((".md", ".json"))}
 
 
 def _locator(text: str, offset: int) -> str:
@@ -358,6 +362,11 @@ def _scan(paths: tuple[str, ...], documents: dict[str, str]) -> list[CitationOcc
 
 def scan_citations(root: object) -> list[CitationOccurrence]:
     base = _root(root)
+    from tools.docs_public.hosted_replay import HostedReplayPublicError, check_repository_hosted_replay
+    try:
+        check_repository_hosted_replay(base)
+    except HostedReplayPublicError:
+        raise CitationError("citation.invalid_hosted_replay") from None
     paths = candidate_paths(base)
     return _scan(paths, _documents(base, paths))
 
@@ -802,6 +811,51 @@ def check_repository(root: object) -> dict[str, int]:
     base = _root(root)
     with _lock(base):
         return _check_repository(base)
+
+
+def check_hosted_replay_citations(root: object, document: object, markdown: str) -> None:
+    """Authenticate public GitHub locators against exact prior Git evidence.
+
+    No network access is needed: the public shape binds run/attempt/repository
+    URLs, while local reachable commits prove deployment and historical heads.
+    The evidence cannot cite a deployment that already contains this record.
+    """
+    from tools.docs_public.hosted_replay import (HostedReplayPublicError, decode_hosted_replay_public,
+        render_hosted_replay_markdown, JSON_PATH, MARKDOWN_PATH)
+    try:
+        base = _root(root)
+        public = decode_hosted_replay_public(document)
+        safe = public.to_dict()
+        if type(markdown) is not str or markdown != render_hosted_replay_markdown(public):
+            raise CitationError("citation.hosted_replay_drift")
+        if scan_text("hosted_replay", public.to_json()) or scan_text("hosted_replay", markdown):
+            raise CitationError("citation.private_hosted_replay")
+        run, historical = safe["run"], safe["historical_real_republish"]
+        for commit in (run["head_sha"], historical["head_sha"]):
+            if run_git(["rev-parse", "--verify", commit + "^{commit}"], base).decode().strip() != commit:
+                raise CitationError("citation.unreachable_anchor")
+            run_git(["merge-base", "--is-ancestor", commit, "HEAD"], base)
+        for commit in (safe["live_boundary"]["published_data_commit"], historical["published_data_commit"]):
+            if run_git(["rev-parse", "--verify", commit + "^{commit}"], base).decode().strip() != commit:
+                raise CitationError("citation.unreachable_anchor")
+            if commit not in run_git(["rev-list", "--all"], base).decode().splitlines():
+                raise CitationError("citation.unreachable_anchor")
+        commit = safe["live_boundary"]["published_data_commit"]
+        if run_git(["rev-parse", commit + "^{tree}"], base).decode().strip() != safe["live_boundary"]["published_data_tree"]:
+            raise CitationError("citation.hosted_boundary_mismatch")
+        if run_git(["ls-tree", "--name-only", run["head_sha"], "--", JSON_PATH, MARKDOWN_PATH], base).strip():
+            raise CitationError("citation.hosted_self_sha")
+        prefix = "https://github.com/" + run["repository"]
+        allowed = {run["run_url"], run["commit_url"], prefix + "/actions/runs/" + str(historical["run_id"]),
+                   prefix + "/commit/" + historical["head_sha"]}
+        observed = [raw for _, kind, raw in _raw_occurrences(MARKDOWN_PATH, markdown)
+                    if kind == "markdown_link"]
+        if len(observed) != len(allowed) or set(observed) != allowed:
+            raise CitationError("citation.invalid_hosted_locator")
+    except CitationError:
+        raise
+    except Exception:
+        raise CitationError("citation.invalid_hosted_replay") from None
 
 
 def write_repository(root: object, *, summaries: dict[str, str] | None = None) -> dict[str, int]:
