@@ -399,6 +399,18 @@ class HostedReplayGeneratedPairTests(unittest.TestCase):
         self.assertNotIn(str(self.root), output.getvalue())
         self.assertIn("hosted_replay.generated_drift", output.getvalue())
 
+    def test_hard_linked_outputs_preserve_the_alias_and_do_not_publish(self):
+        module = public_module()
+        self.source.write_text(envelope().to_json(), encoding="utf-8")
+        target = self.root / "preserved.json"
+        target.write_bytes(b"preserved output\n")
+        os.link(target, self.json_path)
+        with self.assertRaises(module.HostedReplayPublicError):
+            module.generate_hosted_replay_pair(self.source, self.json_path, self.markdown_path, root=ROOT)
+        self.assertEqual(target.read_bytes(), b"preserved output\n")
+        self.assertEqual(self.json_path.read_bytes(), b"preserved output\n")
+        self.assertFalse(self.markdown_path.exists())
+
 
 class HostedReplayCitationTests(unittest.TestCase):
     def test_citation_authority_exists(self):
