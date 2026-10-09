@@ -282,6 +282,7 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
             self.assertIn("trap", block)
             self.assertIn("RUNNER_TEMP", block)
             self.assertIn("requirements-dbt.txt", block)
+            self.assertIn("requirements-capture.txt", block)
         accepted = _job_block(text, "publish-accepted")
         for required in ("publication-worker", "--route-authorized", "--expected-input-digest",
                          "--expected-provenance-digest", "validate-driver", "trap"):
@@ -347,6 +348,25 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         for scenario in ("accepted", "repeat", "rejected"):
             self.assertIn('2> "$REPLAY_ROOT/command.stderr"',
                           doc["jobs"]["prepare-" + scenario]["steps"][-1]["run"])
+
+    def test_audit_refuses_missing_checkpoint_failed_job_and_unverified_cleanup(self):
+        import subprocess
+        import sys
+        _, doc = self._workflow()
+        script = doc["jobs"]["audit-safe-evidence"]["steps"][-1]["run"]
+        cases = ({}, {"prepare-accepted": {"result": "failure", "outputs": {}}},
+                 {"prepare-accepted": {"result": "success", "outputs":
+                    {"cleanup_verified": "false", "driver_json": "{}"}}})
+        for case in cases:
+            with self.subTest(case_number=cases.index(case)), tempfile.TemporaryDirectory() as directory:
+                summary = Path(directory) / "summary"
+                result = subprocess.run(["bash", "-e", "-c", script], cwd=REPO_ROOT,
+                    env=dict(os.environ, REPLAY_NEEDS=json.dumps(case), GITHUB_STEP_SUMMARY=str(summary),
+                        PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]),
+                    capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, b"")
+                self.assertFalse(summary.exists())
 
 
 class WorkflowScheduleAndCalendarGateTests(unittest.TestCase):
