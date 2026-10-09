@@ -20,9 +20,15 @@ def setUpModule():
     # Verification explicitly removes workstation adapters; it never uses them.
     _TEST_ENVIRONMENT = patch.dict(os.environ)
     _TEST_ENVIRONMENT.start()
-    os.environ.pop("SSH_AUTH_SOCK", None)
-    os.environ.pop("GIT_ASKPASS", None)
+    for name in tuple(os.environ):
+        if name.startswith(("CALICO_B2_", "B2_", "AWS_", "AZURE_", "GOOGLE_APPLICATION_")) or name in {
+            "GH_TOKEN", "GITHUB_TOKEN", "SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_ASKPASS",
+            "SSH_ASKPASS", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR", "GIT_WORK_TREE",
+            "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE",
+            "GIT_TEMPLATE_DIR", "GIT_EXEC_PATH"}:
+            os.environ.pop(name, None)
     os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    os.environ["TMPDIR"] = str(Path(tempfile.gettempdir()).resolve())
 
 
 def tearDownModule():
@@ -49,6 +55,24 @@ def _checkpoint(name):
     return _CHECKPOINTS[name]
 
 
+def _live_boundary_fixture():
+    """Synthetic contract inputs only; these are not live observations."""
+    from calico_publish.allowlist import load_allowlist
+    product = Path(__file__).resolve().parents[1]
+    names = sorted(entry.export_name for entry in load_allowlist(product / "contracts/publication-exports-v3.json").exports)
+    return {"published_data_commit": "b" * 40, "published_data_tree": "c" * 40,
+        "archive_inventory_status": "not_observed_by_replay", "archive_inventory_sha256": None,
+        "protected_refs": [{"ref": "refs/heads/main", "sha": "a" * 40},
+            {"ref": "refs/heads/published-data", "sha": "b" * 40},
+            {"ref": "refs/heads/release", "sha": "d" * 40},
+            {"ref": "refs/tags/v1", "sha": "e" * 40}],
+        "published_manifest_sha256": "f" * 64,
+        "exports": [{"export_name": name, "sha256": "a" * 64, "row_count": index + 1}
+                    for index, name in enumerate(names)],
+        "controls": [{"file_name": "authorization-probe-status.json", "sha256": "b" * 64},
+            {"file_name": "capture-status.json", "sha256": "c" * 64}]}
+
+
 def _api_fixture():
     from tools import hosted_replay as replay
     run_tuple = _run_tuple()
@@ -66,11 +90,11 @@ def _api_fixture():
     outputs.update({"route-" + scenario: json.dumps({"should_publish": scenario == "accepted"}) for scenario in replay._ROUTES})
     outputs["audit-safe-evidence"] = json.dumps({"cleanup_verified": True})
     logs = {replay._job_key(row["name"]): b"Fixture job completed\n" for row in rows if row["conclusion"] != "skipped"}
-    boundary = {"published_data_commit": "b" * 40, "published_data_tree": "c" * 40, "archive_inventory_sha256": "d" * 64}
+    boundary = _live_boundary_fixture()
     schema = json.loads((Path(replay.__file__).resolve().parents[1] / "contracts/hosted-replay-envelope-v1.schema.json").read_text())
     historical = {key: value["const"] for key, value in schema["properties"]["historical_real_republish"]["properties"].items()}
     return dict(run=run, jobs={"total_count": len(rows), "jobs": rows}, artifacts={"total_count": 0, "artifacts": []},
-                raw_logs=logs, safe_job_outputs=outputs, live_before=boundary, live_after=dict(boundary),
+                raw_logs=logs, safe_job_outputs=outputs, live_before=boundary, live_after=copy.deepcopy(boundary),
                 historical_real_republish=historical)
 
 
@@ -509,6 +533,142 @@ class HostedReplayTransactionFailureTests(unittest.TestCase):
         self.assertEqual(self.tip(), calls[-1])
         tree = replay._git(self.workspace.repo, "rev-parse", self.tip() + "^{tree}")
         self.assertEqual(tree, self.baseline.tree)
+
+
+class HostedReplayLiveBoundaryTests(unittest.TestCase):
+    def test_complete_sorted_safe_measurements_are_accepted_without_archive_claim(self):
+        from tools import hosted_replay as replay
+        boundary = _live_boundary_fixture()
+        self.assertEqual(replay.validate_live_boundary(boundary), boundary)
+        replay.validate_live_boundaries(boundary, copy.deepcopy(boundary))
+        self.assertEqual(len(boundary["exports"]), 12)
+        self.assertEqual(len(boundary["controls"]), 2)
+        self.assertIsNone(boundary["archive_inventory_sha256"])
+
+    def test_each_required_measurement_is_closed_typed_and_nonnull_except_unobserved_archive(self):
+        from tools import hosted_replay as replay
+        original = _live_boundary_fixture()
+        for key in original:
+            with self.subTest(field=key, mutation="missing"):
+                changed = copy.deepcopy(original)
+                changed.pop(key)
+                with self.assertRaises(replay.ReplayError):
+                    replay.validate_live_boundary(changed)
+            if key != "archive_inventory_sha256":
+                changed = copy.deepcopy(original)
+                changed[key] = None
+                with self.subTest(field=key, mutation="null"), self.assertRaises(replay.ReplayError):
+                    replay.validate_live_boundary(changed)
+        for patch_values in ({"extra": "unapproved"}, {"archive_inventory_sha256": "d" * 64},
+                             {"archive_inventory_status": "measured"}):
+            with self.assertRaises(replay.ReplayError):
+                replay.validate_live_boundary({**original, **patch_values})
+        for key in ("published_data_commit", "published_data_tree", "published_manifest_sha256"):
+            for value in (False, 1, "", "unapproved", "A" * len(original[key]), "0" * (len(original[key]) - 1)):
+                with self.subTest(field=key, mutation="malformed"), self.assertRaises(replay.ReplayError):
+                    replay.validate_live_boundary({**original, key: value})
+
+    def test_refs_are_complete_unique_sorted_safe_and_match_independent_publication_commit(self):
+        from tools import hosted_replay as replay
+        original = _live_boundary_fixture()
+        for ref in ("refs/heads/main", "refs/heads/published-data"):
+            changed = copy.deepcopy(original)
+            changed["protected_refs"] = [row for row in changed["protected_refs"] if row["ref"] != ref]
+            with self.assertRaises(replay.ReplayError):
+                replay.validate_live_boundary(changed)
+        for ref in ("main", "refs/remotes/origin/main", "refs/heads/../main", "refs/heads//main",
+                    "refs/heads/.hidden", "refs/heads/main.lock", "refs/tags/v1.", "refs/tags/v1|unsafe",
+                    "refs/heads/main\n", "refs/heads/main@{1}", "refs/heads/main/", "refs/heads/\\main"):
+            changed = copy.deepcopy(original)
+            changed["protected_refs"][-1]["ref"] = ref
+            changed["protected_refs"].sort(key=lambda row: row["ref"])
+            with self.subTest(mutation="unsafe_ref"), self.assertRaises(replay.ReplayError):
+                replay.validate_live_boundary(changed)
+        changed = copy.deepcopy(original)
+        changed["protected_refs"][-1]["ref"] = "refs/tags/" + replay.derive_replay_canary(
+            _run_tuple(), "prepare-accepted", "private_path")
+        with self.assertRaises(replay.ReplayError):
+            replay.validate_live_boundary(changed)
+        mutations = [lambda d: d["protected_refs"].reverse(),
+            lambda d: d["protected_refs"].append(copy.deepcopy(d["protected_refs"][-1])),
+            lambda d: d["protected_refs"][0].update(sha="A" * 40),
+            lambda d: d["protected_refs"][0].update(sha=True),
+            lambda d: d["protected_refs"][0].update(extra="unapproved"),
+            lambda d: d["protected_refs"][0].pop("sha"),
+            lambda d: d.update(published_data_commit="0" * 40)]
+        for mutate in mutations:
+            changed = copy.deepcopy(original)
+            mutate(changed)
+            with self.assertRaises(replay.ReplayError):
+                replay.validate_live_boundary(changed)
+
+    def test_exports_and_controls_reject_incomplete_duplicate_unapproved_and_malformed_rows(self):
+        from tools import hosted_replay as replay
+        original = _live_boundary_fixture()
+        for field, name_key in (("exports", "export_name"), ("controls", "file_name")):
+            mutations = [lambda rows: rows.pop(), lambda rows: rows.append(copy.deepcopy(rows[0])),
+                lambda rows: rows.__setitem__(1, copy.deepcopy(rows[0])), lambda rows: rows.reverse(),
+                lambda rows: rows[0].update({name_key: "unapproved"}),
+                lambda rows: rows[0].update(sha256="A" * 64), lambda rows: rows[0].update(sha256=None),
+                lambda rows: rows[0].update(sha256="a" * 63), lambda rows: rows[0].update(extra="unapproved"),
+                lambda rows: rows[0].pop("sha256"), lambda rows: rows.__setitem__(0, None)]
+            if field == "exports":
+                mutations.extend(lambda rows, value=value: rows[0].update(row_count=value)
+                                 for value in (True, -1, 1.5, "1", None))
+            for mutate in mutations:
+                changed = copy.deepcopy(original)
+                mutate(changed[field])
+                with self.subTest(field=field), self.assertRaises(replay.ReplayError):
+                    replay.validate_live_boundary(changed)
+
+    def test_drift_in_every_commit_tree_ref_manifest_export_and_control_is_rejected(self):
+        from tools import hosted_replay as replay
+        before = _live_boundary_fixture()
+        after_values = []
+        for field, value in (("published_data_tree", "0" * 40), ("published_manifest_sha256", "0" * 64)):
+            changed = copy.deepcopy(before)
+            changed[field] = value
+            after_values.append(changed)
+        for index in range(len(before["protected_refs"])):
+            changed = copy.deepcopy(before)
+            changed["protected_refs"][index]["sha"] = "0" * 40
+            if changed["protected_refs"][index]["ref"] == "refs/heads/published-data":
+                changed["published_data_commit"] = "0" * 40
+            after_values.append(changed)
+        for field in ("exports", "controls"):
+            for index in range(len(before[field])):
+                for value_key in (["sha256", "row_count"] if field == "exports" else ["sha256"]):
+                    changed = copy.deepcopy(before)
+                    changed[field][index][value_key] = "0" * 64 if value_key == "sha256" else 100
+                    after_values.append(changed)
+        removed = copy.deepcopy(before)
+        removed["protected_refs"].pop()
+        added = copy.deepcopy(before)
+        added["protected_refs"].append({"ref": "refs/tags/v2", "sha": "f" * 40})
+        after_values.extend([removed, added])
+        for changed in after_values:
+            replay.validate_live_boundary(changed)
+            with self.assertRaises(replay.ReplayError) as caught:
+                replay.validate_live_boundaries(before, changed)
+            self.assertEqual(caught.exception.category, "replay.live_boundary_changed")
+
+    def test_collection_checks_boundary_before_inspecting_api_outputs(self):
+        from tools import hosted_replay as replay
+        before = _live_boundary_fixture()
+        after = copy.deepcopy(before)
+        after["controls"][1]["sha256"] = "0" * 64
+        with patch.object(replay, "_run_identity") as api:
+            with self.assertRaises(replay.ReplayError):
+                replay.collect_hosted_envelope(run=None, jobs=None, artifacts=None, raw_logs=None,
+                    safe_job_outputs=None, live_before=before, live_after=after, historical_real_republish=None)
+            api.assert_not_called()
+
+    def test_boundary_json_duplicate_members_fail_before_projection(self):
+        from tools import hosted_replay as replay
+        raw = json.dumps(_live_boundary_fixture())
+        raw = raw.replace('"published_manifest_sha256":', '"published_manifest_sha256":"' + "a" * 64 + '","published_manifest_sha256":')
+        with self.assertRaises(replay.ReplayError):
+            replay.validate_live_boundary(replay._decode(raw))
 
 
 class HostedEnvelopeJobsApiTests(unittest.TestCase):

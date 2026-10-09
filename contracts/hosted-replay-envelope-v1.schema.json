@@ -632,7 +632,12 @@
       "required": [
         "published_data_commit",
         "published_data_tree",
-        "archive_inventory_sha256"
+        "archive_inventory_status",
+        "archive_inventory_sha256",
+        "protected_refs",
+        "published_manifest_sha256",
+        "exports",
+        "controls"
       ],
       "properties": {
         "published_data_commit": {
@@ -643,9 +648,98 @@
           "type": "string",
           "pattern": "^[a-f0-9]{40}$"
         },
+        "archive_inventory_status": {
+          "const": "not_observed_by_replay",
+          "description": "The isolated replay does not traverse or measure the real private archive."
+        },
         "archive_inventory_sha256": {
+          "type": "null",
+          "const": null,
+          "description": "No archive inventory digest is asserted. Never substitute a Git-ref, manifest or export digest."
+        },
+        "protected_refs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "sha"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^refs/(heads|tags)/[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+              },
+              "sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          },
+          "description": "Complete observed protected branch/tag inventory including refs/heads/main and refs/heads/published-data, sorted uniquely by ref. SHA identifies the observed Git ref target, not manifest bytes."
+        },
+        "published_manifest_sha256": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of exact raw content bytes at manifest/published-manifest-v1.json on the independently recorded published-data commit."
+        },
+        "exports": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "export_name",
+              "sha256",
+              "row_count"
+            ],
+            "properties": {
+              "export_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "description": "Exactly the existing publication-exports-v3 allowlist, sorted uniquely by export_name; SHA-256 of raw CSV bytes and measured data-record row_count, with no row values."
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file_name",
+              "sha256"
+            ],
+            "properties": {
+              "file_name": {
+                "enum": [
+                  "authorization-probe-status.json",
+                  "capture-status.json"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "description": "Independent raw-content SHA-256 for each of the two fixed publication control files, sorted uniquely by file_name."
         }
       }
     },
@@ -655,7 +749,12 @@
       "required": [
         "published_data_commit",
         "published_data_tree",
-        "archive_inventory_sha256"
+        "archive_inventory_status",
+        "archive_inventory_sha256",
+        "protected_refs",
+        "published_manifest_sha256",
+        "exports",
+        "controls"
       ],
       "properties": {
         "published_data_commit": {
@@ -666,9 +765,98 @@
           "type": "string",
           "pattern": "^[a-f0-9]{40}$"
         },
+        "archive_inventory_status": {
+          "const": "not_observed_by_replay",
+          "description": "The isolated replay does not traverse or measure the real private archive."
+        },
         "archive_inventory_sha256": {
+          "type": "null",
+          "const": null,
+          "description": "No archive inventory digest is asserted. Never substitute a Git-ref, manifest or export digest."
+        },
+        "protected_refs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "sha"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^refs/(heads|tags)/[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$"
+              },
+              "sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          },
+          "description": "Complete observed protected branch/tag inventory including refs/heads/main and refs/heads/published-data, sorted uniquely by ref. SHA identifies the observed Git ref target, not manifest bytes."
+        },
+        "published_manifest_sha256": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of exact raw content bytes at manifest/published-manifest-v1.json on the independently recorded published-data commit."
+        },
+        "exports": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "export_name",
+              "sha256",
+              "row_count"
+            ],
+            "properties": {
+              "export_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "description": "Exactly the existing publication-exports-v3 allowlist, sorted uniquely by export_name; SHA-256 of raw CSV bytes and measured data-record row_count, with no row values."
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file_name",
+              "sha256"
+            ],
+            "properties": {
+              "file_name": {
+                "enum": [
+                  "authorization-probe-status.json",
+                  "capture-status.json"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "description": "Independent raw-content SHA-256 for each of the two fixed publication control files, sorted uniquely by file_name."
         }
       }
     },

@@ -17,7 +17,7 @@ import stat
 import subprocess
 import tempfile
 
-from tools.hosted_replay import HostedEnvelope, ReplayError, validate_envelope
+from tools.hosted_replay import HostedEnvelope, ReplayError, validate_envelope, validate_live_boundary
 
 SCHEMA_VERSION = "hosted-replay-public-v1"
 JSON_PATH = "docs/evidence/gate-e/hosted-replay-v1.json"
@@ -79,7 +79,7 @@ def _validate(value, schema):
     if set(schema) - supported:
         _fail()
     kind = schema.get("type")
-    types = {"object": dict, "array": list, "string": str, "integer": int, "boolean": bool}
+    types = {"object": dict, "array": list, "string": str, "integer": int, "boolean": bool, "null": type(None)}
     if kind and (kind not in types or type(value) is not types[kind]):
         _fail()
     if "const" in schema and (value != schema["const"] or type(value) is not type(schema["const"])):
@@ -135,6 +135,10 @@ def decode_hosted_replay_envelope(document: object) -> HostedEnvelope:
 
 
 def _semantics(document):
+    try:
+        validate_live_boundary(document["live_boundary"])
+    except ReplayError:
+        _fail("hosted_replay.invalid_live_boundary")
     run = document["run"]
     prefix = "https://github.com/" + run["repository"]
     if (run["run_url"] != f'{prefix}/actions/runs/{run["run_id"]}/attempts/{run["run_attempt"]}'
@@ -284,7 +288,19 @@ def render_hosted_replay_markdown(document: object) -> str:
     parts.extend(f'| {row["job_name"]} | {row["audit"]["byte_length"]} | {row["audit"]["sha256"]} | {row["audit"]["canary_hits"]} |'
                  for row in public["log_audit_commitments"])
     parts.extend(["", "## Preserved boundaries", "", "Live boundary equality: `true`; artifacts: `0`; owned-root cleanup: `true`; result: `pass`."])
-    parts.extend(f'{key}: `{value}`.' for key, value in public["live_boundary"].items())
+    boundary = public["live_boundary"]
+    parts.extend(["", f'Published-data commit: `{boundary["published_data_commit"]}`.',
+        f'Published-data tree: `{boundary["published_data_tree"]}`.',
+        f'Published manifest raw-content SHA-256: `{boundary["published_manifest_sha256"]}`.',
+        "Private archive inventory: not observed by this replay; no archive digest is asserted. "
+        "The separate historical restore/republish proof below retains its own scope.", "",
+        "| Protected ref | Observed SHA |", "| --- | --- |"])
+    parts.extend(f'| {row["ref"]} | {row["sha"]} |' for row in boundary["protected_refs"])
+    parts.extend(["", "Live published export hashes cover raw file bytes; counts cover data records.", "",
+        "| Live export | Rows | Raw-content SHA-256 |", "| --- | --- | --- |"])
+    parts.extend(f'| {row["export_name"]} | {row["row_count"]} | {row["sha256"]} |' for row in boundary["exports"])
+    parts.extend(["", "| Independent live control | Raw-content SHA-256 |", "| --- | --- |"])
+    parts.extend(f'| {row["file_name"]} | {row["sha256"]} |' for row in boundary["controls"])
     parts.extend(["", "## Separate historical real restore/republish", "",
         "This immutable historical real proof is independent of the fixture-hosted replay above.",
         f'Run: [historical observation]({prefix}/actions/runs/{historical["run_id"]}); head: [historical commit]({prefix}/commit/{historical["head_sha"]}).',

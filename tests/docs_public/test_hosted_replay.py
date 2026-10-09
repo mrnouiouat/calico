@@ -28,6 +28,7 @@ def setUpModule():
             "GIT_TEMPLATE_DIR", "GIT_EXEC_PATH"}:
             os.environ.pop(name, None)
     os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    os.environ["TMPDIR"] = str(Path(tempfile.gettempdir()).resolve())
 
 
 def tearDownModule():
@@ -45,7 +46,8 @@ def _envelope_bytes():
         commit = inputs["historical_real_republish"]["published_data_commit"]
         tree = subprocess.check_output(["git", "rev-parse", commit + "^{tree}"], cwd=ROOT, text=True).strip()
         inputs["live_before"] = {**inputs["live_before"], "published_data_commit": commit, "published_data_tree": tree}
-        inputs["live_after"] = dict(inputs["live_before"])
+        next(row for row in inputs["live_before"]["protected_refs"] if row["ref"] == "refs/heads/published-data")["sha"] = commit
+        inputs["live_after"] = copy.deepcopy(inputs["live_before"])
         return driver.collect_hosted_envelope(**inputs).to_json()
 
 
@@ -101,6 +103,8 @@ class HostedReplayProjectionContractTests(unittest.TestCase):
                             target = target[part]
                         if mutation == "missing":
                             target.pop(key)
+                        elif contract["properties"][key].get("type") == "null":
+                            target[key] = "unapproved"
                         else:
                             target[key] = None
                         with self.assertRaises(module.HostedReplayPublicError):
@@ -185,6 +189,69 @@ class HostedReplayProjectionContractTests(unittest.TestCase):
 
 
 class HostedReplayEvidenceClassTests(unittest.TestCase):
+    def test_complete_live_boundary_survives_exact_projection_and_structured_rendering(self):
+        module = public_module()
+        source = envelope().to_dict()
+        projected = module.project_hosted_replay_public(source)
+        public = module.decode_hosted_replay_public(projected.to_json()).to_dict()
+        boundary = public["live_boundary"]
+        self.assertEqual(boundary, source["live_before"])
+        self.assertEqual(boundary, source["live_after"])
+        rendered = module.render_hosted_replay_markdown(public)
+        self.assertIn(f'Published-data commit: `{boundary["published_data_commit"]}`.', rendered)
+        self.assertIn(f'Published-data tree: `{boundary["published_data_tree"]}`.', rendered)
+        self.assertIn(f'Published manifest raw-content SHA-256: `{boundary["published_manifest_sha256"]}`.', rendered)
+        self.assertIn("Private archive inventory: not observed by this replay; no archive digest is asserted.", rendered)
+        for row in boundary["protected_refs"]:
+            self.assertIn(f'| {row["ref"]} | {row["sha"]} |', rendered)
+        for row in boundary["exports"]:
+            self.assertIn(f'| {row["export_name"]} | {row["row_count"]} | {row["sha256"]} |', rendered)
+        for row in boundary["controls"]:
+            self.assertIn(f'| {row["file_name"]} | {row["sha256"]} |', rendered)
+        self.assertNotIn("[{'", rendered)
+        self.assertNotIn("{'", rendered)
+        source["live_before"]["protected_refs"][0]["sha"] = "0" * 40
+        self.assertEqual(module.decode_hosted_replay_public(projected).to_dict(), public)
+
+    def test_public_decoder_rejects_incomplete_duplicate_reordered_and_inconsistent_live_inventory(self):
+        module = public_module()
+        original = module.project_hosted_replay_public(envelope()).to_dict()
+        mutations = [lambda d: d["protected_refs"].pop(0),
+            lambda d: d["protected_refs"].reverse(),
+            lambda d: d["protected_refs"].append(copy.deepcopy(d["protected_refs"][-1])),
+            lambda d: d["protected_refs"][0].update(ref="refs/heads/../main"),
+            lambda d: d.update(published_data_commit="0" * 40),
+            lambda d: d["exports"].reverse(), lambda d: d["exports"].pop(),
+            lambda d: d["exports"].__setitem__(1, copy.deepcopy(d["exports"][0])),
+            lambda d: d["exports"][0].update(export_name="unapproved"),
+            lambda d: d["controls"].reverse(), lambda d: d["controls"].pop(),
+            lambda d: d["controls"].__setitem__(1, copy.deepcopy(d["controls"][0])),
+            lambda d: d.update(archive_inventory_sha256="0" * 64)]
+        for mutate in mutations:
+            changed = copy.deepcopy(original)
+            mutate(changed["live_boundary"])
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.decode_hosted_replay_public(changed)
+
+    def test_manifest_export_and_control_drift_cannot_be_projected(self):
+        module = public_module()
+        original = envelope().to_dict()
+        candidates = []
+        manifest = copy.deepcopy(original)
+        manifest["live_after"]["published_manifest_sha256"] = "0" * 64
+        candidates.append(manifest)
+        for field in ("protected_refs", "exports", "controls"):
+            for index in range(len(original["live_after"][field])):
+                for key in (["sha256", "row_count"] if field == "exports" else ["sha" if field == "protected_refs" else "sha256"]):
+                    changed = copy.deepcopy(original)
+                    changed["live_after"][field][index][key] = 100 if key == "row_count" else "0" * (40 if key == "sha" else 64)
+                    if field == "protected_refs" and changed["live_after"][field][index]["ref"] == "refs/heads/published-data":
+                        changed["live_after"]["published_data_commit"] = "0" * 40
+                    candidates.append(changed)
+        for candidate in candidates:
+            with self.assertRaises(module.HostedReplayPublicError):
+                module.project_hosted_replay_public(candidate)
+
     def test_rendering_is_deterministic_and_separates_four_evidence_classes(self):
         module = public_module()
         public = module.project_hosted_replay_public(envelope())
@@ -289,8 +356,8 @@ class HostedReplayGeneratedPairTests(unittest.TestCase):
             elif field == "audit":
                 changed["raw_log_audits"][0]["audit"]["sha256"] = "0" * 64
             else:
-                changed["live_before"]["archive_inventory_sha256"] = "0" * 64
-                changed["live_after"]["archive_inventory_sha256"] = "0" * 64
+                changed["live_before"]["published_manifest_sha256"] = "0" * 64
+                changed["live_after"]["published_manifest_sha256"] = "0" * 64
             self.source.write_text(json.dumps(changed))
             with self.assertRaises(module.HostedReplayPublicError):
                 module.check_hosted_replay_against_envelope(self.source, self.json_path, self.markdown_path, root=ROOT)

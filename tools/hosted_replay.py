@@ -771,8 +771,7 @@ def validate_envelope(document):
         document = _decode(document)
     schema = _decode((_PRODUCT / "contracts/hosted-replay-envelope-v1.schema.json").read_bytes())
     _schema(document, schema)
-    if document["live_before"] != document["live_after"]:
-        _fail("replay.live_boundary_changed")
+    validate_live_boundaries(document["live_before"], document["live_after"])
     jobs = document["jobs"]
     if [row["job_name"] for row in jobs] != sorted(_JOBS) or len({row["job_id"] for row in jobs}) != len(jobs):
         _fail()
@@ -810,8 +809,55 @@ def validate_envelope(document):
     return document
 
 
+def validate_live_boundary(document):
+    """Require complete, canonical safe measurements of the live Git boundary.
+
+    Hashes describe raw manifest/export/control bytes, not JSON reserialization.
+    The isolated replay does not measure the private archive inventory; its
+    digest remains explicitly unobserved rather than borrowing a Git digest.
+    Object key order is immaterial in the envelope, but inventories are sorted.
+    """
+    schema = _decode((_PRODUCT / "contracts/hosted-replay-envelope-v1.schema.json").read_bytes())
+    _schema(document, schema["properties"]["live_before"])
+    refs = document["protected_refs"]
+    names = [row["ref"] for row in refs]
+    if names != sorted(set(names)) or not {"refs/heads/main", "refs/heads/published-data"} <= set(names):
+        _fail("replay.invalid_live_boundary")
+    for name in names:
+        # This positive ASCII subset is narrower than git-check-ref-format.
+        # Reject its remaining ambiguous/path-like component forms explicitly.
+        parts = name.split("/")[2:]
+        if (".." in name or "//" in name or any(not part or part.startswith(".") or
+                part.endswith((".", ".lock")) for part in parts)):
+            _fail("replay.invalid_live_boundary")
+        from tools.privacy_scan.scanner import scan_text
+        if "CALICO_REPLAY_CANARY_" in name or scan_text("protected_ref", name):
+            _fail("replay.invalid_live_boundary")
+    published_ref = next(row for row in refs if row["ref"] == "refs/heads/published-data")
+    if published_ref["sha"] != document["published_data_commit"]:
+        _fail("replay.invalid_live_boundary")
+    names = sorted(entry.export_name for entry in load_allowlist(
+        _PRODUCT / "contracts/publication-exports-v3.json").exports)
+    if [row["export_name"] for row in document["exports"]] != names:
+        _fail("replay.invalid_live_boundary")
+    if [row["file_name"] for row in document["controls"]] != sorted(CARRIED_FORWARD_PATHS):
+        _fail("replay.invalid_live_boundary")
+    return document
+
+
+def validate_live_boundaries(before, after):
+    validate_live_boundary(before)
+    validate_live_boundary(after)
+    for key in before:
+        if before[key] != after[key]:
+            _fail("replay.live_boundary_changed")
+
+
 def collect_hosted_envelope(*, run, jobs, artifacts, raw_logs, safe_job_outputs,
                             live_before, live_after, historical_real_republish):
+    # Reject incomplete measurements or drift before inspecting API outputs,
+    # deriving byte commitments or allowing any downstream public projection.
+    validate_live_boundaries(live_before, live_after)
     identity = _run_identity(run)
     rows = _api_list(jobs, "jobs")
     job_records, job_ids = {}, set()
@@ -948,6 +994,7 @@ def main(argv=None):
             keys = {"run", "jobs", "artifacts", "safe_job_outputs", "live_before", "live_after", "historical_real_republish"}
             if type(bundle) is not dict or set(bundle) != keys:
                 _fail()
+            validate_live_boundaries(bundle["live_before"], bundle["live_after"])
             directory = _runner_parent(args.logs_dir)
             executed = [name for name in _JOBS if not name.startswith("publish-") or name == "publish-accepted"]
             logs = {}
