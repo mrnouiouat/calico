@@ -360,6 +360,114 @@ class HostedReplayPrivacyTests(unittest.TestCase):
         self.assertTrue(token not in _checkpoint("published").to_json())
 
 
+class HostedReplayCredentialDiagnosticTests(unittest.TestCase):
+    def test_every_rejected_environment_adapter_keeps_a_closed_reason(self):
+        from tools import hosted_replay as replay
+        groups = {
+            "b2_environment": ("CALICO_B2_KEY", "B2_KEY"),
+            "aws_environment": ("AWS_ACCESS_KEY_ID",),
+            "azure_environment": ("AZURE_CLIENT_SECRET",),
+            "google_environment": ("GOOGLE_APPLICATION_CREDENTIALS",),
+            "azure_user_agent": ("AZURE_HTTP_USER_AGENT",),
+            "azure_extension_directory": ("AZURE_EXTENSION_DIR",),
+            "token_environment": ("GH_TOKEN", "GITHUB_TOKEN"),
+            "ssh_environment": ("SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_ASKPASS", "SSH_ASKPASS"),
+            "git_override": ("GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR", "GIT_WORK_TREE",
+                             "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE"),
+            "git_config_path": ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"),
+            "git_template_or_exec": ("GIT_TEMPLATE_DIR", "GIT_EXEC_PATH"),
+        }
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception")
+        for reason, keys in groups.items():
+            for key in keys:
+                with patch.dict(os.environ, {key: token}, clear=True), \
+                        patch.object(replay.subprocess, "run") as command, \
+                        patch.object(replay.tempfile, "TemporaryDirectory") as owned, \
+                        self.assertRaises(replay.ReplayError) as caught:
+                    with replay.replay_workspace(Path(tempfile.gettempdir()).resolve()):
+                        self.fail("rejected adapter reached fixture writes")
+                command.assert_not_called()
+                owned.assert_not_called()
+                self.assertEqual(caught.exception.category, "replay.credentials_rejected")
+                self.assertEqual(caught.exception.credential_reason, "replay.credential_reason." + reason)
+
+    def test_malicious_environment_names_and_values_never_cross_the_cli(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception")
+        for prefix, reason in (("AWS_", "aws_environment"), ("AZURE_", "azure_environment"),
+                              ("B2_", "b2_environment"), ("CALICO_B2_", "b2_environment"),
+                              ("GOOGLE_APPLICATION_", "google_environment")):
+            errors, output = io.StringIO(), io.StringIO()
+            with patch.dict(os.environ, {prefix + token: token + "\n" + token}, clear=True), \
+                    redirect_stderr(errors), redirect_stdout(output):
+                result = replay.main(HostedReplayCliTests()._prepare_arguments())
+            expected = "replay.credentials_rejected\nreplay.credential_reason." + reason + "\n"
+            self.assertTrue(result == 1 and output.getvalue() == "" and errors.getvalue() == expected,
+                            "environment diagnostics must contain only fixed enums")
+
+    def test_empty_adapters_and_null_git_paths_still_pass(self):
+        from tools import hosted_replay as replay
+        with patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "", "AZURE_HTTP_USER_AGENT": "",
+                "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}, clear=True), \
+                patch.object(replay.subprocess, "run", return_value=subprocess.CompletedProcess([], 1)):
+            replay._credentials()
+
+    def test_git_config_matches_and_read_errors_have_distinct_closed_locations(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception").encode()
+        for scope in ("inherited", "repository", "bare"):
+            for code in (0, 128):
+                with patch.object(replay.subprocess, "run", return_value=subprocess.CompletedProcess(
+                        [], code, stdout=token, stderr=token)), self.assertRaises(replay.ReplayError) as caught:
+                    replay._credential_config_check(Path(tempfile.gettempdir()).resolve(), scope,
+                                                    local=scope != "inherited")
+                self.assertEqual(caught.exception.category, "replay.credentials_rejected")
+                self.assertEqual(caught.exception.credential_reason, "replay.credential_reason." + scope +
+                                 "_config" + ("_unreadable" if code else ""))
+
+    def test_cli_and_reporter_forward_exact_closed_reason_pairs_only(self):
+        from tools import hosted_replay as replay
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / "failure.stderr"
+            for reason in replay._CREDENTIAL_REASONS:
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(replay, "prepare_hosted_checkpoint", side_effect=replay.ReplayError(
+                        "replay.credentials_rejected", reason)), redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(HostedReplayCliTests()._prepare_arguments())
+                expected = "replay.credentials_rejected\n" + reason + "\n"
+                self.assertEqual((result, output.getvalue(), errors.getvalue()), (1, "", expected))
+                path.write_text(expected, encoding="ascii")
+                output, errors = io.StringIO(), io.StringIO()
+                with redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(["report-failure", "--input", str(path)])
+                self.assertEqual((result, output.getvalue(), errors.getvalue()), (0, "", expected))
+
+    def test_unknown_or_malformed_reason_is_never_forwarded(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception")
+        for category, expected in (("replay.credentials_rejected", "replay.credentials_rejected\n"),
+                                   ("replay.failed", "replay.failed\n")):
+            for reason in (token, [token], None, "replay.credential_reason.unknown"):
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(replay, "prepare_hosted_checkpoint", side_effect=replay.ReplayError(
+                        category, reason)), redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(HostedReplayCliTests()._prepare_arguments())
+                self.assertTrue(result == 1 and output.getvalue() == "" and errors.getvalue() == expected,
+                                "unknown diagnostic reasons must remain private")
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / "failure.stderr"
+            for raw in ("replay.credentials_rejected\n" + token + "\n", "replay.failed\n" +
+                        next(iter(replay._CREDENTIAL_REASONS)) + "\n", "replay.credentials_rejected\n" +
+                        next(iter(replay._CREDENTIAL_REASONS)) + "\n" + token,
+                        "replay.credentials_rejected\n" + token * 100):
+                path.write_text(raw, encoding="ascii")
+                output, errors = io.StringIO(), io.StringIO()
+                with redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(["report-failure", "--input", str(path)])
+                self.assertTrue(result == 0 and output.getvalue() == "" and errors.getvalue() == "replay.failed\n",
+                                "malformed diagnostic pairs must fail closed")
+
+
 class HostedReplayCliTests(unittest.TestCase):
     def _prepare_arguments(self):
         return ["prepare-checkpoint", "--runner-temp", str(Path(tempfile.gettempdir()).resolve()),
@@ -423,7 +531,7 @@ class HostedReplayCliTests(unittest.TestCase):
                     result = replay.main(self._prepare_arguments())
                 owned.assert_not_called()
                 self.assertEqual((result, output.getvalue(), errors.getvalue()),
-                                 (1, "", "replay.credentials_rejected\n"))
+                                 (1, "", "replay.credentials_rejected\nreplay.credential_reason.inherited_config\n"))
                 with patch.dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull):
                     replay._credentials()
                     # Explicit Git scope never neutralizes a token or SSH adapter.

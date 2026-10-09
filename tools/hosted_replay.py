@@ -69,6 +69,17 @@ _FAILURE_CATEGORIES = frozenset({
     "replay.publication_mutated", "replay.reconstruction_mismatch",
     "replay.route_not_authorized",
 })
+_CREDENTIAL_REASONS = frozenset({
+    "replay.credential_reason.b2_environment", "replay.credential_reason.aws_environment",
+    "replay.credential_reason.azure_environment", "replay.credential_reason.google_environment",
+    "replay.credential_reason.azure_user_agent", "replay.credential_reason.azure_extension_directory",
+    "replay.credential_reason.token_environment", "replay.credential_reason.ssh_environment",
+    "replay.credential_reason.git_override", "replay.credential_reason.git_config_path",
+    "replay.credential_reason.git_template_or_exec", "replay.credential_reason.inherited_config",
+    "replay.credential_reason.inherited_config_unreadable", "replay.credential_reason.repository_config",
+    "replay.credential_reason.repository_config_unreadable", "replay.credential_reason.bare_config",
+    "replay.credential_reason.bare_config_unreadable",
+})
 
 
 def _failure_category(value):
@@ -80,21 +91,37 @@ def report_failure(path):
     """Forward one closed diagnostic before cleanup; raw stderr stays private."""
     _unlinked(path)
     with path.open("rb") as stream:
-        raw = stream.read(129)
-    category = next((value for value in _FAILURE_CATEGORIES
-                     if raw == (value + "\n").encode("ascii")), "replay.failed")
-    print(category, file=sys.stderr)
+        raw = stream.read(513)
+    allowed = {(value + "\n").encode("ascii") for value in _FAILURE_CATEGORIES}
+    allowed.update(("replay.credentials_rejected\n" + reason + "\n").encode("ascii")
+                   for reason in _CREDENTIAL_REASONS)
+    safe = raw if raw in allowed else b"replay.failed\n"
+    print(safe.decode("ascii"), end="", file=sys.stderr)
 
 
 class ReplayError(Exception):
     """Only a fixed category crosses the public boundary."""
-    def __init__(self, category):
+    def __init__(self, category, credential_reason=None):
         self.category = category
+        self.credential_reason = credential_reason
         super().__init__(category)
 
 
 def _fail(category="replay.invalid_evidence"):
     raise ReplayError(category)
+
+
+def _credential_fail(reason):
+    raise ReplayError("replay.credentials_rejected", reason)
+
+
+def _credential_config_check(repository, scope, *, local=False):
+    command = ["git", "config", *(["--local"] if local else []), "--get-regexp", _BLOCKED_GIT_CONFIG]
+    completed = subprocess.run(command, cwd=repository,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    if completed.returncode != 1:
+        suffix = "_unreadable" if completed.returncode != 0 else ""
+        _credential_fail("replay.credential_reason." + scope + "_config" + suffix)
 
 
 def _json(document):
@@ -223,21 +250,27 @@ def _credentials():
     for key, value in os.environ.items():
         if not value:
             continue
-        if (key.startswith(("CALICO_B2_", "B2_", "AWS_", "AZURE_", "GOOGLE_APPLICATION_"))
-            or key in {"GH_TOKEN", "GITHUB_TOKEN", "SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND",
-                       "GIT_ASKPASS", "SSH_ASKPASS", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS",
-                       "GIT_DIR", "GIT_WORK_TREE",
-                       "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE"}):
-            _fail("replay.credentials_rejected")
+        if key == "AZURE_HTTP_USER_AGENT":
+            _credential_fail("replay.credential_reason.azure_user_agent")
+        if key == "AZURE_EXTENSION_DIR":
+            _credential_fail("replay.credential_reason.azure_extension_directory")
+        for prefixes, reason in ((('CALICO_B2_', 'B2_'), 'b2_environment'),
+                                 (('AWS_',), 'aws_environment'), (('AZURE_',), 'azure_environment'),
+                                 (('GOOGLE_APPLICATION_',), 'google_environment')):
+            if key.startswith(prefixes):
+                _credential_fail("replay.credential_reason." + reason)
+        if key in {"GH_TOKEN", "GITHUB_TOKEN"}:
+            _credential_fail("replay.credential_reason.token_environment")
+        if key in {"SSH_AUTH_SOCK", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_ASKPASS", "SSH_ASKPASS"}:
+            _credential_fail("replay.credential_reason.ssh_environment")
+        if key in {"GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR", "GIT_WORK_TREE",
+                   "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE"}:
+            _credential_fail("replay.credential_reason.git_override")
         if key in {"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} and value != os.devnull:
-            _fail("replay.credentials_rejected")
+            _credential_fail("replay.credential_reason.git_config_path")
         if key in {"GIT_TEMPLATE_DIR", "GIT_EXEC_PATH"}:
-            _fail("replay.credentials_rejected")
-    completed = subprocess.run(["git", "config", "--get-regexp",
-        _BLOCKED_GIT_CONFIG],
-        cwd=Path(tempfile.gettempdir()).resolve(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-    if completed.returncode != 1:
-        _fail("replay.credentials_rejected")
+            _credential_fail("replay.credential_reason.git_template_or_exec")
+    _credential_config_check(Path(tempfile.gettempdir()).resolve(), "inherited")
 
 
 def _runner_parent(path):
@@ -276,11 +309,7 @@ def validate_replay_workspace(workspace):
     if workspace.repo.exists():
         if not (workspace.repo / ".git").is_dir():
             _fail("replay.isolation_rejected")
-        completed = subprocess.run(["git", "config", "--local", "--get-regexp",
-            _BLOCKED_GIT_CONFIG],
-            cwd=workspace.repo, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-        if completed.returncode != 1:
-            _fail("replay.credentials_rejected")
+        _credential_config_check(workspace.repo, "repository", local=True)
         if _git(workspace.repo, "remote", "get-url", "origin") != str(workspace.remote):
             _fail("replay.isolation_rejected")
         if _git(workspace.repo, "remote", "get-url", "--push", "origin") != str(workspace.remote):
@@ -289,10 +318,8 @@ def validate_replay_workspace(workspace):
         _fail("replay.isolation_rejected")
     for repository, git_dir in ((workspace.repo, workspace.repo / ".git"), (workspace.remote, workspace.remote)):
         if repository.exists():
-            configured = subprocess.run(["git", "config", "--local", "--get-regexp", _BLOCKED_GIT_CONFIG],
-                cwd=repository, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-            if configured.returncode != 1:
-                _fail("replay.credentials_rejected")
+            scope = "repository" if repository == workspace.repo else "bare"
+            _credential_config_check(repository, scope, local=True)
             if any(path.is_file() and not path.name.endswith(".sample") for path in (git_dir / "hooks").glob("*")):
                 _fail("replay.isolation_rejected")
 
@@ -1075,7 +1102,11 @@ def main(argv=None):
         print(result.to_json())
         return 0
     except ReplayError as error:
-        print(_failure_category(error.category), file=sys.stderr)
+        category = _failure_category(error.category)
+        print(category, file=sys.stderr)
+        reason = error.credential_reason
+        if category == "replay.credentials_rejected" and type(reason) is str and reason in _CREDENTIAL_REASONS:
+            print(reason, file=sys.stderr)
         return 1
     except (OSError, ValueError, TypeError, KeyboardInterrupt):
         print("replay.failed", file=sys.stderr)

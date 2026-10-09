@@ -318,6 +318,8 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         for name in ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"):
             cases = [(phase, detail, expected) for phase in ("command", "validation", "transport")
                 for detail, expected in (("replay.credentials_rejected\n", b"replay.credentials_rejected\n"),
+                                         ("replay.credentials_rejected\nreplay.credential_reason.azure_user_agent\n",
+                                          b"replay.credentials_rejected\nreplay.credential_reason.azure_user_agent\n"),
                                          (token + "\nsynthetic" + "-secret-message", b"replay.failed\n"))]
             for phase, detail, expected in cases:
                 with tempfile.TemporaryDirectory() as temporary:
