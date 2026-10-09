@@ -50,7 +50,7 @@ jobs:
           REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
           trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
-          python -m tools.hosted_replay prepare-checkpoint \
+          env -u AZURE_EXTENSION_DIR python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario accepted \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
@@ -124,7 +124,7 @@ jobs:
           REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
           trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
-          python -m tools.hosted_replay prepare-checkpoint \
+          env -u AZURE_EXTENSION_DIR python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario repeat \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
@@ -198,7 +198,7 @@ jobs:
           REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
           trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
-          python -m tools.hosted_replay prepare-checkpoint \
+          env -u AZURE_EXTENSION_DIR python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario rejected \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
@@ -366,7 +366,7 @@ jobs:
           REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
           trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
-          python -m tools.hosted_replay publication-worker \
+          env -u AZURE_EXTENSION_DIR python -m tools.hosted_replay publication-worker \
             --runner-temp "$REPLAY_ROOT" --scenario accepted \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \

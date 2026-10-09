@@ -331,7 +331,10 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         import subprocess
         import sys
         _, doc = self._workflow()
-        script = "from tools.hosted_replay import _credentials; _credentials()"
+        script = ("import sys\nfrom tools.hosted_replay import _credentials, ReplayError\n"
+                  "try:\n    _credentials()\nexcept ReplayError as error:\n"
+                  "    print(error.category, file=sys.stderr)\n"
+                  "    print(error.credential_reason, file=sys.stderr)\n    sys.exit(1)\n")
         environment = {"PATH": os.environ["PATH"], "TMPDIR": str(Path(tempfile.gettempdir()).resolve()),
                        "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
                        "GIT_CONFIG_NOSYSTEM": "1", "AZURE_EXTENSION_DIR": "synthetic-directory"}
@@ -356,8 +359,8 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
                                  "only observed metadata may bypass the unchanged guard")
                 self.assertTrue(result.stdout == b"", "guard must not print inherited settings")
                 if reason:
-                    self.assertIn(("replay.credential_reason." + reason).encode(), result.stderr)
-                    self.assertNotIn(b"synthetic-blocked-setting", result.stderr)
+                    expected = ("replay.credentials_rejected\nreplay.credential_reason." + reason + "\n").encode()
+                    self.assertTrue(result.stderr == expected, "rejection must contain only fixed diagnostics")
 
     def test_failed_commands_emit_only_bounded_diagnostics_and_always_remove_roots(self):
         import subprocess
