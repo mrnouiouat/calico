@@ -293,6 +293,72 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         self.assertIn("cleanup_verified", _job_block(text, "audit-safe-evidence"))
         self.assertIn("GITHUB_STEP_SUMMARY", _job_block(text, "audit-safe-evidence"))
 
+    def test_replay_process_scope_ignores_host_git_configuration(self):
+        _, doc = self._workflow()
+        for name in ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"):
+            step = doc["jobs"][name]["steps"][-1]
+            for key, value in (("GIT_CONFIG_GLOBAL", "/dev/null"), ("GIT_CONFIG_SYSTEM", "/dev/null"),
+                               ("GIT_CONFIG_NOSYSTEM", "1"), ("GIT_TERMINAL_PROMPT", "0")):
+                self.assertEqual(step["env"][key], value)
+            self.assertIn("report-failure", step["run"])
+            self.assertIn(" ERR", step["run"])
+            self.assertIn(" EXIT", step["run"])
+            self.assertIn('audit_bytes({"stdout": raw, "stderr": root.joinpath("command.stderr").read_bytes()}',
+                          step["run"])
+            self.assertIn('REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"', step["run"])
+            self.assertIn('REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"', step["run"])
+
+    def test_failed_commands_emit_only_bounded_diagnostics_and_always_remove_roots(self):
+        import subprocess
+        import sys
+        from tools.hosted_replay import ReplayRunTuple, derive_replay_canary
+        _, doc = self._workflow()
+        identity = ReplayRunTuple("fixture/replay", 1, 1, "a" * 40)
+        token = derive_replay_canary(identity, "prepare-accepted", "exception")
+        for name in ("prepare-accepted", "prepare-repeat", "prepare-rejected", "publish-accepted"):
+            cases = [(phase, detail, expected) for phase in ("command", "validation", "transport")
+                for detail, expected in (("replay.credentials_rejected\n", b"replay.credentials_rejected\n"),
+                                         (token + "\nsynthetic" + "-secret-message", b"replay.failed\n"))]
+            for phase, detail, expected in cases:
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary).resolve()
+                    binary, runner = root / "bin", root / "runner"
+                    binary.mkdir()
+                    runner.mkdir()
+                    executable = binary / "python"
+                    executable.write_text("#!" + sys.executable + "\nimport os, sys\n"
+                        "phase = os.environ['INJECTED_PHASE']\n"
+                        "current = None\n"
+                        "if len(sys.argv) > 3 and sys.argv[1:3] == ['-m', 'tools.hosted_replay']:\n"
+                        "    if sys.argv[3] in {'prepare-checkpoint', 'publication-worker'}: current = 'command'\n"
+                        "    elif sys.argv[3] == 'validate-driver': current = 'validation'\n"
+                        "elif sys.argv[1:] == ['-']: current = 'transport'\n"
+                        "if current:\n"
+                        "    if current == phase:\n"
+                        "        print(os.environ['INJECTED_FAILURE'], end='', file=sys.stderr)\n"
+                        "        if current == 'command': print(os.environ['INJECTED_FAILURE'], end='')\n"
+                        "        sys.exit(1)\n"
+                        "    if current == 'command': print('{}')\n"
+                        "    sys.exit(0)\n"
+                        "os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n", encoding="utf-8")
+                    executable.chmod(0o700)
+                    output, summary = root / "output", root / "summary"
+                    env = dict(os.environ, PATH=str(binary) + os.pathsep + os.environ["PATH"],
+                        RUNNER_TEMP=str(runner), GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary),
+                        REPLAY_REPOSITORY=identity.repository, REPLAY_RUN_ID="1", REPLAY_ATTEMPT="1",
+                        REPLAY_HEAD=identity.head_sha, EXPECTED_INPUT="a" * 64, EXPECTED_PROVENANCE="b" * 64,
+                        INJECTED_FAILURE=detail, INJECTED_PHASE=phase)
+                    env.update({key: value for key, value in doc["jobs"][name]["steps"][-1]["env"].items()
+                                if key.startswith("GIT_")})
+                    result = subprocess.run(["bash", "-e", "-c", doc["jobs"][name]["steps"][-1]["run"]],
+                        cwd=REPO_ROOT, env=env, capture_output=True)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertTrue(result.stdout == b"" and result.stderr == expected,
+                                    "failure diagnostics must not expose injected values")
+                    self.assertEqual(list(runner.iterdir()), [])
+                    self.assertFalse(output.exists())
+                    self.assertFalse(summary.exists())
+
     def test_negative_routes_and_controlled_calendar_are_explicit(self):
         text, doc = self._workflow()
         for scenario, state in (("failure", "failure"), ("cancelled", "cancelled")):
@@ -315,8 +381,7 @@ class HostedReplayWorkflowContractTests(unittest.TestCase):
         for job in doc["jobs"].values():
             for step in job.get("steps", []):
                 script = step.get("run", "")
-                if "python - <<'PY'\n" in script:
-                    inline = script.split("python - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
+                for inline in re.findall(r"python - <<'PY'[^\n]*\n(.*?)\nPY", script, flags=re.DOTALL):
                     compile(inline, "hosted-replay-inline", "exec")
         script = doc["jobs"]["calendar-matrix"]["steps"][-1]["run"]
         with tempfile.TemporaryDirectory() as directory:

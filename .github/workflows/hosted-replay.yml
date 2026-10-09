@@ -35,6 +35,10 @@ jobs:
       - name: Reconstruct and audit the isolated checkpoint
         id: checkpoint
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_SYSTEM: /dev/null
+          GIT_CONFIG_NOSYSTEM: "1"
+          GIT_TERMINAL_PROMPT: "0"
           REPLAY_REPOSITORY: ${{ github.repository }}
           REPLAY_RUN_ID: ${{ github.run_id }}
           REPLAY_ATTEMPT: ${{ github.run_attempt }}
@@ -43,14 +47,18 @@ jobs:
           set -euo pipefail
           REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
           export REPLAY_ROOT
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
           python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario accepted \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
             > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
-          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
-          python - <<'PY'
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json" 2> "$REPLAY_FAILURE_FILE"
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"
+          python - <<'PY' 2> "$REPLAY_FAILURE_FILE"
           import json
           import os
           from pathlib import Path
@@ -101,6 +109,10 @@ jobs:
       - name: Reconstruct and audit the isolated checkpoint
         id: checkpoint
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_SYSTEM: /dev/null
+          GIT_CONFIG_NOSYSTEM: "1"
+          GIT_TERMINAL_PROMPT: "0"
           REPLAY_REPOSITORY: ${{ github.repository }}
           REPLAY_RUN_ID: ${{ github.run_id }}
           REPLAY_ATTEMPT: ${{ github.run_attempt }}
@@ -109,14 +121,18 @@ jobs:
           set -euo pipefail
           REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
           export REPLAY_ROOT
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
           python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario repeat \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
             > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
-          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
-          python - <<'PY'
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json" 2> "$REPLAY_FAILURE_FILE"
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"
+          python - <<'PY' 2> "$REPLAY_FAILURE_FILE"
           import json
           import os
           from pathlib import Path
@@ -167,6 +183,10 @@ jobs:
       - name: Reconstruct and audit the isolated checkpoint
         id: checkpoint
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_SYSTEM: /dev/null
+          GIT_CONFIG_NOSYSTEM: "1"
+          GIT_TERMINAL_PROMPT: "0"
           REPLAY_REPOSITORY: ${{ github.repository }}
           REPLAY_RUN_ID: ${{ github.run_id }}
           REPLAY_ATTEMPT: ${{ github.run_attempt }}
@@ -175,14 +195,18 @@ jobs:
           set -euo pipefail
           REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
           export REPLAY_ROOT
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
           python -m tools.hosted_replay prepare-checkpoint \
             --runner-temp "$REPLAY_ROOT" --scenario rejected \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
             --run-attempt "$REPLAY_ATTEMPT" --head-sha "$REPLAY_HEAD" \
             > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
-          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
-          python - <<'PY'
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json" 2> "$REPLAY_FAILURE_FILE"
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"
+          python - <<'PY' 2> "$REPLAY_FAILURE_FILE"
           import json
           import os
           from pathlib import Path
@@ -325,6 +349,10 @@ jobs:
       - name: Reconstruct and audit the isolated checkpoint
         id: checkpoint
         env:
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_SYSTEM: /dev/null
+          GIT_CONFIG_NOSYSTEM: "1"
+          GIT_TERMINAL_PROMPT: "0"
           REPLAY_REPOSITORY: ${{ github.repository }}
           REPLAY_RUN_ID: ${{ github.run_id }}
           REPLAY_ATTEMPT: ${{ github.run_attempt }}
@@ -335,7 +363,9 @@ jobs:
           set -euo pipefail
           REPLAY_ROOT="$(mktemp -d "$RUNNER_TEMP/calico-replay-status.XXXXXX")"
           export REPLAY_ROOT
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/command.stderr"
           trap 'rm -rf -- "$REPLAY_ROOT"' EXIT
+          trap 'python -m tools.hosted_replay report-failure --input "$REPLAY_FAILURE_FILE"' ERR
           python -m tools.hosted_replay publication-worker \
             --runner-temp "$REPLAY_ROOT" --scenario accepted \
             --repository "$REPLAY_REPOSITORY" --run-id "$REPLAY_RUN_ID" \
@@ -343,8 +373,10 @@ jobs:
             --route-authorized true --expected-input-digest "$EXPECTED_INPUT" \
             --expected-provenance-digest "$EXPECTED_PROVENANCE" \
             > "$REPLAY_ROOT/driver.json" 2> "$REPLAY_ROOT/command.stderr"
-          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json"
-          python - <<'PY'
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/validation.stderr"
+          python -m tools.hosted_replay validate-driver --input "$REPLAY_ROOT/driver.json" 2> "$REPLAY_FAILURE_FILE"
+          REPLAY_FAILURE_FILE="$REPLAY_ROOT/transport.stderr"
+          python - <<'PY' 2> "$REPLAY_FAILURE_FILE"
           import json
           import os
           from pathlib import Path

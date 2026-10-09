@@ -56,6 +56,34 @@ _CATEGORIES = ("excluded_identifier", "street_address", "contact", "private_path
 _SURFACES = ("stdout", "stderr", "status", "summary", "publication")
 _MAX_JSON = 65536
 _BLOCKED_GIT_CONFIG = r"^(credential\.|url\.|http\.|include\.|includeIf\.|init\.templateDir|core\.(sshCommand|hooksPath|gitProxy)|remote\..*\.(uploadpack|receivepack|proxy))"
+_FAILURE_CATEGORIES = frozenset({
+    "replay.analytical_drift", "replay.canary_found", "replay.capture_failed",
+    "replay.credentials_rejected", "replay.dbt_failed", "replay.empty_audit",
+    "replay.empty_named_output", "replay.failed", "replay.fixture_rejected",
+    "replay.git_failed", "replay.invalid_api_payload", "replay.invalid_arguments",
+    "replay.invalid_audit", "replay.invalid_evidence", "replay.invalid_job_output",
+    "replay.invalid_live_boundary", "replay.invalid_publication_tree",
+    "replay.invalid_scenario", "replay.isolation_rejected",
+    "replay.job_conclusion_mismatch", "replay.live_boundary_changed",
+    "replay.privacy_failed", "replay.publication_gate_failed",
+    "replay.publication_mutated", "replay.reconstruction_mismatch",
+    "replay.route_not_authorized",
+})
+
+
+def _failure_category(value):
+    # Never echo arbitrary exception text, even if supplied as a ReplayError.
+    return value if type(value) is str and value in _FAILURE_CATEGORIES else "replay.failed"
+
+
+def report_failure(path):
+    """Forward one closed diagnostic before cleanup; raw stderr stays private."""
+    _unlinked(path)
+    with path.open("rb") as stream:
+        raw = stream.read(129)
+    category = next((value for value in _FAILURE_CATEGORIES
+                     if raw == (value + "\n").encode("ascii")), "replay.failed")
+    print(category, file=sys.stderr)
 
 
 class ReplayError(Exception):
@@ -489,12 +517,48 @@ def derive_replay_canary(run_tuple, job_name, category):
     return "CALICO_REPLAY_CANARY_" + token
 
 
-def audit_bytes(surfaces, canaries):
+def _hosted_log_findings(raw, run_tuple):
+    """Classify exact public Linux checkout metadata; audit original bytes.
+
+    This applies only to downloaded host logs with a validated public run tuple.
+    Runtime stdout/status/publication surfaces retain the normal path policy.
+    The checkout pin emits these root/includeIf paths and randomUUID() files;
+    no other checkout descendant or replay/private temporary file is admitted.
+    """
+    from tools.privacy_scan.scanner import _scan_utf8_chunks, _POSIX_ABS_PATH_RE, _WINDOWS_ABS_PATH_RE
+    derive_replay_canary(run_tuple, "prepare-accepted", _CATEGORIES[0])
+    findings = _scan_utf8_chunks("raw_log", [raw])
+    name = run_tuple.repository.split("/")[1]
+    checkout = "/".join(("", "home", "runner", "work", name, name))
+    runner_temp = "/".join(("", "home", "runner", "work", "_temp"))
+    uuid = r"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"
+    fixed = {checkout, checkout + "/.git/", checkout + "/.git.path",
+             checkout + "/.git/worktrees/*.path"}
+    def public_metadata_path(value):
+        return (value in fixed or re.fullmatch(re.escape(runner_temp) + "/" + uuid, value) is not None
+                or re.fullmatch(re.escape(runner_temp) + "/git-credentials-" + uuid + r"\.config", value) is not None)
+    try:
+        lines = raw.decode("utf-8").split("\n")
+    except UnicodeError:
+        _fail("replay.privacy_failed")
+    classified_lines = set()
+    for number, line in enumerate(lines, 1):
+        paths = list(_POSIX_ABS_PATH_RE.finditer(line))
+        # Never waive a whole line containing even one unknown/private path.
+        if paths and not _WINDOWS_ABS_PATH_RE.search(line) and all(public_metadata_path(m.group()) for m in paths):
+            classified_lines.add("line " + str(number))
+    return [finding for finding in findings if not (
+        finding.category == "absolute_local_path" and finding.locator in classified_lines)]
+
+
+def audit_bytes(surfaces, canaries, *, hosted_run_tuple=None):
     if not isinstance(surfaces, dict) or not surfaces or set(surfaces) - {*_SURFACES, "raw_log"}:
         _fail("replay.invalid_audit")
     if not isinstance(canaries, (tuple, list)) or not canaries:
         _fail("replay.invalid_audit")
     if any(type(token) is not str or re.fullmatch(r"CALICO_REPLAY_CANARY_[a-p]{64}", token) is None for token in canaries):
+        _fail("replay.invalid_audit")
+    if hosted_run_tuple is not None and (set(surfaces) != {"raw_log"} or type(hosted_run_tuple) is not ReplayRunTuple):
         _fail("replay.invalid_audit")
     records = []
     for surface in sorted(surfaces):
@@ -513,7 +577,9 @@ def audit_bytes(surfaces, canaries):
         if hits:
             _fail("replay.canary_found")
         from tools.privacy_scan.scanner import _scan_utf8_chunks
-        if _scan_utf8_chunks(surface, [raw]):
+        findings = (_hosted_log_findings(raw, hosted_run_tuple) if hosted_run_tuple is not None
+                    else _scan_utf8_chunks(surface, [raw]))
+        if findings:
             _fail("replay.privacy_failed")
         if surface in {"status", "summary", "publication"} and not raw:
             _fail("replay.empty_audit")
@@ -921,7 +987,7 @@ def collect_hosted_envelope(*, run, jobs, artifacts, raw_logs, safe_job_outputs,
         raw = raw_logs[name]
         if type(raw) is not bytes or not raw:
             _fail("replay.invalid_audit")
-        record = audit_bytes({"raw_log": raw}, canaries)[0]
+        record = audit_bytes({"raw_log": raw}, canaries, hosted_run_tuple=identity)[0]
         audits.append({"job_name": name, "audit": record})
     document = {"schema_version": HOSTED_ENVELOPE_SCHEMA_VERSION, "evidence_class": "hosted_fixture_replay",
         "run_tuple": identity.to_dict(), "event": "workflow_dispatch", "conclusion": "success",
@@ -962,13 +1028,17 @@ def main(argv=None):
             command.add_argument("--expected-input-digest", required=True)
             command.add_argument("--expected-provenance-digest", required=True)
             command.add_argument("--route-authorized", choices=("true", "false"), required=True)
-    for name in ("validate-driver", "validate-envelope", "collect-envelope"):
+    for name in ("validate-driver", "validate-envelope", "collect-envelope", "report-failure"):
         command = commands.add_parser(name)
-        command.add_argument("--input", type=Path, required=True)
+        input_flags = ("--input", "--evidence") if name == "validate-envelope" else ("--input",)
+        command.add_argument(*input_flags, type=Path, required=True)
         if name == "collect-envelope":
             command.add_argument("--logs-dir", type=Path, required=True)
     try:
         args = parser.parse_args(argv)
+        if args.command == "report-failure":
+            report_failure(args.input)
+            return 0
         if args.command == "supporting-sequence":
             result = run_replay_sequence(runner_temp=args.runner_temp)
         elif args.command in {"prepare-checkpoint", "publication-worker"}:
@@ -1004,7 +1074,10 @@ def main(argv=None):
             result = collect_hosted_envelope(**bundle, raw_logs=logs)
         print(result.to_json())
         return 0
-    except (ReplayError, OSError, ValueError, TypeError, KeyboardInterrupt):
+    except ReplayError as error:
+        print(_failure_category(error.category), file=sys.stderr)
+        return 1
+    except (OSError, ValueError, TypeError, KeyboardInterrupt):
         print("replay.failed", file=sys.stderr)
         return 1
     except Exception:

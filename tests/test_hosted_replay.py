@@ -2,6 +2,7 @@
 
 import importlib.util
 import copy
+import io
 import json
 import os
 import tempfile
@@ -9,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
+from contextlib import redirect_stdout, redirect_stderr
 import unittest
 
 _CHECKPOINTS = {}
@@ -359,6 +361,78 @@ class HostedReplayPrivacyTests(unittest.TestCase):
 
 
 class HostedReplayCliTests(unittest.TestCase):
+    def _prepare_arguments(self):
+        return ["prepare-checkpoint", "--runner-temp", str(Path(tempfile.gettempdir()).resolve()),
+            "--scenario", "accepted", "--repository", "fixture/replay", "--run-id", "1",
+            "--run-attempt", "1", "--head-sha", "a" * 40]
+
+    def test_cli_preserves_only_closed_failure_categories(self):
+        from tools import hosted_replay as replay
+        for category in replay._FAILURE_CATEGORIES:
+            output, errors = io.StringIO(), io.StringIO()
+            with patch.object(replay, "prepare_hosted_checkpoint", side_effect=replay.ReplayError(category)), \
+                    redirect_stdout(output), redirect_stderr(errors):
+                result = replay.main(self._prepare_arguments())
+            self.assertEqual(result, 1)
+            self.assertEqual(output.getvalue(), "")
+            self.assertEqual(errors.getvalue(), category + "\n")
+
+    def test_cli_never_echoes_injected_exception_canary_or_unknown_category(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception")
+        detail = token + "\n" + "synthetic" + "-secret-message"
+        for error in (RuntimeError(detail), ValueError(detail), OSError(detail),
+                      replay.ReplayError(detail), replay.ReplayError([detail]), KeyboardInterrupt(detail)):
+            output, errors = io.StringIO(), io.StringIO()
+            with patch.object(replay, "prepare_hosted_checkpoint", side_effect=error), \
+                    redirect_stdout(output), redirect_stderr(errors):
+                result = replay.main(self._prepare_arguments())
+            self.assertEqual(result, 1)
+            self.assertTrue(output.getvalue() == "" and errors.getvalue() == "replay.failed\n",
+                            "exceptions must expose only the generic failure category")
+
+    def test_report_failure_forwards_exact_enum_and_refuses_arbitrary_stderr(self):
+        from tools import hosted_replay as replay
+        token = replay.derive_replay_canary(_run_tuple(), "prepare-accepted", "exception").encode()
+        cases = [(value.encode() + b"\n", value) for value in replay._FAILURE_CATEGORIES]
+        cases += [(raw, "replay.failed") for raw in (b"", token, token * 200,
+            b"replay.credentials_rejected", b"replay.credentials_rejected\n" + token,
+            b"replay.credentials_rejected\n\n", b"\xff", b"replay.unknown\n")]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / "failure.stderr"
+            for raw, category in cases:
+                path.write_bytes(raw)
+                output, errors = io.StringIO(), io.StringIO()
+                with redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(["report-failure", "--input", str(path)])
+                self.assertEqual(result, 0)
+                self.assertTrue(output.getvalue() == "" and errors.getvalue() == category + "\n",
+                                "diagnostic forwarding must expose only one approved category")
+
+    def test_inherited_global_git_config_rejects_before_writes_and_null_scope_isolated(self):
+        from tools import hosted_replay as replay
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary).resolve()
+            (home / ".gitconfig").write_text("[http]\n\tsslVerify = false\n", encoding="utf-8")
+            with patch.dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home)):
+                os.environ.pop("GIT_CONFIG_GLOBAL", None)
+                os.environ.pop("GIT_CONFIG_SYSTEM", None)
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(replay.tempfile, "TemporaryDirectory") as owned, \
+                        redirect_stdout(output), redirect_stderr(errors):
+                    result = replay.main(self._prepare_arguments())
+                owned.assert_not_called()
+                self.assertEqual((result, output.getvalue(), errors.getvalue()),
+                                 (1, "", "replay.credentials_rejected\n"))
+                with patch.dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull):
+                    replay._credentials()
+                    # Explicit Git scope never neutralizes a token or SSH adapter.
+                    for key in ("GH_TOKEN", "GITHUB_TOKEN", "SSH_AUTH_SOCK", "GIT_SSH_COMMAND"):
+                        with patch.dict(os.environ, {key: "synthetic-blocked-adapter"}), \
+                                self.assertRaises(replay.ReplayError) as caught:
+                            replay._credentials()
+                        self.assertEqual(caught.exception.category, "replay.credentials_rejected")
+
     def test_both_cli_schema_validators_accept_actual_closed_documents(self):
         from tools import hosted_replay as replay
         with tempfile.TemporaryDirectory() as temporary:
@@ -381,6 +455,19 @@ class HostedReplayCliTests(unittest.TestCase):
             "--input", token], capture_output=True, check=False)
         self.assertEqual((result.returncode, result.stdout, result.stderr), (1, b"", b"replay.failed\n"))
 
+    def test_envelope_validator_accepts_the_documented_evidence_flag_and_input_flag(self):
+        from tools import hosted_replay as replay
+        document = replay.collect_hosted_envelope(**_api_fixture()).to_dict()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary).resolve() / "envelope.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            for flag in ("--evidence", "--input"):
+                result = subprocess.run([sys.executable, "-m", "tools.hosted_replay", "validate-envelope",
+                    flag, str(path)], capture_output=True, check=False)
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(json.loads(result.stdout), {"category": "replay.envelope_verified"})
+                self.assertEqual(result.stderr, b"")
+
     def test_collect_cli_rescans_raw_logs_and_removes_owned_contract_fixture_root(self):
         from tools import hosted_replay as replay
         fixture = _api_fixture()
@@ -400,6 +487,82 @@ class HostedReplayCliTests(unittest.TestCase):
             doc = replay.validate_envelope(result.stdout)
             self.assertEqual(doc["artifact_count"], 0)
         self.assertFalse(root.exists())
+
+
+class HostedReplayHostMetadataTests(unittest.TestCase):
+    def _metadata(self):
+        root = "/".join(("", "home", "runner", "work", "replay", "replay"))
+        temporary = "/".join(("", "home", "runner", "work", "_temp"))
+        unique = "a" * 8 + "-" + "b" * 4 + "-4" + "c" * 3 + "-8" + "d" * 3 + "-" + "e" * 12
+        return root, temporary, unique
+
+    def _canaries(self):
+        from tools import hosted_replay as replay
+        return tuple(replay.derive_replay_canary(_run_tuple(), job, category)
+                     for job in replay._JOBS for category in replay._CATEGORIES)
+
+    def test_public_platform_paths_preserve_original_byte_hash_length_and_hits(self):
+        from tools import hosted_replay as replay
+        root, temporary, unique = self._metadata()
+        paths = (root, root + "/.git/", root + "/.git.path", root + "/.git/worktrees/*.path",
+                 temporary + "/" + unique, temporary + "/git-credentials-" + unique + ".config")
+        raw = ("\n".join(paths) + "\n").encode()
+        records = replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple=_run_tuple())
+        self.assertEqual(records, [{"surface": "raw_log", "byte_length": len(raw),
+            "sha256": replay._digest(raw), "canary_hits": 0}])
+
+    def test_platform_classification_requires_host_log_context_and_never_applies_to_runtime(self):
+        from tools import hosted_replay as replay
+        raw = self._metadata()[0].encode()
+        with self.assertRaises(replay.ReplayError):
+            replay.audit_bytes({"raw_log": raw}, self._canaries())
+        for surface in replay._SURFACES:
+            with self.assertRaises(replay.ReplayError):
+                replay.audit_bytes({surface: raw}, self._canaries())
+            with self.assertRaises(replay.ReplayError):
+                replay.audit_bytes({surface: raw}, self._canaries(), hosted_run_tuple=_run_tuple())
+        with self.assertRaises(replay.ReplayError):
+            replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple={})
+
+    def test_unknown_private_nested_and_foreign_checkout_paths_remain_rejected(self):
+        from tools import hosted_replay as replay
+        root, temporary, unique = self._metadata()
+        private = "/".join(("", "Users", "fixture-owner", "private-source.csv"))
+        unknown = (private, root + "/private-source.csv", root + "/.git/config",
+            root + "/../private-source.csv", temporary + "/private-source.csv",
+            temporary + "/" + unique + "/private-source.csv",
+            temporary + "/calico-replay-status.abcdef", root.replace("replay/replay", "other/other"),
+            temporary + "/git-credentials-" + unique + ".config/private-source.csv")
+        for path in unknown:
+            for raw in (path.encode(), (root + " " + path).encode()):
+                with self.assertRaises(replay.ReplayError) as caught:
+                    replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple=_run_tuple())
+                self.assertEqual(caught.exception.category, "replay.privacy_failed")
+
+    def test_canaries_and_other_excluded_categories_inside_metadata_are_never_concealed(self):
+        from tools import hosted_replay as replay
+        root, temporary, unique = self._metadata()
+        canary = self._canaries()[0]
+        for raw in ((root + "/" + canary).encode(), (temporary + "/" + unique + canary).encode()):
+            with self.assertRaises(replay.ReplayError) as caught:
+                replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple=_run_tuple())
+            self.assertEqual(caught.exception.category, "replay.canary_found")
+        excluded = ("12" + "-" + "345" + "6789", "123" + " Harbor" + " Road",
+                    "fixture" + "@" + "example.invalid", "https://example.invalid/?" + "e" + "in=value")
+        for text in excluded:
+            raw = (root + " " + text).encode()
+            with self.assertRaises(replay.ReplayError) as caught:
+                replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple=_run_tuple())
+            self.assertEqual(caught.exception.category, "replay.privacy_failed")
+
+    def test_invalid_encoding_and_non_newline_controls_cannot_shift_private_path_locations(self):
+        from tools import hosted_replay as replay
+        root = self._metadata()[0]
+        private = "/".join(("", "Users", "fixture-owner", "private-source.csv"))
+        for raw in (root.encode() + b"\n\xff", (root + "\r" + private + "\n" + root).encode(),
+                    (root + "\x85" + private + "\n" + root).encode()):
+            with self.assertRaises(replay.ReplayError):
+                replay.audit_bytes({"raw_log": raw}, self._canaries(), hosted_run_tuple=_run_tuple())
 
 
 class HostedReplayTransactionFailureTests(unittest.TestCase):
