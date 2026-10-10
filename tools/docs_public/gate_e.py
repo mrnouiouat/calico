@@ -296,6 +296,7 @@ def validate_report_state(document):
         url = report["url"]
         if (type(url) is not str or len(url) > 4096 or
                 re.fullmatch(r"https://app\.powerbi\.com/view\?r=[A-Za-z0-9_=&.%-]+", url) is None or
+                re.search(r"%(?![0-9A-Fa-f]{2})", url) is not None or
                 any(ord(c) < 33 or ord(c) > 126 or c in "<>`\\()\"'" for c in unquote(url))):
             _fail()
         parsed = urlsplit(url)

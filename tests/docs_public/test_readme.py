@@ -217,28 +217,6 @@ class WrittenWalkthroughLinkContracts(unittest.TestCase):
         self.assertTrue((ROOT / "docs/walkthrough.md").is_file())
 
 
-class FinalUrlDiffContractTests(WrittenWalkthroughLinkContracts):
-    def test_only_report_block_changes_between_report_states(self):
-        from tools.docs_public import readme as api
-        from tests.docs_public.test_gate_e import FinalUrlRenderingTests
-        from tools.docs_public.gate_e import AUTHORITY_PATH
-        unpublished = api.generate_readme(ROOT)
-        self.assertIn("<!-- calico:report:start -->", unpublished)
-        original = api._read
-        ledger = json.loads((ROOT / AUTHORITY_PATH).read_bytes())
-        ledger["report"] = FinalUrlRenderingTests().report()
-        def read(root, name):
-            return json.dumps(ledger).encode() if name == AUTHORITY_PATH else original(root, name)
-        with patch.object(api, "_read", side_effect=read):
-            published = api.generate_readme(ROOT)
-        def outside(text):
-            left, tail = text.split("<!-- calico:report:start -->")
-            _, right = tail.split("<!-- calico:report:end -->")
-            return left + right
-        self.assertEqual(outside(unpublished), outside(published))
-        self.assertIn(ledger["report"]["url"], published)
-        self.assertNotIn("[Phase 10 report URL slot]", published)
-
     def test_video_or_other_readme_edits_fail_strict_check(self):
         from tools.docs_public import readme as api
         import shutil
@@ -261,6 +239,29 @@ class FinalUrlDiffContractTests(WrittenWalkthroughLinkContracts):
                 (target / "README.md").write_text(damaged)
                 with self.assertRaises(api.ReadmeInputError):
                     api.check_readme(target)
+
+
+class FinalUrlDiffContractTests(unittest.TestCase):
+    def test_only_report_block_changes_between_report_states(self):
+        from tools.docs_public import readme as api
+        from tests.docs_public.test_gate_e import FinalUrlRenderingTests
+        from tools.docs_public.gate_e import AUTHORITY_PATH
+        unpublished = api.generate_readme(ROOT)
+        self.assertIn("<!-- calico:report:start -->", unpublished)
+        original = api._read
+        ledger = json.loads((ROOT / AUTHORITY_PATH).read_bytes())
+        ledger["report"] = FinalUrlRenderingTests().report()
+        def read(root, name):
+            return json.dumps(ledger).encode() if name == AUTHORITY_PATH else original(root, name)
+        with patch.object(api, "_read", side_effect=read):
+            published = api.generate_readme(ROOT)
+        def outside(text):
+            left, tail = text.split("<!-- calico:report:start -->")
+            _, right = tail.split("<!-- calico:report:end -->")
+            return left + right
+        self.assertEqual(outside(unpublished), outside(published))
+        self.assertIn(ledger["report"]["url"], published)
+        self.assertNotIn("[Phase 10 report URL slot]", published)
 
 
 class HostedRepublishRunbookContracts(unittest.TestCase):

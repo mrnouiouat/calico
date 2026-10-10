@@ -191,7 +191,8 @@ class FinalUrlRenderingTests(unittest.TestCase):
         values = [None, {}, dict(self.report(), extra=True)]
         values += [dict(self.report(), url=value) for value in (
             None, "", " ", "http://example.invalid", "https://", "https://user:secret" + "@example.invalid",
-            "https://example.invalid/a)injection", "https://example.invalid/%0a")]
+            "https://example.invalid/a)injection", "https://example.invalid/%0a",
+            "https://app.powerbi.com/view?r=%ZZ", "https://app.powerbi.com/view?r=%0a")]
         values += [dict(self.report(), observed_at=value) for value in (None, "", "2099-01-01", "2026-02-30")]
         values += [{key: value for key, value in self.report().items() if key != missing}
                    for missing in self.report()]
