@@ -30,6 +30,12 @@ def main(argv=None) -> int:
     replay_check.add_argument("--envelope", type=Path, required=True)
     replay_check.add_argument("--json", type=Path, required=True)
     replay_check.add_argument("--markdown", type=Path, required=True)
+    gate_check = commands.add_parser("gate-e-check", help="Validate the ten-condition authority and optional rendering")
+    gate_check.add_argument("--authority", type=Path, required=True)
+    gate_check.add_argument("--markdown", type=Path)
+    gate_generate = commands.add_parser("gate-e-generate", help="Render the validated ten-condition authority")
+    gate_generate.add_argument("--authority", type=Path, required=True)
+    gate_generate.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         root = Path.cwd()
@@ -41,6 +47,15 @@ def main(argv=None) -> int:
             check_readme(root)
             from .hosted_replay import check_repository_hosted_replay
             check_repository_hosted_replay(root)
+            from .gate_e import AUTHORITY_PATH, MARKDOWN_PATH, check_gate_e
+            if (root / AUTHORITY_PATH).exists():
+                check_gate_e(root / AUTHORITY_PATH, root / MARKDOWN_PATH, root=root)
+        elif args.command == "gate-e-check":
+            from .gate_e import check_gate_e
+            check_gate_e(args.authority, args.markdown, root=root)
+        elif args.command == "gate-e-generate":
+            from .gate_e import generate_gate_e
+            generate_gate_e(args.authority, args.output, root=root)
         elif args.command == "hosted-replay-generate":
             from .hosted_replay import generate_hosted_replay_pair
             generate_hosted_replay_pair(args.envelope, args.json_output, args.markdown_output, root=root)
@@ -52,7 +67,8 @@ def main(argv=None) -> int:
         return 1
     except Exception as exc:
         from .hosted_replay import HostedReplayPublicError
-        if isinstance(exc, HostedReplayPublicError):
+        from .gate_e import GateEEvidenceError
+        if isinstance(exc, (HostedReplayPublicError, GateEEvidenceError)):
             print("docs-public: " + exc.category, file=sys.stderr)
             return 1
         print("docs-public: readme.internal_error", file=sys.stderr)

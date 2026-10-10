@@ -49,7 +49,7 @@ class GateEEvidenceContractTests(unittest.TestCase):
         d = authority(m)
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         rows = [
-            {"type": "ci_run", "locator": "https://github.com/mrnouiouat/calico/actions/runs/37985365302/attempts/1", "claim": "Hosted fixture replay", "recorded_at": "2026-10-10", "conclusion": "success", "head_sha": head, "evidence_class": "fixture_hosted_replay"},
+            {"type": "ci_run", "locator": "https://github.com/mrnouiouat/calico/actions/runs/37985365302/attempts/1", "claim": "Hosted fixture replay", "recorded_at": "2026-10-10", "conclusion": "success", "head_sha": head, "evidence_class": "fixture_hosted_replay", "event": "workflow_dispatch"},
             {"type": "commit", "locator": head, "claim": "Committed product"},
             {"type": "test_id", "locator": "tests.docs_public.test_gate_e.GateEEvidenceContractTests.test_ten_conditions_validate_and_render_deterministically", "claim": "Strict evidence contract"},
             {"type": "manifest", "locator": "docs/evidence/gate-e/hosted-replay-v1.json", "claim": "Closed measured projection", "sha256": hashlib.sha256((ROOT / "docs/evidence/gate-e/hosted-replay-v1.json").read_bytes()).hexdigest()},
