@@ -6,6 +6,7 @@ import copy
 from datetime import date, datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
@@ -151,7 +152,7 @@ def _file(root, locator):
         path = _path(Path(root) / relative)
         if not path.is_file() or not path.is_relative_to(Path(root).resolve()):
             _fail("gate_e.unresolved_locator")
-        raw = path.read_bytes()
+        raw = _read(path)
         if anchor:
             from tools.citation_scan.scanner import _anchors
             if anchor not in _anchors(raw.decode("utf-8")):
@@ -271,7 +272,13 @@ def render_gate_e_markdown(document, *, root=_PRODUCT):
 def _read(path):
     from .hosted_replay import _path, HostedReplayPublicError
     try:
-        return _path(path).read_bytes()
+        path = _path(path)
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, "rb") as handle:
+            raw = handle.read(2_000_001)
+        if len(raw) > 2_000_000:
+            _fail("gate_e.oversize")
+        return raw
     except (OSError, HostedReplayPublicError):
         _fail("gate_e.unreadable")
 
@@ -300,3 +307,251 @@ def generate_gate_e(authority_path, output, *, root=_PRODUCT):
         _fail("gate_e.unsafe_path")
     document = check_gate_e(authority_path, root=root)
     _write(output, render_gate_e_markdown(document, root=root).encode())
+
+
+# Safe projection of the immutable historical real observation. Its scope and
+# dates never advance when later product commits change HEAD.
+HISTORICAL_REAL_OBSERVATION = {
+    "evidence_class": "real_restore_republish_observation",
+    "run_id": 37726333085, "run_attempt": 1, "event": "workflow_dispatch",
+    "head_sha": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677",
+    "completed_at": "2026-10-08T04:14:36Z",
+    "published_data_commit": "45cd920e3087a3f14d6bb196d15c49abc980f665",
+    "published_manifest_sha256": "da4f4a3385f674adc4aea66044ad977a8f8dea86fdc10a7ca5607f918755e7ed",
+    "policy_sha256": "91ab3bf914ef26102d48e44d44446fd02a4048440760bc64e9c8b95ce6f3aada",
+    "transaction_status": "no_change", "conclusion": "success",
+}
+_REAL_SEMANTIC_SHA256 = "c8ef0fc48b12ba2d96625ec7ae499c26cedd145f13236961cd9d8171942920da"
+_DRAFT_KEYS = ("schema_version", "derived_at", "evidence_classes", "proved_outcomes",
+               "residual_gaps", "recommended_status", "amendment_required", "supersedes")
+_APPROVAL_KEYS = ("approval_required", "approved_at", "approved_by_role")
+_OUTCOMES = ("accepted", "no_new_release", "rejected")
+_SUPERSEDES = [{"superseded": "D-04 offline-only outcome fallback and original 10-07 ordering",
+                "successor": "D-14 measured hosted replay before residual approval"}]
+_OBSERVATION_KEYS = ("evidence_class", "run_id", "run_attempt", "event", "head_sha",
+    "created_at", "completed_at", "recorded_at", "conclusion", "outcome", "outcome_basis",
+    "log_privacy", "log_finding_count")
+
+
+def _semantic_bytes(value):
+    try:
+        return json.dumps(value, sort_keys=True, ensure_ascii=True, allow_nan=False,
+                          separators=(",", ":")).encode()
+    except (TypeError, ValueError, RecursionError):
+        _fail()
+
+
+def _real_observation(document):
+    if type(document) in (str, bytes):
+        document = _decode(document)
+    if type(document) is not dict:
+        _fail("gate_e.invalid_real_observation")
+    if set(document) == {"seed", "baseline", "mac_restore_build", "hosted_republish"}:
+        if hashlib.sha256(_semantic_bytes(document)).hexdigest() != _REAL_SEMANTIC_SHA256:
+            _fail("gate_e.changed_historical_real_record")
+    elif _semantic_bytes(document) != _semantic_bytes(HISTORICAL_REAL_OBSERVATION):
+        _fail("gate_e.changed_historical_real_tuple")
+    return copy.deepcopy(HISTORICAL_REAL_OBSERVATION)
+
+
+def _hosted_observation(document):
+    from .hosted_replay import (decode_hosted_replay_envelope, project_hosted_replay_public,
+                                decode_hosted_replay_public, HostedReplayPublicError, JSON_PATH)
+    try:
+        if type(document) in (str, bytes):
+            document = _decode(document)
+        if type(document) is not dict:
+            _fail()
+        public = (project_hosted_replay_public(decode_hosted_replay_envelope(document))
+                  if document.get("schema_version") == "hosted-replay-envelope-v1"
+                  else decode_hosted_replay_public(document))
+        measured = decode_hosted_replay_public(_read(_PRODUCT / JSON_PATH))
+        if public != measured:
+            _fail("gate_e.changed_measured_hosted_record")
+        source = measured.to_dict()
+        historic = source["historical_real_republish"]
+        if any(historic[key] != HISTORICAL_REAL_OBSERVATION[key] for key in
+               ("head_sha", "run_id", "published_data_commit", "published_manifest_sha256")):
+            _fail("gate_e.changed_historical_real_tuple")
+        return {"evidence_class": "fixture_hosted_replay", "run": source["run"],
+                "recorded_at": "2026-10-09",
+                "public_sha256": hashlib.sha256(measured.encoded).hexdigest(),
+                "proved_outcomes": list(_OUTCOMES)}
+    except (HostedReplayPublicError, OSError, KeyError, TypeError, ValueError):
+        _fail("gate_e.invalid_hosted_observation")
+
+
+def _timestamp(value):
+    if type(value) is not str or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+        _fail("gate_e.invalid_date")
+    try:
+        observed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        _fail("gate_e.invalid_date")
+    if observed > datetime.now(timezone.utc):
+        _fail("gate_e.invalid_date")
+    return observed
+
+
+def _observations(rows, evidence_class):
+    if type(rows) is not list or not 1 <= len(rows) <= 100:
+        _fail("gate_e.missing_observations")
+    identities = []
+    result = []
+    for row in rows:
+        _keys(row, _OBSERVATION_KEYS)
+        if row["evidence_class"] != evidence_class or row["event"] != (
+                "schedule" if evidence_class == "actual_schedule_observation" else "workflow_dispatch"):
+            _fail("gate_e.mislabeled_observation")
+        if any(type(row[key]) is not int or row[key] <= 0 for key in ("run_id", "run_attempt")):
+            _fail("gate_e.invalid_run_identity")
+        _commit(_PRODUCT, row["head_sha"])
+        started, completed = _timestamp(row["created_at"]), _timestamp(row["completed_at"])
+        if completed < started or _date(row["recorded_at"]) < completed.date():
+            _fail("gate_e.invalid_date")
+        if row["conclusion"] not in {"success", "failure", "cancelled"}:
+            _fail("gate_e.incomplete_observation")
+        if row["outcome"] not in (*_OUTCOMES, "not_observed") or row["outcome_basis"] != (
+                "no_capture_status_observed" if row["outcome"] == "not_observed" else "recorded_capture_status"):
+            _fail("gate_e.unproved_outcome")
+        if row["log_privacy"] == "no_findings":
+            if type(row["log_finding_count"]) is not int or row["log_finding_count"] != 0:
+                _fail("gate_e.invalid_privacy_observation")
+        elif row["log_privacy"] == "absolute_local_path_findings":
+            if type(row["log_finding_count"]) is not int or row["log_finding_count"] <= 0:
+                _fail("gate_e.invalid_privacy_observation")
+        else:
+            _fail("gate_e.invalid_privacy_observation")
+        identities.append((row["run_id"], row["run_attempt"]))
+        result.append(copy.deepcopy(row))
+    if identities != sorted(set(identities)):
+        _fail("gate_e.ambiguous_observations")
+    return result
+
+
+def _derive(hosted, real, live, scheduled):
+    gaps = []
+    for evidence_class, rows in (("live_source_observation", live), ("actual_schedule_observation", scheduled)):
+        observed = {row["outcome"] for row in rows}
+        gaps.extend({"evidence_class": evidence_class, "outcome": outcome, "reason": "not_observed"}
+                    for outcome in _OUTCOMES if outcome not in observed)
+        if any(row["log_privacy"] != "no_findings" for row in rows):
+            gaps.append({"evidence_class": evidence_class, "outcome": "privacy_boundary",
+                         "reason": "historical_log_privacy_not_clean"})
+    return {"schema_version": "condition-four-disposition-v1",
+            "derived_at": max([hosted["recorded_at"], real["completed_at"][:10],
+                               *(row["recorded_at"] for row in (*live, *scheduled))]),
+            "evidence_classes": {"fixture_hosted_replay": hosted, "live_source_observation": live,
+                "actual_schedule_observation": scheduled, "real_restore_republish_observation": real},
+            "proved_outcomes": list(_OUTCOMES), "residual_gaps": gaps,
+            "recommended_status": "pass_with_disclosed_deviation" if gaps else "pass",
+            "amendment_required": bool(gaps), "supersedes": copy.deepcopy(_SUPERSEDES)}
+
+
+def derive_condition_four_disposition(*, hosted_replay, real_republish, live_observations, scheduled_observations):
+    """Pure derivation from validated measured proof and bounded dated records.
+
+    No network requests, inferred admission from a green run, or owner approval.
+    Historical log findings stay visible and are never waived by fixture proof.
+    """
+    return _derive(_hosted_observation(hosted_replay), _real_observation(real_republish),
+        _observations(live_observations, "live_source_observation"),
+        _observations(scheduled_observations, "actual_schedule_observation"))
+
+
+def decode_condition_four_draft(document):
+    if type(document) in (str, bytes):
+        document = _decode(document)
+    _keys(document, _DRAFT_KEYS)
+    _date(document["derived_at"])
+    classes = document["evidence_classes"]
+    _keys(classes, EVIDENCE_CLASSES)
+    from .hosted_replay import JSON_PATH
+    expected_hosted = _hosted_observation(_decode(_read(_PRODUCT / JSON_PATH)))
+    if _semantic_bytes(classes["fixture_hosted_replay"]) != _semantic_bytes(expected_hosted):
+        _fail("gate_e.changed_measured_hosted_record")
+    expected = _derive(expected_hosted, _real_observation(classes["real_restore_republish_observation"]),
+        _observations(classes["live_source_observation"], "live_source_observation"),
+        _observations(classes["actual_schedule_observation"], "actual_schedule_observation"))
+    if _semantic_bytes(document) != _semantic_bytes(expected):
+        _fail("gate_e.disposition_not_evidence_derived")
+    return expected
+
+
+def finalize_condition_four_disposition(*, draft, approved_at=None, approved_by_role=None):
+    """Add only approval fields; canonical role is the literal repository owner.
+
+    The CLI's repository-owner token maps to this spelling at the CLI boundary.
+    This operation records supplied approval; it never solicits or infers it.
+    """
+    draft = decode_condition_four_draft(draft)
+    required = bool(draft["residual_gaps"])
+    if required:
+        if approved_by_role != "repository owner" or _date(approved_at) < _date(draft["derived_at"]):
+            _fail("gate_e.invalid_approval")
+    elif approved_at is not None or approved_by_role is not None:
+        _fail("gate_e.unexpected_approval")
+    return {**draft, "approval_required": required, "approved_at": approved_at, "approved_by_role": approved_by_role}
+
+
+def decode_condition_four_final(document):
+    if type(document) in (str, bytes):
+        document = _decode(document)
+    _keys(document, (*_DRAFT_KEYS, *_APPROVAL_KEYS))
+    expected = finalize_condition_four_disposition(draft={key: document[key] for key in _DRAFT_KEYS},
+        approved_at=document["approved_at"], approved_by_role=document["approved_by_role"])
+    if _semantic_bytes(document) != _semantic_bytes(expected):
+        _fail("gate_e.changed_final_disposition")
+    return expected
+
+
+def validate_final_condition_four_disposition(*, draft, final, hosted_replay, real_republish):
+    draft = decode_condition_four_draft(draft)
+    final = decode_condition_four_final(final)
+    expected = derive_condition_four_disposition(hosted_replay=hosted_replay, real_republish=real_republish,
+        live_observations=draft["evidence_classes"]["live_source_observation"],
+        scheduled_observations=draft["evidence_classes"]["actual_schedule_observation"])
+    if (_semantic_bytes(draft) != _semantic_bytes(expected) or
+            _semantic_bytes({key: final[key] for key in _DRAFT_KEYS}) != _semantic_bytes(draft)):
+        _fail("gate_e.draft_final_mismatch")
+
+
+def render_condition_four_public_decision(*, draft, final, hosted_replay, real_republish):
+    validate_final_condition_four_disposition(draft=draft, final=final,
+        hosted_replay=hosted_replay, real_republish=real_republish)
+    final = decode_condition_four_final(final)
+    classes = final["evidence_classes"]
+    parts = ["# Condition 4 evidence disposition", "", "Status: `" + final["recommended_status"] + "`.",
+        "Derived from recorded observations dated " + final["derived_at"] + ".",
+        "Fixture acceptance is not live-source acceptance. Dispatched calendar cases are not actual scheduled observations.",
+        "The historical real restore/republish proves its recorded mechanism; it is not current-head accepted-trigger proof.", "",
+        "Hosted fixture outcomes: accepted, no_new_release, rejected.", ""]
+    if final["approved_at"]:
+        parts.extend(["Public amendment recorded " + final["approved_at"] + ".", ""])
+    parts.extend(["| Evidence class | Outcome | Residual reason |", "| --- | --- | --- |"])
+    parts.extend(f'| {row["evidence_class"]} | {row["outcome"]} | {row["reason"]} |' for row in final["residual_gaps"])
+    if not final["residual_gaps"]:
+        parts.append("No residual gaps; no amendment required.")
+    parts.extend(["", "## Recorded evidence", ""])
+    for evidence_class in EVIDENCE_CLASSES:
+        source = classes[evidence_class]
+        records = source if type(source) is list else [source]
+        for record in records:
+            run = record["run"] if evidence_class == "fixture_hosted_replay" else record
+            url = f'https://github.com/mrnouiouat/calico/actions/runs/{run["run_id"]}/attempts/{run["run_attempt"]}'
+            when = record.get("recorded_at", record.get("completed_at", ""))
+            detail = ("hosted fixture outcomes" if evidence_class == "fixture_hosted_replay" else
+                      record.get("outcome", "historical real no_change"))
+            parts.append(f'- {evidence_class}: [recorded attempt]({url}), head `{run["head_sha"]}`, {when}, {detail}.')
+            if record.get("log_finding_count", 0):
+                parts.append(f'  Historical log privacy: {record["log_privacy"]}, {record["log_finding_count"]} locations; no clean claim or waiver.')
+            if evidence_class == "fixture_hosted_replay":
+                parts.append(f'  Validated public evidence SHA-256: `{record["public_sha256"]}`; actual event `{run["event"]}`; conclusion `{run["conclusion"]}`.')
+            elif evidence_class == "real_restore_republish_observation":
+                parts.append(f'  Historical published commit `{record["published_data_commit"]}`; manifest SHA-256 `{record["published_manifest_sha256"]}`; policy SHA-256 `{record["policy_sha256"]}`; transaction `{record["transaction_status"]}`.')
+            else:
+                parts.append(f'  Actual event `{record["event"]}`; conclusion `{record["conclusion"]}`; outcome basis `{record["outcome_basis"]}`; created {record["created_at"]}; completed {record["completed_at"]}.')
+    parts.extend(["", "## Additive successor", ""])
+    parts.extend(f'{pair["superseded"]} → {pair["successor"]}.' for pair in final["supersedes"])
+    parts.append("")
+    return "\n".join(parts)

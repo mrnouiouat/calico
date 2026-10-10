@@ -36,6 +36,19 @@ def main(argv=None) -> int:
     gate_generate = commands.add_parser("gate-e-generate", help="Render the validated ten-condition authority")
     gate_generate.add_argument("--authority", type=Path, required=True)
     gate_generate.add_argument("--output", type=Path, required=True)
+    disposition_finalize = commands.add_parser("condition-four-finalize", help="Add explicitly supplied approval to the validated private draft")
+    disposition_finalize.add_argument("--draft", type=Path, required=True)
+    disposition_finalize.add_argument("--final", type=Path, required=True)
+    disposition_finalize.add_argument("--approved-at")
+    disposition_finalize.add_argument("--approved-by-role", choices=("repository-owner",))
+    for name in ("condition-four-check", "condition-four-render"):
+        command = commands.add_parser(name, help="Validate exact draft/final meaning against measured evidence")
+        for key in ("draft", "final", "hosted", "real"):
+            command.add_argument("--" + key, type=Path, required=True)
+        if name.endswith("check"):
+            command.add_argument("--public", type=Path)
+        else:
+            command.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         root = Path.cwd()
@@ -56,6 +69,28 @@ def main(argv=None) -> int:
         elif args.command == "gate-e-generate":
             from .gate_e import generate_gate_e
             generate_gate_e(args.authority, args.output, root=root)
+        elif args.command == "condition-four-finalize":
+            from .gate_e import _read, _write, _encode, finalize_condition_four_disposition
+            from .hosted_replay import _path
+            if _path(args.draft) == _path(args.final):
+                from .gate_e import GateEEvidenceError
+                raise GateEEvidenceError("gate_e.unsafe_path")
+            document = finalize_condition_four_disposition(draft=_read(args.draft),
+                approved_at=args.approved_at,
+                approved_by_role="repository owner" if args.approved_by_role == "repository-owner" else None)
+            _write(args.final, _encode(document))
+        elif args.command in {"condition-four-check", "condition-four-render"}:
+            from .gate_e import _read, _write, render_condition_four_public_decision, GateEEvidenceError
+            from .hosted_replay import _path
+            inputs = {"draft": _read(args.draft), "final": _read(args.final),
+                      "hosted_replay": _read(args.hosted), "real_republish": _read(args.real)}
+            rendered = render_condition_four_public_decision(**inputs).encode()
+            if args.command == "condition-four-render":
+                if _path(args.output) in {_path(path) for path in (args.draft, args.final, args.hosted, args.real)}:
+                    raise GateEEvidenceError("gate_e.unsafe_path")
+                _write(args.output, rendered)
+            elif args.public is not None and _read(args.public) != rendered:
+                raise GateEEvidenceError("gate_e.generated_drift")
         elif args.command == "hosted-replay-generate":
             from .hosted_replay import generate_hosted_replay_pair
             generate_hosted_replay_pair(args.envelope, args.json_output, args.markdown_output, root=root)
