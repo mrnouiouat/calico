@@ -162,6 +162,48 @@ m._generate_common_pair({'generation': 2}, root/'docs/evidence/a.json', root/'do
 ROOT = Path(__file__).resolve().parents[2]
 
 
+class FinalUrlRenderingTests(unittest.TestCase):
+    def test_closed_report_states_are_available_before_freeze(self):
+        from tools.docs_public import gate_e as api
+        self.assertTrue(callable(getattr(api, "validate_report_state", None)),
+                        "The ledger must validate both bounded report states before freeze")
+        self.assertEqual(api.validate_report_state({}), None)
+
+    def report(self):
+        return {"url": "https://app.powerbi.com/view?r=synthetic",
+                "observed_at": "2026-10-01",
+                "anonymous_observation": {"access_mode": "signed_out", "pages": {
+                    "published_registry_change": "pass", "release_quality": "pass",
+                    "cohort_persistence": "pass", "organization_lookup": "pass"},
+                    "release_banner_source_retired": "pass", "lookup_selection_guard": "pass"}}
+
+    def test_valid_report_and_schema_agree(self):
+        from tools.docs_public import gate_e as api
+        report = self.report()
+        self.assertEqual(api.validate_report_state({"report": report}), report)
+        document = api.build_portfolio_document()
+        document["report"] = report
+        self.assertEqual(api.validate_portfolio_authority(document), document)
+        self.assertIn(report["url"], api.render_gate_e_markdown(document))
+
+    def test_invalid_report_combinations_fail_without_echo(self):
+        from tools.docs_public import gate_e as api
+        values = [None, {}, dict(self.report(), extra=True)]
+        values += [dict(self.report(), url=value) for value in (
+            None, "", " ", "http://example.invalid", "https://", "https://user:secret" + "@example.invalid",
+            "https://example.invalid/a)injection", "https://example.invalid/%0a")]
+        values += [dict(self.report(), observed_at=value) for value in (None, "", "2099-01-01", "2026-02-30")]
+        values += [{key: value for key, value in self.report().items() if key != missing}
+                   for missing in self.report()]
+        wrong = self.report()
+        wrong["anonymous_observation"]["pages"]["organization_lookup"] = "fail"
+        values.append(wrong)
+        for value in values:
+            with self.assertRaises(api.GateEEvidenceError) as caught:
+                api.validate_report_state({"report": value})
+            self.assertEqual(caught.exception.category, "gate_e.invalid_report_state")
+
+
 def module(case):
     case.assertIsNotNone(importlib.util.find_spec("tools.docs_public.gate_e"),
                          "Gate E must validate and render openable evidence")
