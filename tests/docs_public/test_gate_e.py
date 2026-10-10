@@ -61,6 +61,22 @@ class PortfolioEvidenceResolutionTests(unittest.TestCase):
 
 
 class SpikeEraAuditContractTests(unittest.TestCase):
+    def test_historical_identity_and_exclusion_evidence_contains_the_claimed_fields(self):
+        m = module(self)
+        d = m.build_spike_audit_document(root=ROOT)
+        locators = {item["locator"] for item in d["rows"][5]["evidence"]}
+        source = "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md"
+        self.assertIn(source, locators)
+        text = (ROOT / source).read_text()
+        for field in ("original_url", "wayback_timestamp", "received_bytes", "sha256", "parsed_rows", "logical_release", "list"):
+            self.assertIn('"' + field + '"', text)
+        self.assertIn("docs/evidence/gate-a/spike-001-successor-v1.json", locators)
+        exclusion = "docs/provenance/spikes/005-project-recommendation/README.md#usefulness-boundary"
+        self.assertIn(exclusion, {item["locator"] for item in d["rows"][10]["evidence"]})
+        text = (ROOT / exclusion.partition("#")[0]).read_text().split("## Usefulness boundary", 1)[1].split("##", 1)[0]
+        for phrase in ("stakeholder interviews", "investigation queues", "email notifications", "predictions", "causal explanations"):
+            self.assertIn(phrase, text)
+
     def test_exact_requirement_clauses_and_superseding_decisions(self):
         m = module(self)
         self.assertTrue(callable(getattr(m, "build_spike_audit_document", None)),
