@@ -141,3 +141,159 @@ class ConditionFourEvidenceClassTests(unittest.TestCase):
         item = {"type": "ci_run", "locator": "https://github.com/mrnouiouat/calico/actions/runs/37985365302/attempts/1", "claim": "Recorded schedule", "recorded_at": "2026-10-10", "conclusion": "success", "head_sha": head, "evidence_class": "actual_schedule_observation", "event": "workflow_dispatch"}
         d["conditions"][3]["evidence"] = [item]
         with self.assertRaises(m.GateEEvidenceError): m.validate_gate_e_document(d, root=ROOT)
+
+
+def measured(m):
+    hosted = json.loads((ROOT / "docs/evidence/gate-e/hosted-replay-v1.json").read_text())
+    return hosted, copy.deepcopy(m.HISTORICAL_REAL_OBSERVATION)
+
+
+def observations(*, scheduled=False, complete=False):
+    outcomes = ("accepted", "no_new_release", "rejected") if complete else ("rejected",)
+    return [{"evidence_class": "actual_schedule_observation" if scheduled else "live_source_observation",
+             "run_id": 37693376162 + n, "run_attempt": 1,
+             "event": "schedule" if scheduled else "workflow_dispatch",
+             "head_sha": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677",
+             "created_at": "2026-10-07T22:01:00Z", "completed_at": "2026-10-07T22:10:09Z",
+             "recorded_at": "2026-10-10", "conclusion": "success", "outcome": outcome,
+             "outcome_basis": "recorded_capture_status", "log_privacy": "no_findings",
+             "log_finding_count": 0} for n, outcome in enumerate(outcomes)]
+
+
+def draft(m, *, complete=False):
+    hosted, real = measured(m)
+    return m.derive_condition_four_disposition(hosted_replay=hosted, real_republish=real,
+        live_observations=observations(complete=complete), scheduled_observations=observations(scheduled=True, complete=complete))
+
+
+class ConditionFourDispositionEqualityTests(unittest.TestCase):
+    def test_derivation_follows_measured_outcomes_and_class_boundaries(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "derive_condition_four_disposition", None)),
+                        "Residual gaps must be derived from measured evidence")
+        d = draft(m)
+        self.assertEqual(d["proved_outcomes"], ["accepted", "no_new_release", "rejected"])
+        self.assertEqual([r["outcome"] for r in d["residual_gaps"]], ["accepted", "no_new_release", "accepted", "no_new_release"])
+        self.assertEqual(d["recommended_status"], "pass_with_disclosed_deviation")
+        self.assertTrue(d["amendment_required"])
+        self.assertEqual(tuple(d["evidence_classes"]), m.EVIDENCE_CLASSES)
+        complete = draft(m, complete=True)
+        self.assertEqual(complete["residual_gaps"], [])
+        self.assertEqual(complete["recommended_status"], "pass")
+        self.assertFalse(complete["amendment_required"])
+
+    def test_missing_unknown_mislabeled_and_ambiguous_observations_fail(self):
+        m = module(self); hosted, real = measured(m)
+        for value in (None, [], [{}], [dict(observations(scheduled=True)[0], event="workflow_dispatch")],
+                      [dict(observations(scheduled=True)[0], evidence_class="fixture_hosted_replay")],
+                      [dict(observations(scheduled=True)[0], outcome=None)],
+                      [dict(observations(scheduled=True)[0], completed_at="2026-02-30T00:00:00Z")]):
+            with self.assertRaises(m.GateEEvidenceError):
+                m.derive_condition_four_disposition(hosted_replay=hosted, real_republish=real,
+                    live_observations=observations(), scheduled_observations=value)
+        duplicate = observations(scheduled=True) * 2
+        with self.assertRaises(m.GateEEvidenceError):
+            m.derive_condition_four_disposition(hosted_replay=hosted, real_republish=real,
+                live_observations=observations(), scheduled_observations=duplicate)
+
+    def test_wrong_measured_head_run_hash_or_historical_tuple_fails(self):
+        m = module(self); hosted, real = measured(m)
+        for key, value in (("head_sha", "0" * 40), ("run_id", 1), ("event", "schedule"), ("conclusion", "failure")):
+            changed = copy.deepcopy(hosted); changed["run"][key] = value
+            with self.assertRaises(m.GateEEvidenceError):
+                m.derive_condition_four_disposition(hosted_replay=changed, real_republish=real,
+                    live_observations=observations(), scheduled_observations=observations(scheduled=True))
+        for key in ("head_sha", "published_data_commit", "published_manifest_sha256", "policy_sha256", "run_id"):
+            changed = copy.deepcopy(real); changed[key] = 1 if key == "run_id" else "0" * len(changed[key])
+            with self.assertRaises(m.GateEEvidenceError):
+                m.derive_condition_four_disposition(hosted_replay=hosted, real_republish=changed,
+                    live_observations=observations(), scheduled_observations=observations(scheduled=True))
+
+    def test_only_three_approval_additions_are_allowed_and_all_draft_values_equal(self):
+        m = module(self); hosted, real = measured(m); d = draft(m)
+        final = m.finalize_condition_four_disposition(draft=d, approved_at="2026-10-10", approved_by_role="repository owner")
+        self.assertEqual(set(final) - set(d), {"approval_required", "approved_at", "approved_by_role"})
+        self.assertEqual({key: final[key] for key in d}, d)
+        m.validate_final_condition_four_disposition(draft=d, final=final, hosted_replay=hosted, real_republish=real)
+        for key in d:
+            changed = copy.deepcopy(final)
+            value = changed[key]
+            changed[key] = list(reversed(value)) if isinstance(value, list) else "changed"
+            if changed[key] == value: changed[key] = None
+            with self.assertRaises(m.GateEEvidenceError):
+                m.validate_final_condition_four_disposition(draft=d, final=changed, hosted_replay=hosted, real_republish=real)
+        changed = copy.deepcopy(d); changed["residual_gaps"] = []
+        with self.assertRaises(m.GateEEvidenceError):
+            m.finalize_condition_four_disposition(draft=changed, approved_at=None, approved_by_role=None)
+        changed = copy.deepcopy(d); changed["evidence_classes"]["fixture_hosted_replay"]["run"]["run_id"] = 1
+        with self.assertRaises(m.GateEEvidenceError):
+            m.validate_final_condition_four_disposition(draft=changed, final=final, hosted_replay=hosted, real_republish=real)
+
+    def test_approval_dates_roles_and_proof_complete_null_approval(self):
+        m = module(self)
+        for when, role in ((None, None), ("2026-02-30", "repository owner"), ("2026-10-10", "someone"), ("2026-10-10", "repository-owner"), ("2026-10-08", "repository owner"), ("2099-01-01", "repository owner")):
+            with self.assertRaises(m.GateEEvidenceError):
+                m.finalize_condition_four_disposition(draft=draft(m), approved_at=when, approved_by_role=role)
+        complete = draft(m, complete=True)
+        final = m.finalize_condition_four_disposition(draft=complete, approved_at=None, approved_by_role=None)
+        self.assertFalse(final["approval_required"]); self.assertIsNone(final["approved_at"]); self.assertIsNone(final["approved_by_role"])
+        with self.assertRaises(m.GateEEvidenceError):
+            m.finalize_condition_four_disposition(draft=complete, approved_at="2026-10-10", approved_by_role="repository owner")
+
+
+class ConditionFourDisclosureTests(unittest.TestCase):
+    def test_public_projection_has_exact_residual_meaning_and_no_private_fields(self):
+        m = module(self); hosted, real = measured(m); d = draft(m)
+        final = m.finalize_condition_four_disposition(draft=d, approved_at="2026-10-10", approved_by_role="repository owner")
+        public = m.render_condition_four_public_decision(draft=d, final=final, hosted_replay=hosted, real_republish=real)
+        self.assertEqual(public, m.render_condition_four_public_decision(draft=json.dumps(d), final=json.dumps(final), hosted_replay=hosted, real_republish=real))
+        self.assertIn("Fixture acceptance is not live-source acceptance", public)
+        self.assertIn("Dispatched calendar cases are not actual scheduled observations", public)
+        self.assertIn("2026-10-10", public)
+        for gap in d["residual_gaps"]:
+            self.assertIn(gap["evidence_class"] + " | " + gap["outcome"], public)
+        for excluded in ("repository owner", "approved_by_role", "approval_required", ".planning", "calico-build"):
+            self.assertNotIn(excluded, public)
+        complete = draft(m, complete=True)
+        complete_final = m.finalize_condition_four_disposition(draft=complete, approved_at=None, approved_by_role=None)
+        self.assertIn("No residual gaps", m.render_condition_four_public_decision(draft=complete, final=complete_final, hosted_replay=hosted, real_republish=real))
+
+    def test_private_unknown_duplicate_and_changed_draft_or_final_fail(self):
+        m = module(self); hosted, real = measured(m); d = draft(m)
+        for key in d:
+            changed = copy.deepcopy(d); changed[key] = None
+            with self.assertRaises(m.GateEEvidenceError): m.decode_condition_four_draft(changed)
+        for changed in (dict(d, private_path="../private"), dict(d, derived_at="2026-02-30")):
+            with self.assertRaises(m.GateEEvidenceError): m.decode_condition_four_draft(changed)
+        raw = json.dumps(d).replace('"schema_version":', '"schema_version":"duplicate","schema_version":', 1)
+        with self.assertRaises(m.GateEEvidenceError): m.decode_condition_four_draft(raw)
+        final = m.finalize_condition_four_disposition(draft=d, approved_at="2026-10-10", approved_by_role="repository owner")
+        final["residual_gaps"].reverse()
+        with self.assertRaises(m.GateEEvidenceError):
+            m.render_condition_four_public_decision(draft=d, final=final, hosted_replay=hosted, real_republish=real)
+
+    def test_historical_privacy_findings_are_disclosed_and_not_waived(self):
+        m = module(self); hosted, real = measured(m)
+        live = observations(complete=True); live[0].update(log_privacy="absolute_local_path_findings", log_finding_count=66)
+        d = m.derive_condition_four_disposition(hosted_replay=hosted, real_republish=real,
+            live_observations=live, scheduled_observations=observations(scheduled=True, complete=True))
+        self.assertEqual(d["residual_gaps"], [{"evidence_class": "live_source_observation", "outcome": "privacy_boundary", "reason": "historical_log_privacy_not_clean"}])
+
+    def test_finalize_check_render_cli_round_trip_and_repository_owner_role_mapping(self):
+        m = module(self); hosted, real = measured(m)
+        with tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve()) as temporary:
+            paths = {key: Path(temporary) / (key + ".json") for key in ("draft", "final", "hosted", "real", "public")}
+            for key, value in (("draft", draft(m)), ("hosted", hosted), ("real", real)):
+                paths[key].write_text(json.dumps(value))
+            base = [str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public"]
+            result = subprocess.run(base + ["condition-four-finalize", "--draft", str(paths["draft"]), "--final", str(paths["final"]), "--approved-at", "2026-10-10", "--approved-by-role", "repository-owner"], cwd=ROOT, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            self.assertEqual(json.loads(paths["final"].read_text())["approved_by_role"], "repository owner")
+            flags = [item for key in ("draft", "final", "hosted", "real") for item in ("--" + key, str(paths[key]))]
+            result = subprocess.run(base + ["condition-four-render", *flags, "--output", str(paths["public"])], cwd=ROOT, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            result = subprocess.run(base + ["condition-four-check", *flags, "--public", str(paths["public"])], cwd=ROOT, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            paths["public"].write_text("changed")
+            result = subprocess.run(base + ["condition-four-check", *flags, "--public", str(paths["public"])], cwd=ROOT, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
