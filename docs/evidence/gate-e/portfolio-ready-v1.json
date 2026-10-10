@@ -276,15 +276,9 @@
       "status": "pass",
       "evidence": [
         {
-          "type": "file_sha256",
-          "locator": "README.md",
-          "sha256": "dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced",
-          "claim": "Question, grains, SQL lineage, limitations, refresh procedure and findings"
-        },
-        {
           "type": "test_id",
           "locator": "tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh",
-          "claim": "README content and refresh dates are independently enforced"
+          "claim": "README question, grains, SQL lineage, limitations, refresh procedure and findings are independently enforced"
         }
       ],
       "amendment": null

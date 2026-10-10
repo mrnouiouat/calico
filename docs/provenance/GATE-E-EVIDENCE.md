@@ -109,8 +109,7 @@ Status: `pass`.
 
 | Evidence type | Openable locator | Claim |
 | --- | --- | --- |
-| file_sha256 | [README.md](../../README.md) | Question, grains, SQL lineage, limitations, refresh procedure and findings; sha256: dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced |
-| test_id | [tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh](https://github.com/mrnouiouat/calico/blob/main/tests/docs_public/test_readme.py) | README content and refresh dates are independently enforced |
+| test_id | [tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh](https://github.com/mrnouiouat/calico/blob/main/tests/docs_public/test_readme.py) | README question, grains, SQL lineage, limitations, refresh procedure and findings are independently enforced |
 
 ## Condition 9
 

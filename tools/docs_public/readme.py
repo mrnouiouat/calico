@@ -351,7 +351,7 @@ TOPICS = (
     "How to reproduce",
 )
 README_TOPIC_ORDER = (0, 3, 2, 14, 11, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 1, 16, 17)
-BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts", "walkthrough")
+BLOCK_NAMES = ("architecture", "grains", "metrics", "claims", "identity", "refresh", "lineage", "excerpts", "walkthrough", "report")
 WALKTHROUGH_LINK = "Walkthrough: [Read the written walkthrough](docs/walkthrough.md)."
 MIT_LICENSE = '''MIT License
 
@@ -512,8 +512,7 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "| Cohort persistence | What happened to a starting published delinquent population across observed endpoints. |\n"
         "| Release quality | Source coverage, release checks and capture status. |\n"
         "| Organization lookup | A selected organization's dated observations, with official verification. |\n\n"
-        "**Interactive report:** public access is pending final publication approval. The walkthrough is available now; an approved report screenshot will be added when available. Report updates use manual Power BI Refresh now.\n\n"
-        "<!-- [Phase 10 report URL slot] -->",
+        + report_block(base),
         "- How does the published registry population change between accepted releases?\n"
         "- Which observed cohorts remain in the published delinquent population?\n"
         "- What source-reported compliance history is available for a selected organization?\n"
@@ -528,7 +527,8 @@ def generate_readme(root: Path, *, write: bool = False) -> str:
         "**Fixture:** public, offline and reproducible; synthetic inputs reproduce the defect shapes without real identities. **Real:** explicit owner-controlled admitted store outside Git, verified against committed catalog anchors; the same SQL DAG and tests run after preflight. The raw archive is private, so the public checkout cannot rerun all historical real-data findings. See [build modes](docs/build-modes.md).",
         _metrics_block(base, inputs) + "\n\n" + _claims_block(inputs),
         "The final three-release panel is bounded by the accepted identities below. It is a longitudinal history across those observations; continuing the series requires a compatible source. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.\n\n"
-        "Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.",
+        "Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.\n\n"
+        "Hosted fixture replay proves accepted publication, identical-repeat preservation and rejected-candidate preservation through the shared route. Fixture acceptance is not live-source acceptance; dispatched calendar cases are not actual scheduled observations. The separate immutable real restore/republish proves its recorded no_change mechanism. The [approved condition-4 amendment](docs/decisions/condition-4-hosted-outcomes.md) retains exactly six residuals: accepted and no_new_release were not observed for the live source or actual schedule, and historical ordinary log privacy is not clean for either class. The recorded absolute_local_path counts are 66, 22 and 66; they are audit limits, not evidence of excluded-content leakage or a privacy waiver. Source retirement ended new four-file releases; adopting the successor source and founder action #5 remain beyond v1.",
         _identity_block(inputs) + "\n\n" + _refresh_block(inputs) + "\n\nSee the [Power BI refresh runbook](docs/powerbi-refresh-runbook.md) for native manual refresh and official verification.",
         _block("lineage", "```mermaid\n" + render_mermaid(graph) + "```\n\nGenerated from the [safe fixture projection](" + LINEAGE + "); source model hashes and immediate edges are checked offline. Raw dbt manifests, compiled SQL, profiles and runtime paths are not published."),
         "- **Source integrity:** verified source bytes, explicit parsing contracts and all-or-nothing release admission.\n"
@@ -580,3 +580,18 @@ def check_readme(root: Path) -> None:
         raw = _read(base, name)
         if raw != encode_document(decode_document(raw)):
             _fail("readme.noncanonical_evidence")
+
+
+def report_block(root: Path) -> str:
+    from .gate_e import AUTHORITY_PATH, GateEEvidenceError, _decode, validate_report_state
+    try:
+        document = _decode(_read(root, AUTHORITY_PATH)) if root.joinpath(AUTHORITY_PATH).exists() else {}
+        report = validate_report_state(document)
+    except GateEEvidenceError:
+        _fail("readme.invalid_report_state")
+    if report is None:
+        body = "**Interactive report:** public access is pending final publication approval. Report updates use manual Power BI Refresh now.\n\n<!-- [Phase 10 report URL slot] -->"
+    else:
+        body = ("**Interactive report:** [Open the verified anonymous report](" + report["url"] + ").\n\n"
+            "Verified from a signed-out session on " + report["observed_at"] + ": all four pages, the source-publication-retired release banner and the lookup selection guard passed. Anonymous describes access, not de-identified content. Report updates use manual Power BI Refresh now.")
+    return _block("report", body)

@@ -121,7 +121,10 @@ class ReadmeContracts(unittest.TestCase):
                 "**Current scope:**", "Adopting the successor publication is future work",
                 "retirement described here concerns the commercial proposition",
                 "2026-08-19", "2026-10-01T03:56:55.950Z", "source_contract_mismatch",
-                "disappearance is not cure", "[Phase 10 report URL slot]", "CP1252", "QUOTE_NONE"):
+                "disappearance is not cure", "[Phase 10 report URL slot]", "CP1252", "QUOTE_NONE",
+                "Fixture acceptance is not live-source acceptance", "dispatched calendar cases are not actual scheduled observations",
+                "exactly six residuals", "66, 22 and 66", "not evidence of excluded-content leakage or a privacy waiver",
+                "founder action #5 remain beyond v1", "No trust, risk, fraud, quality or robustness score"):
             self.assertIn(required, text)
         for name in api.BLOCK_NAMES:
             self.assertEqual(text.count("<!-- calico:" + name + ":start -->"), 1)
@@ -214,7 +217,7 @@ class WrittenWalkthroughLinkContracts(unittest.TestCase):
         self.assertTrue((ROOT / "docs/walkthrough.md").is_file())
 
 
-class FinalUrlDiffContractTests(unittest.TestCase):
+class FinalUrlDiffContractTests(WrittenWalkthroughLinkContracts):
     def test_only_report_block_changes_between_report_states(self):
         from tools.docs_public import readme as api
         from tests.docs_public.test_gate_e import FinalUrlRenderingTests

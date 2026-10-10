@@ -9,6 +9,34 @@
     "conditions"
   ],
   "properties": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "observed_at", "anonymous_observation"],
+      "properties": {
+        "url": {"type": "string", "pattern": "https://app\\.powerbi\\.com/view\\?r=[A-Za-z0-9_=&.%-]+", "maxLength": 4096},
+        "observed_at": {"type": "string", "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+        "anonymous_observation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["access_mode", "pages", "release_banner_source_retired", "lookup_selection_guard"],
+          "properties": {
+            "access_mode": {"type": "string", "const": "signed_out"},
+            "release_banner_source_retired": {"type": "string", "const": "pass"},
+            "lookup_selection_guard": {"type": "string", "const": "pass"},
+            "pages": {
+              "type": "object", "additionalProperties": false,
+              "required": ["published_registry_change", "release_quality", "cohort_persistence", "organization_lookup"],
+              "properties": {
+                "published_registry_change": {"type": "string", "const": "pass"},
+                "release_quality": {"type": "string", "const": "pass"},
+                "cohort_persistence": {"type": "string", "const": "pass"},
+                "organization_lookup": {"type": "string", "const": "pass"}
+              }
+            }
+          }
+        }
+      }
+    },
     "schema_version": {
       "type": "string",
       "const": "portfolio-ready-v1"

@@ -123,8 +123,8 @@ Disposition: `satisfied`. Requirement-derived clause.
 
 | Evidence type | Openable locator | Claim |
 | --- | --- | --- |
-| file_sha256 | [README.md#limitations](../../README.md#limitations) | Current outside-in non-claims retain no internal characterization, cause, scores, rankings or partner recommendation; sha256: dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced |
 | file_sha256 | [docs/provenance/spikes/005-project-recommendation/README.md#usefulness-boundary](../../docs/provenance/spikes/005-project-recommendation/README.md#usefulness-boundary) | Exact still-in-force exclusion list; other superseded predecessor recommendations do not govern this row; sha256: 62400e2211ed14f7f5187eb071a0cced4cbf5f882320aa1e4267444218189f6c |
+| test_id | [tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh](https://github.com/mrnouiouat/calico/blob/main/tests/docs_public/test_readme.py) | Current generated README enforces its bounded topics and limitations |
 
 ## published artifacts are aggregate-only and contain no organization identity fields
 
@@ -162,4 +162,4 @@ Disposition: `deferred_not_v1`. Founder action #5 alone is deferred_not_v1.
 
 | Evidence type | Openable locator | Claim |
 | --- | --- | --- |
-| file_sha256 | [README.md#limitations](../../README.md#limitations) | Founder action #5 external test remains deferred beyond v1; sha256: dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced |
+| test_id | [tests.docs_public.test_gate_e.SpikeEraAuditContractTests.test_exact_requirement_clauses_and_superseding_decisions](https://github.com/mrnouiouat/calico/blob/main/tests/docs_public/test_gate_e.py) | Founder action #5 alone remains deferred beyond v1 in the exact enumeration |

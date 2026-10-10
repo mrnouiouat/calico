@@ -28,9 +28,11 @@ Walkthrough: [Read the written walkthrough](docs/walkthrough.md).
 | Release quality | Source coverage, release checks and capture status. |
 | Organization lookup | A selected organization's dated observations, with official verification. |
 
-**Interactive report:** public access is pending final publication approval. The walkthrough is available now; an approved report screenshot will be added when available. Report updates use manual Power BI Refresh now.
+<!-- calico:report:start -->
+**Interactive report:** public access is pending final publication approval. Report updates use manual Power BI Refresh now.
 
 <!-- [Phase 10 report URL slot] -->
+<!-- calico:report:end -->
 
 ## Techniques demonstrated
 
@@ -48,6 +50,8 @@ The source change also exercised the admission boundary: incompatible candidates
 The final three-release panel is bounded by the accepted identities below. It is a longitudinal history across those observations; continuing the series requires a compatible source. Source publication retirement is recorded by the pinned capture status below; future capture failures do not extend this panel. Official-portal staleness remains unresolved and pending verification; the historical approximate lag is not a settled current fact.
 
 Observed exit, not observed and right censoring remain distinct. Source-reported dates do not establish onset, filing time, continuous status, intent or cause. No annualized rate or formal survival estimate is inferred. Every identifiable registration key publishes by default; an explicit private sidecar entry is the exclusion mechanism. The exact inspected export/semantic inventory remains authoritative.
+
+Hosted fixture replay proves accepted publication, identical-repeat preservation and rejected-candidate preservation through the shared route. Fixture acceptance is not live-source acceptance; dispatched calendar cases are not actual scheduled observations. The separate immutable real restore/republish proves its recorded no_change mechanism. The [approved condition-4 amendment](docs/decisions/condition-4-hosted-outcomes.md) retains exactly six residuals: accepted and no_new_release were not observed for the live source or actual schedule, and historical ordinary log privacy is not clean for either class. The recorded absolute_local_path counts are 66, 22 and 66; they are audit limits, not evidence of excluded-content leakage or a privacy waiver. Source retirement ended new four-file releases; adopting the successor source and founder action #5 remain beyond v1.
 
 ## Deliberate non-claims
 

@@ -10,6 +10,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
+from urllib.parse import urlsplit, unquote
 
 SCHEMA_PATH = "docs/evidence/gate-e/portfolio-ready-v1.schema.json"
 AUTHORITY_PATH = "docs/evidence/gate-e/portfolio-ready-v1.json"
@@ -87,9 +88,10 @@ def _shape(value, schema):
     if "enum" in schema and value not in schema["enum"]:
         _fail()
     if kind == "object":
-        if set(value) != set(schema["required"]) or schema["additionalProperties"] is not False:
+        if (not set(schema["required"]).issubset(value) or not set(value).issubset(schema["properties"])
+                or schema["additionalProperties"] is not False):
             _fail()
-        for key in schema["required"]:
+        for key in value:
             _shape(value[key], schema["properties"][key])
     elif kind == "array":
         if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 1000):
@@ -190,6 +192,7 @@ def _test_id(root, value):
 def validate_gate_e_document(document, *, root=_PRODUCT):
     schema = _decode((_PRODUCT / SCHEMA_PATH).read_bytes())
     _shape(document, schema)
+    validate_report_state(document)
     recorded = _date(document["recorded_at"])
     for number, row in enumerate(document["conditions"], 1):
         if row["condition"] != number or row["text"] != CONDITION_TEXTS[number - 1]:
@@ -268,7 +271,47 @@ def render_gate_e_markdown(document, *, root=_PRODUCT):
             amendment = row["amendment"]
             parts.extend(["", f'Public amendment: [{amendment["recorded_at"]}](../../{amendment["locator"]}); SHA-256: `{amendment["sha256"]}`.'])
         parts.append("")
+    report = validate_report_state(document)
+    if report is not None:
+        parts.extend(["## Anonymous report observation", "",
+            "[Open the verified report](" + report["url"] + ").", "",
+            "Signed-out observation: " + report["observed_at"] + ". All four pages, the source-publication-retired release banner and the lookup selection guard passed.",
+            "Anonymous describes access, not de-identified content.", ""])
     return "\n".join(parts)
+
+
+def validate_report_state(document):
+    """Absent report is unpublished; present report has exactly three verified fields.
+
+    This validates the report projection alone so README generation cannot create
+    a full-document hash cycle with the condition evidence authority.
+    """
+    try:
+        if type(document) is not dict:
+            _fail()
+        if "report" not in document:
+            return None
+        report = document["report"]
+        _keys(report, ("url", "observed_at", "anonymous_observation"))
+        url = report["url"]
+        if (type(url) is not str or len(url) > 4096 or
+                re.fullmatch(r"https://app\.powerbi\.com/view\?r=[A-Za-z0-9_=&.%-]+", url) is None or
+                any(ord(c) < 33 or ord(c) > 126 or c in "<>`\\()\"'" for c in unquote(url))):
+            _fail()
+        parsed = urlsplit(url)
+        if parsed.username or parsed.password or parsed.fragment or parsed.port is not None:
+            _fail()
+        _date(report["observed_at"])
+        observation = report["anonymous_observation"]
+        expected = {"access_mode": "signed_out", "pages": {
+            "published_registry_change": "pass", "release_quality": "pass",
+            "cohort_persistence": "pass", "organization_lookup": "pass"},
+            "release_banner_source_retired": "pass", "lookup_selection_guard": "pass"}
+        if observation != expected or type(observation) is not dict:
+            _fail()
+        return copy.deepcopy(report)
+    except (GateEEvidenceError, ValueError, TypeError, RecursionError):
+        _fail("gate_e.invalid_report_state")
 
 
 def _read(path):
@@ -458,8 +501,7 @@ def build_portfolio_document(*, root=_PRODUCT):
          f("powerbi/semantic-model-inventory-v1.json", "Complete visible, hidden, calculated, measure and relationship model surface"),
          t("tests.publish.test_inventory.InventoryTests.test_v3_control_source_and_each_cross_class_relationship", "Semantic-model source and relationships remain within the v3 boundary"),
          t("tests.publish.test_gate.PublicationGateFixtureTests.test_01_committed_baseline_loads_and_passes", "Committed fixture publication passes the field gate")],
-        [f("README.md", "Question, grains, SQL lineage, limitations, refresh procedure and findings"),
-         t("tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh", "README content and refresh dates are independently enforced")],
+        [t("tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh", "README question, grains, SQL lineage, limitations, refresh procedure and findings are independently enforced")],
         [f("docs/walkthrough.md", "Concise written finding, SQL transformation, source defect and deliberate non-claim"),
          t("tests.docs_public.test_walkthrough.WrittenWalkthroughContracts.test_four_topics_exist_without_recording_or_hosting_prerequisites", "Written walkthrough has all four decided topics")],
         [f("AGENTS.md", "Python landing/admission; DuckDB/dbt analytical calculations; Power BI presentation"),
@@ -508,7 +550,7 @@ def validate_portfolio_authority(document, *, root=_PRODUCT):
         for item in row["evidence"]:
             if item["locator"].partition("#")[0] in _GENERATED_AUTHORITIES:
                 _fail("gate_e.self_or_future_reference")
-    if document != build_portfolio_document(root=root):
+    if {key: value for key, value in document.items() if key != "report"} != build_portfolio_document(root=root):
         _fail("gate_e.condition_evidence_mismatch")
     return copy.deepcopy(document)
 
@@ -542,11 +584,11 @@ def build_spike_audit_document(*, root=_PRODUCT):
         [f("contracts/metric-denominators-v1.json", "Date-pair denominators and non-annualized gap proportions"),
          t("tests.dbt_longitudinal.test_spells.DelinquencySpellsSqlShapeTests.test_delinquency_spells_never_coalesces_a_missing_bound", "Left/right/interval censoring remains explicit")],
         [f("docs/provenance/spikes/005-project-recommendation/README.md#usefulness-boundary", "Exact still-in-force exclusion list; other superseded predecessor recommendations do not govern this row"),
-         f("README.md#limitations", "Current outside-in non-claims retain no internal characterization, cause, scores, rankings or partner recommendation")],
+         t("tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh", "Current generated README enforces its bounded topics and limitations")],
         [f("docs/decisions/register.md#d-007", "D-007 intentionally permits bounded approved named organization history")],
         [f("docs/decisions/register.md#d-008", "D-008 settles one Power BI implementation")],
         [f("docs/decisions/register.md#d-012", "D-012 excludes broader archive census from v1")],
-        [f("README.md#limitations", "Founder action #5 external test remains deferred beyond v1")],
+        [t("tests.docs_public.test_gate_e.SpikeEraAuditContractTests.test_exact_requirement_clauses_and_superseding_decisions", "Founder action #5 alone remains deferred beyond v1 in the exact enumeration")],
     ]
     rows = []
     for index, (text, items) in enumerate(zip(SPIKE_REQUIREMENT_TEXTS, evidence)):
