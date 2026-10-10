@@ -85,6 +85,29 @@ class SpikeEraAuditContractTests(unittest.TestCase):
 
 
 class GateEAtomicGenerationTests(unittest.TestCase):
+    def test_process_interruption_after_exchange_leaves_the_entire_new_pair(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "generate_gate_e_pair", None)))
+        with tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve()) as directory:
+            root = Path(directory)
+            paths = (root / "docs/evidence/a.json", root / "docs/provenance/a.md")
+            m._generate_common_pair({"generation": 1}, *paths, "generation one\n")
+            script = """import os, sys
+from pathlib import Path
+from tools.docs_public import gate_e as m
+root = Path(sys.argv[1])
+exchange = m._exchange_directories
+def interrupt(a, b):
+    exchange(a, b)
+    os._exit(91)
+m._exchange_directories = interrupt
+m._generate_common_pair({'generation': 2}, root/'docs/evidence/a.json', root/'docs/provenance/a.md', 'generation two\\n')
+"""
+            result = subprocess.run([sys.executable, "-c", script, str(root)], cwd=ROOT, capture_output=True)
+            self.assertEqual(result.returncode, 91)
+            self.assertEqual(json.loads(paths[0].read_bytes()), {"generation": 2})
+            self.assertEqual(paths[1].read_text(), "generation two\n")
+
     def test_generators_produce_byte_identical_complete_pairs(self):
         m = module(self)
         self.assertTrue(callable(getattr(m, "generate_gate_e_pair", None)),

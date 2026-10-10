@@ -145,8 +145,8 @@ def _file(root, locator):
             any(p in (".", "..") or p.startswith(".") and p != ".github" for p in parts) or
             str(PurePosixPath(relative)) != relative or
             not (relative in {"README.md", "AGENTS.md", "LICENSE"} or parts[0] in {
-                "docs", "contracts", "tests", "tools", "calico_capture", "calico_publish", "calico_dbt", "dbt", ".github"}) or
-            relative in {AUTHORITY_PATH, MARKDOWN_PATH}):
+                "docs", "contracts", "tests", "tools", "powerbi", "calico_capture", "calico_publish", "calico_dbt", "dbt", ".github"}) or
+            relative in {AUTHORITY_PATH, MARKDOWN_PATH, SPIKE_AUTHORITY_PATH, SPIKE_MARKDOWN_PATH}):
         _fail("gate_e.unsafe_locator")
     try:
         path = _path(Path(root) / relative)
@@ -296,7 +296,26 @@ def _write(path, raw):
 
 
 def check_gate_e(authority_path, markdown_path=None, *, root=_PRODUCT):
-    document = decode_gate_e_document(_read(authority_path), root=root)
+    from .hosted_replay import _pair_lock, HostedReplayPublicError
+    if Path(authority_path).resolve() != (Path(root) / AUTHORITY_PATH).resolve():
+        return _check_gate_e_unlocked(authority_path, markdown_path, root=root)
+    try:
+        with _pair_lock(Path(root) / "gate-e-json", Path(root) / "gate-e-markdown"):
+            return _check_gate_e_unlocked(authority_path, markdown_path, root=root)
+    except HostedReplayPublicError:
+        _fail("gate_e.lock_busy")
+
+
+def _check_gate_e_unlocked(authority_path, markdown_path=None, *, root=_PRODUCT):
+    raw = _read(authority_path)
+    document = decode_gate_e_document(raw, root=root)
+    if Path(authority_path).resolve() == (Path(root) / AUTHORITY_PATH).resolve():
+        validate_portfolio_authority(document, root=root)
+        if raw != _encode(document):
+            _fail("gate_e.generated_drift")
+        if (Path(root) / SPIKE_AUTHORITY_PATH).exists():
+            _check_spike_audit_unlocked(Path(root) / SPIKE_AUTHORITY_PATH,
+                                       Path(root) / SPIKE_MARKDOWN_PATH, root=root)
     rendered = render_gate_e_markdown(document, root=root).encode()
     if markdown_path is not None and _read(markdown_path) != rendered:
         _fail("gate_e.generated_drift")
@@ -308,7 +327,14 @@ def generate_gate_e(authority_path, output, *, root=_PRODUCT):
     if _path(authority_path) == _path(output):
         _fail("gate_e.unsafe_path")
     document = check_gate_e(authority_path, root=root)
-    _write(output, render_gate_e_markdown(document, root=root).encode())
+    if Path(authority_path).resolve() == (Path(root) / AUTHORITY_PATH).resolve():
+        generate_gate_e_pair(document, authority_path, output, root=root)
+        if (Path(root) / SPIKE_AUTHORITY_PATH).exists():
+            generate_spike_audit_pair(_decode(_read(Path(root) / SPIKE_AUTHORITY_PATH)),
+                                     Path(root) / SPIKE_AUTHORITY_PATH,
+                                     Path(root) / SPIKE_MARKDOWN_PATH, root=root)
+    else:
+        _write(output, render_gate_e_markdown(document, root=root).encode())
 
 
 # Safe projection of the immutable historical real observation. Its scope and
@@ -333,6 +359,343 @@ _SUPERSEDES = [{"superseded": "D-04 offline-only outcome fallback and original 1
 _OBSERVATION_KEYS = ("evidence_class", "run_id", "run_attempt", "event", "head_sha",
     "created_at", "completed_at", "recorded_at", "conclusion", "outcome", "outcome_basis",
     "log_privacy", "log_finding_count")
+
+SPIKE_AUTHORITY_PATH = "docs/evidence/gate-e/spike-era-requirements-v1.json"
+SPIKE_MARKDOWN_PATH = "docs/provenance/spike-era-requirements-audit.md"
+SPIKE_REQUIREMENT_TEXTS = (
+    "automated first/third-Wednesday capture",
+    "four-file atomic admission",
+    "accepted/no_new_release/rejected run recording",
+    "visible release-integrity and bulk-movement flags",
+    "scheduled automation is not the sole preservation mechanism",
+    "historical release identity includes source URL, archive timestamp, as-of date, list, revision, byte count, row count, and SHA-256",
+    "full nonblank State Charity Reg# is the longitudinal key with keyless rows visible as coverage and EIN never a fallback identity",
+    "snapshots immutable, transitions and interval-censored spells derived",
+    "disappearance is not cure",
+    "duration metrics retain left, right, and interval censoring and never annualize a raw gap proportion",
+    "the exclusion list (stakeholder interviews, internal organization-level tooling, investigation queues, email notifications, predictions, causal explanations, per-organization recommendations) holds",
+    "published artifacts are aggregate-only and contain no organization identity fields",
+    "one BI implementation ships: Power BI if Publish to web works, Evidence otherwise",
+    "the archive-census precondition",
+    "seeking one external test of whether the finished monitor catches a real release problem — founder action #5",
+)
+_GENERATED_AUTHORITIES = frozenset({AUTHORITY_PATH, MARKDOWN_PATH,
+                                    SPIKE_AUTHORITY_PATH, SPIKE_MARKDOWN_PATH})
+_HOSTED_PATH = "docs/evidence/gate-e/hosted-replay-v1.json"
+_AMENDMENT_PATH = "docs/decisions/condition-4-hosted-outcomes.md"
+_IMMUTABLE_HASHES = {
+    _HOSTED_PATH: "7a5abc056144409c7efd29eafcff6dffa7babf7d05169f0487e788bb824136f6",
+    _AMENDMENT_PATH: "444ade2ad968bb570d66ec5ac775fa96666212758ca2879dc52e7cc893dda635",
+}
+
+
+def _bound_file(root, locator, claim, *, manifest=False):
+    raw = _file(root, locator)
+    digest = hashlib.sha256(raw).hexdigest()
+    relative = locator.partition("#")[0]
+    if relative in _IMMUTABLE_HASHES and digest != _IMMUTABLE_HASHES[relative]:
+        _fail("gate_e.changed_prior_authority")
+    return {"type": "manifest" if manifest else "file_sha256", "locator": locator,
+            "sha256": digest, "claim": claim}
+
+
+def _bound_test(root, locator, claim):
+    _test_id(root, locator)
+    return {"type": "test_id", "locator": locator, "claim": claim}
+
+
+def _ci(run, *, recorded_at, claim, evidence_class):
+    return {"type": "ci_run", "locator": run["run_url"], "claim": claim,
+            "recorded_at": recorded_at, "conclusion": run["conclusion"],
+            "head_sha": run["head_sha"], "event": run["event"],
+            "evidence_class": evidence_class}
+
+
+def _ordered(items):
+    return sorted(items, key=lambda e: (e["type"], e["locator"]))
+
+
+def build_portfolio_document(*, root=_PRODUCT):
+    """Bind the ten real requirements to earlier evidence, never to this output.
+
+    This is an offline projection. Hosted conclusions remain at their recorded
+    SHAs; the manual Service observation does not become a new lookup or embed.
+    """
+    root = Path(root).resolve()
+    hosted = _decode(_file(root, _HOSTED_PATH))
+    _hosted_observation(hosted)
+    h = _bound_file(root, _HOSTED_PATH,
+        "Actual Jobs API conclusions, reconstruction digest equality, fixture SQL and bytes-derived privacy audits; isolated atomic publication", manifest=True)
+    amendment = _bound_file(root, _AMENDMENT_PATH,
+        "Approved 2026-10-10 six-residual amendment; historical log limits are disclosed without a privacy waiver")
+    fixture_ci = _ci(hosted["run"], recorded_at="2026-10-09",
+        claim="Recorded fixture-hosted replay: 32 dbt models and 228 tests passed on its historical head",
+        evidence_class="fixture_hosted_replay")
+    jobs = {j["job_name"]: j for j in hosted["jobs"]}
+    if jobs["publish-accepted"]["conclusion"] != "success" or any(
+        jobs["publish-" + name]["conclusion"] != "skipped"
+        for name in ("repeat", "rejected", "calendar-refused", "failure", "cancelled")):
+        _fail("gate_e.missing_actual_worker_proof")
+    real = HISTORICAL_REAL_OBSERVATION
+    real_ci = _ci(dict(real, run_url=f'https://github.com/mrnouiouat/calico/actions/runs/{real["run_id"]}/attempts/1'),
+        recorded_at="2026-10-08", evidence_class="real_restore_republish_observation",
+        claim="Immutable real B2 restore/build/publication mechanism; exact no_change; published manifest " + real["published_manifest_sha256"] + "; policy " + real["policy_sha256"] + "; published commit " + real["published_data_commit"])
+    f = lambda path, claim: _bound_file(root, path, claim)
+    t = lambda path, claim: _bound_test(root, path, claim)
+    rows = [
+        [fixture_ci, h, f(".github/workflows/dbt-fixture.yml", "The normal CI workflow runs the public fixture dbt build and its tests")],
+        [_bound_file(root, "docs/evidence/gate-b/real-build-proof-v3.json", "Recorded local real-mode SQL models/tests, exact source binding and zero reconciliation mismatches", manifest=True), real_ci,
+         t("tests.dbt_metrics.test_reconciliation.RealProofProvenanceTests.test_verify_proof_rejects_fixture_mode_when_real_required", "Real evidence cannot substitute fixture mode")],
+        [h, t("tests.landing.test_admission.RejectionMatrixTests.test_missing_logical_file_rejected_as_invalid_mapping_pointer_unchanged", "Incomplete four-file admission preserves the prior release"),
+         t("tests.landing.test_admission.RejectionMatrixTests.test_wrong_arity_rejected_with_no_raw_row_in_output", "Structural failures reject without printing raw rows")],
+        [fixture_ci, h, amendment],
+        [h, real_ci, f("docs/provenance/HOSTED-REPLAY-EVIDENCE.md", "Accepted publisher succeeded; repeat/rejected/calendar/failure/cancel publishers skipped; isolated transaction and exact unchanged negative boundaries")],
+        [f("docs/powerbi-refresh-runbook.md", "Stable published Web sources; existing manual Refresh now fallback; scheduled refresh reliability is not proved"),
+         {"type": "owner_attestation", "locator": "docs/powerbi-refresh-runbook.md#power-bi-refresh-and-owner-acceptance-runbook",
+          "claim": "Recorded owner Service observation 2026-09-22: native Refresh now completed; accepted 2026-08-19 revision 1; latest attempt rejected; source retired. No new Service lookup or public embed",
+          "recorded_at": "2026-09-22", "conclusion": "observed"}],
+        [f("contracts/publication-exports-v3.json", "Approved aggregate and bounded named-history fields"),
+         f("powerbi/semantic-model-inventory-v1.json", "Complete visible, hidden, calculated, measure and relationship model surface"),
+         t("tests.publish.test_inventory.InventoryTests.test_v3_control_source_and_each_cross_class_relationship", "Semantic-model source and relationships remain within the v3 boundary"),
+         t("tests.publish.test_gate.PublicationGateFixtureTests.test_01_committed_baseline_loads_and_passes", "Committed fixture publication passes the field gate")],
+        [f("README.md", "Question, grains, SQL lineage, limitations, refresh procedure and findings"),
+         t("tests.docs_public.test_readme.ReadmeContracts.test_complete_readme_has_all_decided_topics_and_separate_refresh", "README content and refresh dates are independently enforced")],
+        [f("docs/walkthrough.md", "Concise written finding, SQL transformation, source defect and deliberate non-claim"),
+         t("tests.docs_public.test_walkthrough.WrittenWalkthroughContracts.test_four_topics_exist_without_recording_or_hosting_prerequisites", "Written walkthrough has all four decided topics")],
+        [f("AGENTS.md", "Python landing/admission; DuckDB/dbt analytical calculations; Power BI presentation"),
+         f("docs/evidence/dbt-lineage-v1.json", "SQL model lineage"), f("docs/evidence/sql-excerpts-v1.json", "Representative SQL excerpts bound to source hashes"),
+         t("tests.docs_public.test_walkthrough.WrittenWalkthroughContracts.test_sql_excerpt_is_exact_and_bound_to_source_hashes", "Walkthrough SQL remains byte-exact and bound to model sources")],
+    ]
+    proof = _decode(_file(root, "docs/evidence/gate-b/real-build-proof-v3.json"))
+    if (proof.get("mode") != "real" or proof.get("status") != "success" or
+            proof.get("verified_input_binding") is not True or
+            proof.get("reconciliation", {}).get("status") != "reconciled" or
+            type(proof.get("reconciliation", {}).get("mismatch_row_count")) is not int or
+            proof["reconciliation"]["mismatch_row_count"] != 0 or
+            any(type(proof.get(key)) is not int or proof[key] <= 0 for key in
+                ("dbt_model_count", "dbt_test_count", "verified_object_count", "verified_release_count"))):
+        _fail("gate_e.invalid_real_build_proof")
+    for name in ("test_truncated_payload_rejected_with_deterministic_transfer_code",
+                 "test_wrong_header_rejected_with_safe_logical_location_only",
+                 "test_blank_date_rejected_with_ordered_date_reason",
+                 "test_mismatched_date_rejected_with_ordered_date_reason",
+                 "test_duplicate_key_within_list_rejected_with_duplicate_category",
+                 "test_duplicate_key_across_lists_rejected_with_duplicate_category",
+                 "test_unknown_registration_family_rejected_blank_keys_stay_accepted",
+                 "test_invalid_same_date_revision_rejected_preserves_prior_promotion"):
+        rows[2].append(t("tests.landing.test_admission.RejectionMatrixTests." + name,
+                         "Known structural rejection preserves the prior admitted release"))
+    # Recorded live and schedule observations are distinct from dispatched replay.
+    for run_id, event, sha, claim in (
+        (36812428040, "workflow_dispatch", "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b", "Live source rejected; 66 historical ordinary log absolute_local_path locations; no clean-log claim"),
+        (36779395262, "schedule", "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b", "Actual schedule outside capture window; 22 historical ordinary log absolute_local_path locations; no accepted claim"),
+        (37693376162, "schedule", real["head_sha"], "Actual schedule rejected retired source; 66 historical ordinary log absolute_local_path locations; no clean-log claim"),
+    ):
+        rows[3].append(_ci({"run_url": f"https://github.com/mrnouiouat/calico/actions/runs/{run_id}/attempts/1",
+            "conclusion": "success", "head_sha": sha, "event": event}, recorded_at="2026-10-10", claim=claim,
+            evidence_class="actual_schedule_observation" if event == "schedule" else "live_source_observation"))
+    document = {"schema_version": "portfolio-ready-v1", "recorded_at": "2026-10-10", "conditions": []}
+    for number, evidence in enumerate(rows, 1):
+        document["conditions"].append({"condition": number, "text": CONDITION_TEXTS[number - 1],
+            "status": "pass_with_disclosed_deviation" if number == 4 else "pass", "evidence": _ordered(evidence),
+            "amendment": {"locator": _AMENDMENT_PATH, "sha256": amendment["sha256"], "recorded_at": "2026-10-10"} if number == 4 else None})
+    return document
+
+
+def validate_portfolio_authority(document, *, root=_PRODUCT):
+    document = decode_gate_e_document(document, root=root)
+    for row in document["conditions"]:
+        for item in row["evidence"]:
+            if item["locator"].partition("#")[0] in _GENERATED_AUTHORITIES:
+                _fail("gate_e.self_or_future_reference")
+    if document != build_portfolio_document(root=root):
+        _fail("gate_e.condition_evidence_mismatch")
+    return copy.deepcopy(document)
+
+
+def build_spike_audit_document(*, root=_PRODUCT):
+    """The 11 current clauses, three superseded clauses and sole deferred action."""
+    portfolio = build_portfolio_document(root=root)
+    f = lambda path, claim: _bound_file(root, path, claim)
+    t = lambda path, claim: _bound_test(root, path, claim)
+    calendar = [f("calico_capture/calendar.py", "Exact UTC first/third-Wednesday authority: allow days 1/7/15/21; refuse days 8/22"),
+                t("tests.capture.test_schedule_contract.CalendarBoundaryDateTests.test_exact_wednesday_boundaries", "All six calendar boundaries are independently tested"),
+                f(".github/workflows/capture-current.yml", "Wednesday schedule plus shared calendar gate and manual capture fallback"),
+                *portfolio["conditions"][3]["evidence"]]
+    evidence = [calendar, portfolio["conditions"][2]["evidence"],
+        [f("contracts/capture-status-v3.schema.json", "Closed accepted/no_new_release/rejected run recording"), *portfolio["conditions"][3]["evidence"]],
+        [f("docs/walkthrough.md", "Visible release-integrity and bulk movement descriptions; no inferred cause")],
+        [f("docs/capture-runbook.md", "Manual preservation fallback remains mandatory after scheduled cutover"),
+         t("tests.capture.test_archive.SynchronizeTransactionTests.test_byte_identical_replay_is_an_idempotent_no_op", "Immutable private preservation has an independent idempotent mechanism")],
+        [f("docs/evidence/gate-b/real-input-catalog-v1.json", "Twelve real source identities include URL, archive timestamp, date/list/revision, bytes/rows/hash")],
+        [t("tests.dbt_longitudinal.test_transitions.KeyedSnapshotSqlShapeTests.test_keyed_snapshots_uses_exact_eligible_predicate", "Full registration keys; no excluded identifier fallback"),
+         t("tests.dbt_longitudinal.test_transitions.KeyedSnapshotSqlShapeTests.test_unkeyed_coverage_groups_the_row_level_relation", "Keyless records remain visible coverage")],
+        [t("tests.dbt_longitudinal.test_spells.DelinquencySpellsSqlShapeTests.test_delinquency_spells_never_coalesces_a_missing_bound", "Derived interval-censored spells retain absent bounds"),
+         t("tests.capture.test_archive.SynchronizeTransactionTests.test_different_bytes_at_existing_key_is_a_deterministic_collision", "Immutable source snapshots cannot overwrite an existing key")],
+        [f("docs/walkthrough.md", "Disappearance is not cure"),
+         t("tests.dbt_longitudinal.test_transitions.EntityTransitionsSqlShapeTests.test_entity_transitions_never_coalesces_missing_status", "Missing status stays distinct from observed exit")],
+        [f("contracts/metric-denominators-v1.json", "Date-pair denominators and non-annualized gap proportions"),
+         t("tests.dbt_longitudinal.test_spells.DelinquencySpellsSqlShapeTests.test_delinquency_spells_never_coalesces_a_missing_bound", "Left/right/interval censoring remains explicit")],
+        [f("README.md#limitations", "Outside-in non-claims and v1 exclusions; no stakeholder interviews, internal tools, investigations, notifications, predictions, cause or recommendations")],
+        [f("docs/decisions/register.md#d-007", "D-007 intentionally permits bounded approved named organization history")],
+        [f("docs/decisions/register.md#d-008", "D-008 settles one Power BI implementation")],
+        [f("docs/decisions/register.md#d-012", "D-012 excludes broader archive census from v1")],
+        [f("README.md#limitations", "Founder action #5 external test remains deferred beyond v1")],
+    ]
+    rows = []
+    for index, (text, items) in enumerate(zip(SPIKE_REQUIREMENT_TEXTS, evidence)):
+        decision = ("D-007", "D-008", "D-012")[index - 11] if 11 <= index < 14 else None
+        rows.append({"id": text, "text": text, "disposition": "satisfied" if index < 11 else "superseded" if index < 14 else "deferred_not_v1",
+            "evidence": _ordered(items), "decision": decision,
+            "note": "Source retirement ended new releases; dispatched fixture calendar cases and actual schedule observations remain distinct; the approved six residuals apply" if index == 0 else
+                    "Founder action #5 alone is deferred_not_v1" if index == 14 else "Requirement-derived clause"})
+    return {"schema_version": "spike-era-requirements-v1", "recorded_at": "2026-10-10", "rows": rows}
+
+
+def validate_spike_audit_document(document, *, root=_PRODUCT):
+    if type(document) in (str, bytes):
+        document = _decode(document)
+    _keys(document, ("schema_version", "recorded_at", "rows"))
+    if document["schema_version"] != "spike-era-requirements-v1" or type(document["rows"]) is not list or len(document["rows"]) != 15:
+        _fail("gate_e.spike_enumeration")
+    _date(document["recorded_at"])
+    expected = build_spike_audit_document(root=root)
+    for row, wanted in zip(document["rows"], expected["rows"]):
+        _keys(row, wanted)
+        if type(row["id"]) is not str or row != wanted:
+            _fail("gate_e.spike_requirement_mismatch")
+        # Reuse the closed typed evidence validator, including date/hash/test checks.
+        template = {"schema_version": "portfolio-ready-v1", "recorded_at": document["recorded_at"],
+            "conditions": [{"condition": n, "text": text, "status": "pass", "amendment": None,
+                            "evidence": row["evidence"]} for n, text in enumerate(CONDITION_TEXTS, 1)]}
+        validate_gate_e_document(template, root=root)
+        if row["decision"]:
+            _file(root, "docs/decisions/register.md#" + row["decision"].lower())
+    if document != expected:
+        _fail("gate_e.spike_requirement_mismatch")
+    return copy.deepcopy(document)
+
+
+def render_spike_audit_markdown(document, *, root=_PRODUCT):
+    document = validate_spike_audit_document(document, root=root)
+    parts = ["# Spike-era requirements audit", "", "Generated from the exact predecessor requirement enumeration.",
+        "Recorded: " + document["recorded_at"] + ". Eleven clauses remain in force, three are superseded, and founder action #5 alone is deferred.", ""]
+    for row in document["rows"]:
+        parts.extend(["## " + row["text"], "", "Disposition: `" + row["disposition"] + "`. " + row["note"] + ".", ""])
+        if row["decision"]:
+            parts.extend(["Superseding decision: [" + row["decision"] + "](../decisions/register.md#" + row["decision"].lower() + ").", ""])
+        # Share the typed-evidence renderer without treating this audit as a condition.
+        template = {"schema_version": "portfolio-ready-v1", "recorded_at": document["recorded_at"],
+            "conditions": [{"condition": n, "text": text, "status": "pass", "amendment": None,
+                            "evidence": row["evidence"]} for n, text in enumerate(CONDITION_TEXTS, 1)]}
+        rendered = render_gate_e_markdown(template, root=root)
+        parts.extend(["| Evidence type" + rendered.split("| Evidence type", 1)[1].split("## Condition 2", 1)[0].rstrip(), ""])
+    return "\n".join(parts)
+
+
+def _exchange_directories(previous, replacement):
+    """One OS namespace operation: even process termination cannot split a pair."""
+    import ctypes
+    import sys
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        function = libc.renameatx_np
+        function.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+        result = function(-2, os.fsencode(previous), -2, os.fsencode(replacement), 2)
+    elif sys.platform.startswith("linux"):
+        function = libc.renameat2
+        function.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+        result = function(-100, os.fsencode(previous), -100, os.fsencode(replacement), 2)
+    else:
+        _fail("gate_e.atomic_exchange_unavailable")
+    if result:
+        _fail("gate_e.atomic_exchange_failed")
+
+
+def _generate_common_pair(document, json_path, markdown_path, markdown):
+    """Stage a complete common-directory successor; preserve every sibling byte.
+
+    The shared lock lives outside the exchanged directory. A competing writer
+    fails closed. The exchange is the only mutation of the visible authority.
+    """
+    import shutil
+    import tempfile
+    from .hosted_replay import _path, _pair_lock, HostedReplayPublicError
+    json_path, markdown_path = _path(json_path), _path(markdown_path)
+    if json_path == markdown_path:
+        _fail("gate_e.unsafe_path")
+    common = Path(os.path.commonpath((json_path.parent, markdown_path.parent)))
+    if common == common.parent or common.name != "docs":
+        _fail("gate_e.unsafe_common_directory")
+    common.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with _pair_lock(common.parent / "gate-e-json", common.parent / "gate-e-markdown"):
+            if common.exists():
+                for path in common.rglob("*"):
+                    if path.is_symlink() or path.is_file() and path.stat().st_nlink != 1:
+                        _fail("gate_e.unsafe_path")
+            with tempfile.TemporaryDirectory(prefix=".gate-e-", dir=common.parent) as directory:
+                candidate = Path(directory) / "docs"
+                if common.exists():
+                    shutil.copytree(common, candidate)
+                else:
+                    candidate.mkdir()
+                for target, raw in ((json_path, _encode(document)), (markdown_path, markdown.encode())):
+                    path = candidate / target.relative_to(common)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    with path.open("wb") as handle:
+                        handle.write(raw); handle.flush(); os.fsync(handle.fileno())
+                    if path.read_bytes() != raw:
+                        _fail("gate_e.staged_drift")
+                if common.exists():
+                    _exchange_directories(common, candidate)
+                else:
+                    os.replace(candidate, common)
+    except HostedReplayPublicError as error:
+        _fail("gate_e.lock_busy" if error.category == "hosted_replay.lock_busy" else "gate_e.write_failed")
+    except OSError:
+        _fail("gate_e.write_failed")
+
+
+def generate_gate_e_pair(document, json_path, markdown_path, *, root=_PRODUCT):
+    document = validate_portfolio_authority(document, root=root)
+    _pair_destinations(json_path, markdown_path, AUTHORITY_PATH, MARKDOWN_PATH)
+    _generate_common_pair(document, json_path, markdown_path, render_gate_e_markdown(document, root=root))
+
+
+def generate_spike_audit_pair(document, json_path, markdown_path, *, root=_PRODUCT):
+    document = validate_spike_audit_document(document, root=root)
+    _pair_destinations(json_path, markdown_path, SPIKE_AUTHORITY_PATH, SPIKE_MARKDOWN_PATH)
+    _generate_common_pair(document, json_path, markdown_path, render_spike_audit_markdown(document, root=root))
+
+
+def check_spike_audit_pair(json_path, markdown_path, *, root=_PRODUCT):
+    from .hosted_replay import _pair_lock, HostedReplayPublicError
+    try:
+        with _pair_lock(Path(root) / "gate-e-json", Path(root) / "gate-e-markdown"):
+            return _check_spike_audit_unlocked(json_path, markdown_path, root=root)
+    except HostedReplayPublicError:
+        _fail("gate_e.lock_busy")
+
+
+def _check_spike_audit_unlocked(json_path, markdown_path, *, root=_PRODUCT):
+    document = validate_spike_audit_document(_read(json_path), root=root)
+    if _read(json_path) != _encode(document) or _read(markdown_path) != render_spike_audit_markdown(document, root=root).encode():
+        _fail("gate_e.generated_drift")
+    return document
+
+
+def _pair_destinations(json_path, markdown_path, authority, rendering):
+    from .hosted_replay import _path, HostedReplayPublicError
+    try:
+        paths = (_path(json_path), _path(markdown_path))
+        common = Path(os.path.commonpath((paths[0].parent, paths[1].parent)))
+        if tuple(path.relative_to(common).as_posix() for path in paths) != (
+                str(PurePosixPath(authority).relative_to("docs")),
+                str(PurePosixPath(rendering).relative_to("docs"))):
+            _fail("gate_e.unsafe_pair_destinations")
+    except (ValueError, HostedReplayPublicError):
+        _fail("gate_e.unsafe_pair_destinations")
 
 
 def _semantic_bytes(value):
