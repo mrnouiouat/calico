@@ -12,6 +12,114 @@ import sys
 import tempfile
 import unittest
 
+
+class CommittedPortfolioAuthorityTests(unittest.TestCase):
+    def test_ten_real_conditions_have_their_required_evidence(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_portfolio_document", None)),
+                        "The authority must bind each actual condition to its required evidence")
+        d = m.build_portfolio_document(root=ROOT)
+        m.validate_portfolio_authority(d, root=ROOT)
+        self.assertEqual([r["condition"] for r in d["conditions"]], list(range(1, 11)))
+        self.assertEqual(d["conditions"][3]["status"], "pass_with_disclosed_deviation")
+        self.assertEqual(m.check_gate_e(ROOT / m.AUTHORITY_PATH, ROOT / m.MARKDOWN_PATH), d)
+        self.assertNotIn("app.powerbi.com/view", json.dumps(d))
+
+
+class PortfolioEvidenceResolutionTests(unittest.TestCase):
+    def test_missing_real_evidence_cannot_be_replaced_by_readme_or_tests(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_portfolio_document", None)))
+        d = m.build_portfolio_document(root=ROOT)
+        for n in range(10):
+            bad = copy.deepcopy(d)
+            bad["conditions"][n]["evidence"] = authority(m)["conditions"][n]["evidence"]
+            with self.assertRaises(m.GateEEvidenceError): m.validate_portfolio_authority(bad, root=ROOT)
+
+    def test_unknown_null_stale_future_and_self_evidence_fail(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_portfolio_document", None)))
+        d = m.build_portfolio_document(root=ROOT)
+        for field, value in (("evidence", None), ("evidence", []), ("condition", 1.0), ("status", "unknown")):
+            bad = copy.deepcopy(d); bad["conditions"][0][field] = value
+            with self.assertRaises(m.GateEEvidenceError): m.validate_portfolio_authority(bad, root=ROOT)
+        for locator in (m.AUTHORITY_PATH, m.MARKDOWN_PATH, "docs/evidence/gate-e/spike-era-requirements-v1.json"):
+            bad = copy.deepcopy(d)
+            bad["conditions"][0]["evidence"][0] = {"type": "file_sha256", "locator": locator, "sha256": "0" * 64, "claim": "Invalid reference"}
+            with self.assertRaises(m.GateEEvidenceError): m.validate_portfolio_authority(bad, root=ROOT)
+        bad = copy.deepcopy(d); bad["conditions"][0]["evidence"][0]["head_sha"] = "0" * 40
+        with self.assertRaises(m.GateEEvidenceError): m.validate_portfolio_authority(bad, root=ROOT)
+
+    def test_equality_publication_proof_is_valid_and_precision_is_preserved(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_portfolio_document", None)))
+        d = m.build_portfolio_document(root=ROOT)
+        m.validate_portfolio_authority(d, root=ROOT)
+        real = next(e for e in d["conditions"][4]["evidence"] if e.get("evidence_class") == "real_restore_republish_observation")
+        self.assertIn("no_change", real["claim"])
+        self.assertIn(m.HISTORICAL_REAL_OBSERVATION["published_manifest_sha256"], real["claim"])
+
+
+class SpikeEraAuditContractTests(unittest.TestCase):
+    def test_exact_requirement_clauses_and_superseding_decisions(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_spike_audit_document", None)),
+                        "The exact predecessor requirement enumeration must be implemented")
+        d = m.build_spike_audit_document(root=ROOT)
+        m.validate_spike_audit_document(d, root=ROOT)
+        self.assertEqual([r["text"] for r in d["rows"]], list(m.SPIKE_REQUIREMENT_TEXTS))
+        self.assertEqual([r["decision"] for r in d["rows"] if r["disposition"] == "superseded"], ["D-007", "D-008", "D-012"])
+        self.assertEqual(sum(r["disposition"] == "satisfied" for r in d["rows"]), 11)
+        self.assertEqual(sum(r["disposition"] == "deferred_not_v1" for r in d["rows"]), 1)
+
+    def test_missing_extra_duplicate_reordered_null_and_unknown_rows_fail(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "build_spike_audit_document", None)))
+        d = m.build_spike_audit_document(root=ROOT)
+        for rows in (None, [], d["rows"][:1], d["rows"][:-1], d["rows"] * 2, list(reversed(d["rows"])), [None] * 15):
+            bad = copy.deepcopy(d); bad["rows"] = rows
+            with self.assertRaises(m.GateEEvidenceError): m.validate_spike_audit_document(bad, root=ROOT)
+        for field, value in (("decision", "D-999"), ("disposition", "pass"), ("text", "invented"), ("id", 1.0), ("evidence", [])):
+            bad = copy.deepcopy(d); bad["rows"][0][field] = value
+            with self.assertRaises(m.GateEEvidenceError): m.validate_spike_audit_document(bad, root=ROOT)
+
+
+class GateEAtomicGenerationTests(unittest.TestCase):
+    def test_generators_produce_byte_identical_complete_pairs(self):
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "generate_gate_e_pair", None)),
+                        "Generation must publish the authority and rendering in one directory transaction")
+        with tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve()) as directory:
+            root = Path(directory)
+            for builder, generator, paths in ((m.build_portfolio_document, m.generate_gate_e_pair, (m.AUTHORITY_PATH, m.MARKDOWN_PATH)),
+                                              (m.build_spike_audit_document, m.generate_spike_audit_pair, (m.SPIKE_AUTHORITY_PATH, m.SPIKE_MARKDOWN_PATH))):
+                d = builder(root=ROOT)
+                targets = tuple(root / p for p in paths)
+                generator(d, *targets, root=ROOT)
+                before = [p.read_bytes() for p in targets]
+                generator(d, *targets, root=ROOT)
+                self.assertEqual(before, [p.read_bytes() for p in targets])
+
+    def test_interruption_and_concurrent_generation_preserve_the_complete_pair(self):
+        from unittest.mock import patch
+        import concurrent.futures
+        m = module(self)
+        self.assertTrue(callable(getattr(m, "generate_gate_e_pair", None)))
+        with tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve()) as directory:
+            d = m.build_portfolio_document(root=ROOT)
+            paths = (Path(directory) / m.AUTHORITY_PATH, Path(directory) / m.MARKDOWN_PATH)
+            m.generate_gate_e_pair(d, *paths, root=ROOT)
+            before = [p.read_bytes() for p in paths]
+            with patch.object(m, "_exchange_directories", side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt): m.generate_gate_e_pair(d, *paths, root=ROOT)
+            self.assertEqual(before, [p.read_bytes() for p in paths])
+            def generate():
+                try: m.generate_gate_e_pair(d, *paths, root=ROOT)
+                except m.GateEEvidenceError as error: self.assertEqual(error.category, "gate_e.lock_busy")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(lambda _: generate(), range(8)))
+            self.assertEqual(before, [p.read_bytes() for p in paths])
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
