@@ -194,6 +194,8 @@ def validate_gate_e_document(document, *, root=_PRODUCT):
     for number, row in enumerate(document["conditions"], 1):
         if row["condition"] != number or row["text"] != CONDITION_TEXTS[number - 1]:
             _fail("gate_e.condition_order_or_text")
+        if number != 4 and row["status"] != "pass":
+            _fail("gate_e.unapproved_condition_deviation")
         evidence = row["evidence"]
         order = [(item["type"], item["locator"]) for item in evidence]
         if order != sorted(set(order)):
@@ -256,7 +258,7 @@ def render_gate_e_markdown(document, *, root=_PRODUCT):
             locator = item["locator"]
             link = ("https://github.com/mrnouiouat/calico/commit/" + locator if item["type"] == "commit" else
                     "https://github.com/mrnouiouat/calico/blob/main/" + "/".join(locator.split(".")[:-2]) + ".py" if item["type"] == "test_id" else
-                    locator if locator.startswith("https://") else "../../../" + locator)
+                    locator if locator.startswith("https://") else "../../" + locator)
             claim = item["claim"]
             for key in ("recorded_at", "conclusion", "head_sha", "sha256", "event", "evidence_class"):
                 if key in item:
@@ -264,7 +266,7 @@ def render_gate_e_markdown(document, *, root=_PRODUCT):
             parts.append(f'| {item["type"]} | [{locator}]({link}) | {claim} |')
         if row["amendment"]:
             amendment = row["amendment"]
-            parts.extend(["", f'Public amendment: [{amendment["recorded_at"]}](../../../{amendment["locator"]}); SHA-256: `{amendment["sha256"]}`.'])
+            parts.extend(["", f'Public amendment: [{amendment["recorded_at"]}](../../{amendment["locator"]}); SHA-256: `{amendment["sha256"]}`.'])
         parts.append("")
     return "\n".join(parts)
 
@@ -409,9 +411,9 @@ def _observations(rows, evidence_class):
         started, completed = _timestamp(row["created_at"]), _timestamp(row["completed_at"])
         if completed < started or _date(row["recorded_at"]) < completed.date():
             _fail("gate_e.invalid_date")
-        if row["conclusion"] not in {"success", "failure", "cancelled"}:
+        if type(row["conclusion"]) is not str or row["conclusion"] not in {"success", "failure", "cancelled"}:
             _fail("gate_e.incomplete_observation")
-        if row["outcome"] not in (*_OUTCOMES, "not_observed") or row["outcome_basis"] != (
+        if type(row["outcome"]) is not str or row["outcome"] not in (*_OUTCOMES, "not_observed") or row["outcome_basis"] != (
                 "no_capture_status_observed" if row["outcome"] == "not_observed" else "recorded_capture_status"):
             _fail("gate_e.unproved_outcome")
         if row["log_privacy"] == "no_findings":
@@ -466,6 +468,8 @@ def decode_condition_four_draft(document):
     _date(document["derived_at"])
     classes = document["evidence_classes"]
     _keys(classes, EVIDENCE_CLASSES)
+    if tuple(classes) != EVIDENCE_CLASSES:
+        _fail("gate_e.evidence_class_order")
     from .hosted_replay import JSON_PATH
     expected_hosted = _hosted_observation(_decode(_read(_PRODUCT / JSON_PATH)))
     if _semantic_bytes(classes["fixture_hosted_replay"]) != _semantic_bytes(expected_hosted):

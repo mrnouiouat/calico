@@ -8,6 +8,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -37,6 +38,7 @@ class GateEEvidenceContractTests(unittest.TestCase):
         rendered = m.render_gate_e_markdown(d, root=ROOT)
         self.assertEqual(rendered, m.render_gate_e_markdown(copy.deepcopy(d), root=ROOT))
         self.assertIn("scheduled and manually dispatched", rendered)
+        self.assertIn("[README.md](../../README.md)", rendered)
 
     def test_independent_closed_schema(self):
         m = module(self)
@@ -122,13 +124,13 @@ class GateEEvidenceFailingDirectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve()) as temporary:
             path = Path(temporary) / "authority.json"; path.write_text(json.dumps(authority(m)))
             output = Path(temporary) / "evidence.md"
-            result = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public", "gate-e-generate", "--authority", str(path), "--output", str(output)], cwd=ROOT, capture_output=True)
+            result = subprocess.run([sys.executable, "-m", "tools.docs_public", "gate-e-generate", "--authority", str(path), "--output", str(output)], cwd=ROOT, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr.decode())
             before = output.read_bytes()
-            result = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public", "gate-e-check", "--authority", str(path), "--markdown", str(output)], cwd=ROOT, capture_output=True)
+            result = subprocess.run([sys.executable, "-m", "tools.docs_public", "gate-e-check", "--authority", str(path), "--markdown", str(output)], cwd=ROOT, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr.decode()); self.assertEqual(output.read_bytes(), before)
             path.write_text('{"unapproved":"PRIVATE_SENTINEL"}')
-            result = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public", "gate-e-check", "--authority", str(path), "--markdown", str(output)], cwd=ROOT, capture_output=True)
+            result = subprocess.run([sys.executable, "-m", "tools.docs_public", "gate-e-check", "--authority", str(path), "--markdown", str(output)], cwd=ROOT, capture_output=True)
             self.assertNotEqual(result.returncode, 0); self.assertNotIn(b"PRIVATE_SENTINEL", result.stderr)
 
 
@@ -228,6 +230,9 @@ class ConditionFourDispositionEqualityTests(unittest.TestCase):
         changed = copy.deepcopy(d); changed["evidence_classes"]["fixture_hosted_replay"]["run"]["run_id"] = 1
         with self.assertRaises(m.GateEEvidenceError):
             m.validate_final_condition_four_disposition(draft=changed, final=final, hosted_replay=hosted, real_republish=real)
+        changed = copy.deepcopy(final); changed["evidence_classes"] = dict(reversed(list(changed["evidence_classes"].items())))
+        with self.assertRaises(m.GateEEvidenceError):
+            m.validate_final_condition_four_disposition(draft=d, final=changed, hosted_replay=hosted, real_republish=real)
 
     def test_approval_dates_roles_and_proof_complete_null_approval(self):
         m = module(self)
@@ -285,7 +290,7 @@ class ConditionFourDisclosureTests(unittest.TestCase):
             paths = {key: Path(temporary) / (key + ".json") for key in ("draft", "final", "hosted", "real", "public")}
             for key, value in (("draft", draft(m)), ("hosted", hosted), ("real", real)):
                 paths[key].write_text(json.dumps(value))
-            base = [str(ROOT / ".venv/bin/python"), "-m", "tools.docs_public"]
+            base = [sys.executable, "-m", "tools.docs_public"]
             result = subprocess.run(base + ["condition-four-finalize", "--draft", str(paths["draft"]), "--final", str(paths["final"]), "--approved-at", "2026-10-10", "--approved-by-role", "repository-owner"], cwd=ROOT, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr.decode())
             self.assertEqual(json.loads(paths["final"].read_text())["approved_by_role"], "repository owner")

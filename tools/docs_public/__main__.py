@@ -56,6 +56,9 @@ def main(argv=None) -> int:
             capture_inputs(root, args.published_ref, write=True)
         elif args.command == "generate":
             generate_readme(root, write=True)
+            from .gate_e import AUTHORITY_PATH, MARKDOWN_PATH, generate_gate_e
+            if (root / AUTHORITY_PATH).exists():
+                generate_gate_e(root / AUTHORITY_PATH, root / MARKDOWN_PATH, root=root)
         elif args.command == "check":
             check_readme(root)
             from .hosted_replay import check_repository_hosted_replay
