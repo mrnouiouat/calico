@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prior immutable public inspection without self or future observations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "inspected_snapshot",
+    "recorded_at",
+    "substantive_inputs",
+    "semantic_inventory_sha256",
+    "published_data_commit",
+    "published_manifest_sha256",
+    "checks",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "final-inspection-checklist-v1"
+    },
+    "inspected_snapshot": {
+      "type": "string",
+      "pattern": "[0-9a-f]{40}"
+    },
+    "recorded_at": {
+      "type": "string",
+      "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    },
+    "substantive_inputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "[0-9a-f]{64}"
+          }
+        }
+      }
+    },
+    "semantic_inventory_sha256": {
+      "type": "string",
+      "pattern": "[0-9a-f]{64}"
+    },
+    "published_data_commit": {
+      "type": "string",
+      "pattern": "[0-9a-f]{40}"
+    },
+    "published_manifest_sha256": {
+      "type": "string",
+      "pattern": "[0-9a-f]{64}"
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tree_privacy",
+        "reachable_history_privacy",
+        "migration_redaction",
+        "generated_docs",
+        "citations",
+        "decision_register",
+        "semantic_inventory",
+        "published_manifest"
+      ],
+      "properties": {
+        "tree_privacy": {
+          "type": "string",
+          "const": "pass"
+        },
+        "reachable_history_privacy": {
+          "type": "string",
+          "const": "pass"
+        },
+        "migration_redaction": {
+          "type": "string",
+          "const": "pass"
+        },
+        "generated_docs": {
+          "type": "string",
+          "const": "pass"
+        },
+        "citations": {
+          "type": "string",
+          "const": "pass"
+        },
+        "decision_register": {
+          "type": "string",
+          "const": "pass"
+        },
+        "semantic_inventory": {
+          "type": "string",
+          "const": "pass"
+        },
+        "published_manifest": {
+          "type": "string",
+          "const": "pass"
+        }
+      }
+    },
+    "result": {
+      "type": "string",
+      "const": "pass"
+    }
+  }
+}

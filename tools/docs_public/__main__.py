@@ -22,6 +22,12 @@ def main(argv=None) -> int:
     inputs.add_argument("--published-ref", required=True)
     commands.add_parser("generate", help="Write README and MIT license from pinned evidence")
     commands.add_parser("check", help="Offline drift verification without writes")
+    inspection_generate = commands.add_parser("inspection-generate", help="Inspect a clean prior immutable snapshot and atomically generate its checklist")
+    inspection_generate.add_argument("--snapshot", required=True)
+    commands.add_parser("inspection-check", help="Validate the prior-snapshot checklist and current substantive equality")
+    final_diff = commands.add_parser("final-url-diff", help="Check the exact three-path report transition against immutable X")
+    final_diff.add_argument("--base", required=True)
+    final_diff.add_argument("--final")
     replay_generate = commands.add_parser("hosted-replay-generate", help="Project one validated private envelope into public evidence")
     replay_generate.add_argument("--envelope", type=Path, required=True)
     replay_generate.add_argument("--json-output", type=Path, required=True)
@@ -52,7 +58,18 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         root = Path.cwd()
-        if args.command == "inputs":
+        if args.command == "inspection-generate":
+            from .inspection import generate_public_inspection
+            generate_public_inspection(args.snapshot, root=root)
+        elif args.command == "inspection-check":
+            from .inspection import check_public_inspection
+            check_public_inspection(root=root)
+        elif args.command == "final-url-diff":
+            from .inspection import check_final_url_diff
+            if check_final_url_diff(args.base, args.final, root=root)["result"] != "pass":
+                from .inspection import InspectionContractError
+                raise InspectionContractError("inspection.report_transition_required")
+        elif args.command == "inputs":
             capture_inputs(root, args.published_ref, write=True)
         elif args.command == "generate":
             generate_readme(root, write=True)
@@ -66,6 +83,9 @@ def main(argv=None) -> int:
             from .gate_e import AUTHORITY_PATH, MARKDOWN_PATH, check_gate_e
             if (root / AUTHORITY_PATH).exists():
                 check_gate_e(root / AUTHORITY_PATH, root / MARKDOWN_PATH, root=root)
+            from .inspection import JSON_PATH, check_public_inspection
+            if (root / JSON_PATH).exists():
+                check_public_inspection(root=root)
         elif args.command == "gate-e-check":
             from .gate_e import check_gate_e
             check_gate_e(args.authority, args.markdown, root=root)
@@ -106,7 +126,8 @@ def main(argv=None) -> int:
     except Exception as exc:
         from .hosted_replay import HostedReplayPublicError
         from .gate_e import GateEEvidenceError
-        if isinstance(exc, (HostedReplayPublicError, GateEEvidenceError)):
+        from .inspection import InspectionContractError
+        if isinstance(exc, (HostedReplayPublicError, GateEEvidenceError, InspectionContractError)):
             print("docs-public: " + exc.category, file=sys.stderr)
             return 1
         print("docs-public: readme.internal_error", file=sys.stderr)

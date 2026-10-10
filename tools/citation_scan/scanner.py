@@ -52,6 +52,8 @@ KINDS = frozenset({"markdown_link", "markdown_image", "reference_definition", "r
 RESOLUTIONS = frozenset({"resolved", "missing", "missing_fragment", "outside_root", "private", "syntax"})
 _PATH = re.compile(r"[A-Za-z0-9_. /%#@+~{}*?\[\]<>|:\\-]+\Z")
 _LOCATOR = re.compile(r"L[1-9][0-9]*:C[1-9][0-9]*(?::N[1-9][0-9]*)?\Z")
+REPORT_LOCATOR = "gate-e-report-url"
+REPORT_SOURCES = frozenset({"README.md", "docs/provenance/GATE-E-EVIDENCE.md"})
 _OID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _IDS = re.compile(r"(?<![A-Za-z0-9-])[DCIW]-[0-9]{3}(?![A-Za-z0-9-])")
@@ -96,7 +98,9 @@ class CitationOccurrence:
 
     def __post_init__(self):
         _public_path(self.source)
-        if (not isinstance(self.locator, str) or not _LOCATOR.fullmatch(self.locator)
+        stable_report = (self.locator == REPORT_LOCATOR and self.source in REPORT_SOURCES
+                         and self.target == REPORT_LOCATOR and self.kind == "markdown_link" and self.resolution == "resolved")
+        if (not isinstance(self.locator, str) or not (_LOCATOR.fullmatch(self.locator) or stable_report)
                 or self.kind not in KINDS or self.resolution not in RESOLUTIONS
                 or not isinstance(self.target, str) or not self.target or len(self.target) > 4096
                 or scan_text("citation", self.target)):
@@ -344,8 +348,27 @@ def _raw_occurrences(source: str, text: str):
 
 def _scan(paths: tuple[str, ...], documents: dict[str, str]) -> list[CitationOccurrence]:
     rows = []
+    report_url = None
+    report_projection = "<!-- calico:report:start -->" in documents.get("README.md", "")
+    if report_projection:
+        from tools.docs_public.gate_e import AUTHORITY_PATH, GateEEvidenceError, validate_report_state
+        try:
+            report = validate_report_state(_json(documents[AUTHORITY_PATH]))
+            report_url = None if report is None else report["url"]
+        except (GateEEvidenceError, KeyError):
+            raise CitationError("citation.invalid_report_state") from None
     for source, text in sorted(documents.items()):
+        report_offset = None
+        if report_projection and source in REPORT_SOURCES:
+            if report_url is not None:
+                expected = ("[Open the verified anonymous report](" if source == "README.md" else "[Open the verified report](") + report_url + ")"
+                if text.count(expected) != 1:
+                    raise CitationError("citation.report_link_drift")
+                report_offset = text.index(expected)
+            rows.append(CitationOccurrence(source, REPORT_LOCATOR, REPORT_LOCATOR, "markdown_link", "resolved"))
         for offset, kind, raw in _raw_occurrences(source, text):
+            if report_projection and source in REPORT_SOURCES and raw == report_url and offset == report_offset:
+                continue
             try:
                 resolved = _resolve(source, raw, kind, set(paths), documents)
             except (UnicodeError, ValueError):
@@ -369,6 +392,16 @@ def scan_citations(root: object) -> list[CitationOccurrence]:
         raise CitationError("citation.invalid_hosted_replay") from None
     paths = candidate_paths(base)
     return _scan(paths, _documents(base, paths))
+
+
+def resolve_report_citation(root: object):
+    """The stable locator resolves solely through the closed ledger report."""
+    from tools.docs_public.gate_e import AUTHORITY_PATH, GateEEvidenceError, validate_report_state
+    try:
+        report = validate_report_state(_json(_read(_root(root), AUTHORITY_PATH)))
+        return None if report is None else report["url"]
+    except GateEEvidenceError:
+        raise CitationError("citation.invalid_report_state") from None
 
 
 def inventory_document(rows: list[CitationOccurrence]) -> dict:

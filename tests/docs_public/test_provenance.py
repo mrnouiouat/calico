@@ -242,10 +242,10 @@ class CompleteProvenanceTests(unittest.TestCase):
             self.assertEqual(len(expected), 10)
             evidence.write_text("# Separately validated generated replay evidence\n", encoding="utf-8")
             self.assertEqual(api.validate_complete_index(root), expected)
-            for name in ("GATE-E-EVIDENCE.md", "spike-era-requirements-audit.md"):
+            for name in ("GATE-E-EVIDENCE.md", "spike-era-requirements-audit.md", "final-inspection-checklist.md"):
                 evidence.with_name(name).write_text("# Separately validated generated authority\n", encoding="utf-8")
                 self.assertEqual(api.validate_complete_index(root), expected)
-            for name in ("UNAPPROVED.md", "HOSTED-REPLAY-EVIDENCE-copy.md", "GATE-E-EVIDENCE-copy.md", "spike-era-requirements-audit-copy.md"):
+            for name in ("UNAPPROVED.md", "HOSTED-REPLAY-EVIDENCE-copy.md", "GATE-E-EVIDENCE-copy.md", "spike-era-requirements-audit-copy.md", "final-inspection-checklist-copy.md"):
                 extra = evidence.with_name(name)
                 extra.write_text("# Unapproved document\n", encoding="utf-8")
                 with self.assertRaises(api.ProvenanceError) as caught:
