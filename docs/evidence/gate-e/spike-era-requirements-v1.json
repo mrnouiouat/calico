@@ -1,0 +1,454 @@
+{
+  "schema_version": "spike-era-requirements-v1",
+  "recorded_at": "2026-10-10",
+  "rows": [
+    {
+      "id": "automated first/third-Wednesday capture",
+      "text": "automated first/third-Wednesday capture",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/36779395262/attempts/1",
+          "claim": "Actual schedule outside capture window; 22 historical ordinary log absolute_local_path locations; no accepted claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b",
+          "event": "schedule",
+          "evidence_class": "actual_schedule_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/36812428040/attempts/1",
+          "claim": "Live source rejected; 66 historical ordinary log absolute_local_path locations; no clean-log claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b",
+          "event": "workflow_dispatch",
+          "evidence_class": "live_source_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/37693376162/attempts/1",
+          "claim": "Actual schedule rejected retired source; 66 historical ordinary log absolute_local_path locations; no clean-log claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677",
+          "event": "schedule",
+          "evidence_class": "actual_schedule_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/37985365302/attempts/1",
+          "claim": "Recorded fixture-hosted replay: 32 dbt models and 228 tests passed on its historical head",
+          "recorded_at": "2026-10-09",
+          "conclusion": "success",
+          "head_sha": "3bd3e43bb9cc0f7222559c2466c64488fe787685",
+          "event": "workflow_dispatch",
+          "evidence_class": "fixture_hosted_replay"
+        },
+        {
+          "type": "file_sha256",
+          "locator": ".github/workflows/capture-current.yml",
+          "sha256": "4e92dfbbe1051cbfa634011baf3722be961975d0486ee6d2a6f99520afed7faf",
+          "claim": "Wednesday schedule plus shared calendar gate and manual capture fallback"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "calico_capture/calendar.py",
+          "sha256": "9160c9bdbff305ad4bd4228e51a4f91dcec409b3bca0e6e49ef7af891ba537f4",
+          "claim": "Exact UTC first/third-Wednesday authority: allow days 1/7/15/21; refuse days 8/22"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/decisions/condition-4-hosted-outcomes.md",
+          "sha256": "444ade2ad968bb570d66ec5ac775fa96666212758ca2879dc52e7cc893dda635",
+          "claim": "Approved 2026-10-10 six-residual amendment; historical log limits are disclosed without a privacy waiver"
+        },
+        {
+          "type": "manifest",
+          "locator": "docs/evidence/gate-e/hosted-replay-v1.json",
+          "sha256": "7a5abc056144409c7efd29eafcff6dffa7babf7d05169f0487e788bb824136f6",
+          "claim": "Actual Jobs API conclusions, reconstruction digest equality, fixture SQL and bytes-derived privacy audits; isolated atomic publication"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.capture.test_schedule_contract.CalendarBoundaryDateTests.test_exact_wednesday_boundaries",
+          "claim": "All six calendar boundaries are independently tested"
+        }
+      ],
+      "decision": null,
+      "note": "Source retirement ended new releases; dispatched fixture calendar cases and actual schedule observations remain distinct; the approved six residuals apply"
+    },
+    {
+      "id": "four-file atomic admission",
+      "text": "four-file atomic admission",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "manifest",
+          "locator": "docs/evidence/gate-e/hosted-replay-v1.json",
+          "sha256": "7a5abc056144409c7efd29eafcff6dffa7babf7d05169f0487e788bb824136f6",
+          "claim": "Actual Jobs API conclusions, reconstruction digest equality, fixture SQL and bytes-derived privacy audits; isolated atomic publication"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_blank_date_rejected_with_ordered_date_reason",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_duplicate_key_across_lists_rejected_with_duplicate_category",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_duplicate_key_within_list_rejected_with_duplicate_category",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_invalid_same_date_revision_rejected_preserves_prior_promotion",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_mismatched_date_rejected_with_ordered_date_reason",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_missing_logical_file_rejected_as_invalid_mapping_pointer_unchanged",
+          "claim": "Incomplete four-file admission preserves the prior release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_truncated_payload_rejected_with_deterministic_transfer_code",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_unknown_registration_family_rejected_blank_keys_stay_accepted",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_wrong_arity_rejected_with_no_raw_row_in_output",
+          "claim": "Structural failures reject without printing raw rows"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.RejectionMatrixTests.test_wrong_header_rejected_with_safe_logical_location_only",
+          "claim": "Known structural rejection preserves the prior admitted release"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "accepted/no_new_release/rejected run recording",
+      "text": "accepted/no_new_release/rejected run recording",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/36779395262/attempts/1",
+          "claim": "Actual schedule outside capture window; 22 historical ordinary log absolute_local_path locations; no accepted claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b",
+          "event": "schedule",
+          "evidence_class": "actual_schedule_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/36812428040/attempts/1",
+          "claim": "Live source rejected; 66 historical ordinary log absolute_local_path locations; no clean-log claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "9297d1db4e381f3da7ae03ba7e9ed57812d12a9b",
+          "event": "workflow_dispatch",
+          "evidence_class": "live_source_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/37693376162/attempts/1",
+          "claim": "Actual schedule rejected retired source; 66 historical ordinary log absolute_local_path locations; no clean-log claim",
+          "recorded_at": "2026-10-10",
+          "conclusion": "success",
+          "head_sha": "ae8a612b0e0be8b47b1a15d366b1a41eb3433677",
+          "event": "schedule",
+          "evidence_class": "actual_schedule_observation"
+        },
+        {
+          "type": "ci_run",
+          "locator": "https://github.com/mrnouiouat/calico/actions/runs/37985365302/attempts/1",
+          "claim": "Recorded fixture-hosted replay: 32 dbt models and 228 tests passed on its historical head",
+          "recorded_at": "2026-10-09",
+          "conclusion": "success",
+          "head_sha": "3bd3e43bb9cc0f7222559c2466c64488fe787685",
+          "event": "workflow_dispatch",
+          "evidence_class": "fixture_hosted_replay"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "contracts/capture-status-v3.schema.json",
+          "sha256": "a1d0bcbb2aec5f0a0d4103932e8b84d9b191de0bed92c894f00c0a4c32fa603d",
+          "claim": "Closed accepted/no_new_release/rejected run recording"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/decisions/condition-4-hosted-outcomes.md",
+          "sha256": "444ade2ad968bb570d66ec5ac775fa96666212758ca2879dc52e7cc893dda635",
+          "claim": "Approved 2026-10-10 six-residual amendment; historical log limits are disclosed without a privacy waiver"
+        },
+        {
+          "type": "manifest",
+          "locator": "docs/evidence/gate-e/hosted-replay-v1.json",
+          "sha256": "7a5abc056144409c7efd29eafcff6dffa7babf7d05169f0487e788bb824136f6",
+          "claim": "Actual Jobs API conclusions, reconstruction digest equality, fixture SQL and bytes-derived privacy audits; isolated atomic publication"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "visible release-integrity and bulk-movement flags",
+      "text": "visible release-integrity and bulk-movement flags",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "dbt/models/intermediate/int_release_flags.sql",
+          "sha256": "2a9fd517072d290e346f6626ba35910ee3af637df4d90efa76b78362e72fccd6",
+          "claim": "Governed SQL derives integrity and visible bulk-movement flags"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "dbt/models/marts/mart_release_quality.sql",
+          "sha256": "1e438a705e34d57631c3142299a8575d7dbb4d2442207bed5dd74d7cae0f5e4a",
+          "claim": "Published release-quality mart exposes the governed flag results"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/walkthrough.md",
+          "sha256": "728dbd41b719eb6a67b678d877398bc165fdaf760896cb45640a74491ff3764f",
+          "claim": "Visible release-integrity and bulk movement descriptions; no inferred cause"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "scheduled automation is not the sole preservation mechanism",
+      "text": "scheduled automation is not the sole preservation mechanism",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/capture-runbook.md",
+          "sha256": "d9314ed8a4ad6e574eb01de93a92dcba4449a8292ea6ad3808e9ae67dda570bb",
+          "claim": "Manual preservation fallback remains mandatory after scheduled cutover"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.capture.test_archive.SynchronizeTransactionTests.test_byte_identical_replay_is_an_idempotent_no_op",
+          "claim": "Immutable private preservation has an independent idempotent mechanism"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "historical release identity includes source URL, archive timestamp, as-of date, list, revision, byte count, row count, and SHA-256",
+      "text": "historical release identity includes source URL, archive timestamp, as-of date, list, revision, byte count, row count, and SHA-256",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/evidence/gate-a/spike-001-successor-v1.json",
+          "sha256": "c9f7a1b3fef9a586e7f60e930f2f12d32cd3bc30d07b82de9406947f5d64d2cf",
+          "claim": "Corrected historical parsed counts supersede retained predecessor counts"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/evidence/gate-b/real-input-catalog-v1.json",
+          "sha256": "cb4544408249160bc24ec4f3f56ae2575fd924405e3a4aa3127bc2d571ff6040",
+          "claim": "Three accepted date/revision identities bind their private revision manifests through exact hashes"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/provenance/spikes/001-archive-sample-validation/archive-sample-manifest.json.md",
+          "sha256": "1605b57c82095b97acdfbd619d96f2e5ef7cc727b73eb451962cc7f3ebd77119",
+          "claim": "Recorded historical original URLs, archive timestamps, source dates/lists, byte counts and hashes; predecessor row counts carry visible additive corrections"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.landing.test_admission.AcceptedRevisionTests.test_baseline_candidate_admits_revision_one_with_full_provenance",
+          "claim": "Admission persists exact date/revision, four source hashes, bytes and reconciled row counts"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "full nonblank State Charity Reg# is the longitudinal key with keyless rows visible as coverage and EIN never a fallback identity",
+      "text": "full nonblank State Charity Reg# is the longitudinal key with keyless rows visible as coverage and EIN never a fallback identity",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "test_id",
+          "locator": "tests.dbt_longitudinal.test_transitions.KeyedSnapshotSqlShapeTests.test_keyed_snapshots_uses_exact_eligible_predicate",
+          "claim": "Full registration keys; no excluded identifier fallback"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.dbt_longitudinal.test_transitions.KeyedSnapshotSqlShapeTests.test_unkeyed_coverage_groups_the_row_level_relation",
+          "claim": "Keyless records remain visible coverage"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "snapshots immutable, transitions and interval-censored spells derived",
+      "text": "snapshots immutable, transitions and interval-censored spells derived",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "test_id",
+          "locator": "tests.capture.test_archive.SynchronizeTransactionTests.test_different_bytes_at_existing_key_is_a_deterministic_collision",
+          "claim": "Immutable source snapshots cannot overwrite an existing key"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.dbt_longitudinal.test_spells.DelinquencySpellsSqlShapeTests.test_delinquency_spells_never_coalesces_a_missing_bound",
+          "claim": "Derived interval-censored spells retain absent bounds"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "disappearance is not cure",
+      "text": "disappearance is not cure",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/walkthrough.md",
+          "sha256": "728dbd41b719eb6a67b678d877398bc165fdaf760896cb45640a74491ff3764f",
+          "claim": "Disappearance is not cure"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.dbt_longitudinal.test_transitions.EntityTransitionsSqlShapeTests.test_entity_transitions_never_coalesces_missing_status",
+          "claim": "Missing status stays distinct from observed exit"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "duration metrics retain left, right, and interval censoring and never annualize a raw gap proportion",
+      "text": "duration metrics retain left, right, and interval censoring and never annualize a raw gap proportion",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "contracts/metric-denominators-v1.json",
+          "sha256": "f99c0f2ee45cef25f069b4c00e18d702a2f2224fd9dbcc49994e61034d0ab237",
+          "claim": "Date-pair denominators and non-annualized gap proportions"
+        },
+        {
+          "type": "test_id",
+          "locator": "tests.dbt_longitudinal.test_spells.DelinquencySpellsSqlShapeTests.test_delinquency_spells_never_coalesces_a_missing_bound",
+          "claim": "Left/right/interval censoring remains explicit"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "the exclusion list (stakeholder interviews, internal organization-level tooling, investigation queues, email notifications, predictions, causal explanations, per-organization recommendations) holds",
+      "text": "the exclusion list (stakeholder interviews, internal organization-level tooling, investigation queues, email notifications, predictions, causal explanations, per-organization recommendations) holds",
+      "disposition": "satisfied",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "README.md#limitations",
+          "sha256": "dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced",
+          "claim": "Current outside-in non-claims retain no internal characterization, cause, scores, rankings or partner recommendation"
+        },
+        {
+          "type": "file_sha256",
+          "locator": "docs/provenance/spikes/005-project-recommendation/README.md#usefulness-boundary",
+          "sha256": "62400e2211ed14f7f5187eb071a0cced4cbf5f882320aa1e4267444218189f6c",
+          "claim": "Exact still-in-force exclusion list; other superseded predecessor recommendations do not govern this row"
+        }
+      ],
+      "decision": null,
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "published artifacts are aggregate-only and contain no organization identity fields",
+      "text": "published artifacts are aggregate-only and contain no organization identity fields",
+      "disposition": "superseded",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/decisions/register.md#d-007",
+          "sha256": "999e1f7f8776a57e4445ac62c1385ab7d3d0d7b826169bd282f6313970734acb",
+          "claim": "D-007 intentionally permits bounded approved named organization history"
+        }
+      ],
+      "decision": "D-007",
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "one BI implementation ships: Power BI if Publish to web works, Evidence otherwise",
+      "text": "one BI implementation ships: Power BI if Publish to web works, Evidence otherwise",
+      "disposition": "superseded",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/decisions/register.md#d-008",
+          "sha256": "999e1f7f8776a57e4445ac62c1385ab7d3d0d7b826169bd282f6313970734acb",
+          "claim": "D-008 settles one Power BI implementation"
+        }
+      ],
+      "decision": "D-008",
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "the archive-census precondition",
+      "text": "the archive-census precondition",
+      "disposition": "superseded",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "docs/decisions/register.md#d-012",
+          "sha256": "999e1f7f8776a57e4445ac62c1385ab7d3d0d7b826169bd282f6313970734acb",
+          "claim": "D-012 excludes broader archive census from v1"
+        }
+      ],
+      "decision": "D-012",
+      "note": "Requirement-derived clause"
+    },
+    {
+      "id": "seeking one external test of whether the finished monitor catches a real release problem \u2014 founder action #5",
+      "text": "seeking one external test of whether the finished monitor catches a real release problem \u2014 founder action #5",
+      "disposition": "deferred_not_v1",
+      "evidence": [
+        {
+          "type": "file_sha256",
+          "locator": "README.md#limitations",
+          "sha256": "dc89e86085b3faf8fe46a859f23424597ddb6ddc5df66bdec6772ff97cc22ced",
+          "claim": "Founder action #5 external test remains deferred beyond v1"
+        }
+      ],
+      "decision": null,
+      "note": "Founder action #5 alone is deferred_not_v1"
+    }
+  ]
+}
