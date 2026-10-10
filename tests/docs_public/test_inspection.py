@@ -15,6 +15,8 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+CHECKLIST_OUTPUTS = frozenset({"docs/evidence/gate-e/final-inspection-checklist-v1.json",
+                             "docs/provenance/final-inspection-checklist.md"})
 
 
 def api(test):
@@ -40,6 +42,11 @@ def fixture():
             git(root, "update-ref", "refs/synthetic-source/" + str(index), oid)
         for name in git(ROOT, "ls-files", "--cached", "--others", "--exclude-standard").splitlines():
             destination = root / name
+            # A prior snapshot must precede its checklist, even when this test
+            # runs from the frozen public candidate that already contains it.
+            if name in CHECKLIST_OUTPUTS:
+                destination.unlink(missing_ok=True)
+                continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / name, destination)
         git(root, "config", "user.name", "Synthetic Inspector")
@@ -69,6 +76,21 @@ def publish(m, root):
 
 
 class PublicInspectionContractTests(unittest.TestCase):
+    def test_prior_fixture_excludes_only_checklist_outputs_from_frozen_source(self):
+        with fixture() as (source, _):
+            for name in CHECKLIST_OUTPUTS:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("Synthetic generated checklist\n", encoding="utf-8")
+            git(source, "add", "--", *sorted(CHECKLIST_OUTPUTS))
+            git(source, "commit", "--quiet", "-m", "Synthetic frozen checklist source")
+            expected = set(git(source, "ls-files").splitlines()) - CHECKLIST_OUTPUTS
+            with patch(__name__ + ".ROOT", source), fixture() as (prior, _):
+                self.assertEqual(set(git(prior, "ls-files").splitlines()), expected)
+                self.assertTrue(all(not (prior / name).exists() for name in CHECKLIST_OUTPUTS))
+                self.assertTrue(all((prior / name).read_bytes() == (source / name).read_bytes()
+                                    for name in expected))
+
     def test_immutable_inspection_contract_exists_before_freeze(self):
         m = api(self)
         for name in ("build_substantive_input_manifest", "validate_public_inspection",
