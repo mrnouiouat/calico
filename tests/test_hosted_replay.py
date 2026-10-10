@@ -15,10 +15,16 @@ import unittest
 
 _CHECKPOINTS = {}
 _TEST_ENVIRONMENT = None
+_TEST_ROOT = None
+_TEST_TEMP_CACHE = None
 
 
 def setUpModule():
-    global _TEST_ENVIRONMENT
+    global _TEST_ENVIRONMENT, _TEST_ROOT, _TEST_TEMP_CACHE
+    _TEST_ROOT = tempfile.TemporaryDirectory(prefix="calico-replay-tests-",
+                                            dir=Path(tempfile.gettempdir()).resolve())
+    _TEST_TEMP_CACHE = patch.object(tempfile, "tempdir", str(Path(_TEST_ROOT.name).resolve()))
+    _TEST_TEMP_CACHE.start()
     # Verification explicitly removes workstation adapters; it never uses them.
     _TEST_ENVIRONMENT = patch.dict(os.environ)
     _TEST_ENVIRONMENT.start()
@@ -36,6 +42,8 @@ def setUpModule():
 
 def tearDownModule():
     _TEST_ENVIRONMENT.stop()
+    _TEST_TEMP_CACHE.stop()
+    _TEST_ROOT.cleanup()
 
 
 def _run_tuple():
@@ -265,6 +273,46 @@ class HostedReplayReconstructionTests(unittest.TestCase):
 
 
 class HostedReplayIsolationTests(unittest.TestCase):
+    def test_module_roots_are_owned_and_restore_inherited_temp_settings(self):
+        parent = Path("/tmp").resolve()
+        if not parent.is_dir() or not os.access(parent, os.W_OK):
+            parent = Path(tempfile.gettempdir()).resolve()
+        script = """
+import importlib, os, tempfile
+from pathlib import Path
+from tools import hosted_replay as replay
+module = importlib.import_module(os.environ["REPLAY_TEST_MODULE"])
+parent = Path(tempfile.gettempdir()).resolve()
+os.environ["RUNNER_TEMP"] = str(parent)
+if hasattr(os, "getuid") and parent.stat().st_uid != os.getuid():
+    try:
+        replay._runner_parent(parent)
+    except replay.ReplayError as error:
+        assert error.category == "replay.isolation_rejected"
+    else:
+        raise AssertionError("ownership guard must reject the inherited parent")
+os.environ["RUNNER_TEMP"] = str(parent / "distinct-runner")
+before_environment, before_cache = dict(os.environ), tempfile.tempdir
+module.setUpModule()
+root = Path(tempfile.gettempdir()).resolve()
+try:
+    assert root != parent and root.is_relative_to(parent)
+    assert os.environ["TMPDIR"] == os.environ["RUNNER_TEMP"] == str(root)
+    assert not hasattr(os, "getuid") or root.stat().st_uid == os.getuid()
+    with replay.replay_workspace(root) as workspace:
+        replay.validate_replay_workspace(workspace)
+finally:
+    module.tearDownModule()
+assert dict(os.environ) == before_environment and tempfile.tempdir == before_cache
+assert not root.exists()
+"""
+        for module in ("tests.test_hosted_replay", "tests.docs_public.test_hosted_replay"):
+            with self.subTest(module=module):
+                environment = dict(os.environ, TMPDIR=str(parent), REPLAY_TEST_MODULE=module)
+                result = subprocess.run([sys.executable, "-c", script], env=environment,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, "owned module root or restoration failed")
+
     def test_unowned_worktree_and_alias_roots_fail_before_candidate_work(self):
         from tools import hosted_replay as replay
         with tempfile.TemporaryDirectory() as temporary:

@@ -14,10 +14,16 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 _ENVIRONMENT = None
+_TEMP_ROOT = None
+_TEMP_CACHE = None
 
 
 def setUpModule():
-    global _ENVIRONMENT
+    global _ENVIRONMENT, _TEMP_ROOT, _TEMP_CACHE
+    _TEMP_ROOT = tempfile.TemporaryDirectory(prefix="calico-replay-docs-tests-",
+                                            dir=Path(tempfile.gettempdir()).resolve())
+    _TEMP_CACHE = patch.object(tempfile, "tempdir", str(Path(_TEMP_ROOT.name).resolve()))
+    _TEMP_CACHE.start()
     _ENVIRONMENT = patch.dict(os.environ)
     _ENVIRONMENT.start()
     for name in tuple(os.environ):
@@ -34,6 +40,8 @@ def setUpModule():
 
 def tearDownModule():
     _ENVIRONMENT.stop()
+    _TEMP_CACHE.stop()
+    _TEMP_ROOT.cleanup()
 
 
 @cache
