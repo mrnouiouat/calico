@@ -655,6 +655,8 @@ def validate_index(root: Path, expected: tuple[PredecessorAnchor, ...]) -> list[
         "docs/provenance/citation-transitions-v1.json",
         "docs/provenance/citation-transitions-v2.json",
         "docs/provenance/HOSTED-REPLAY-EVIDENCE.md",
+        "docs/provenance/GATE-E-EVIDENCE.md",
+        "docs/provenance/spike-era-requirements-audit.md",
     }
     actual_paths = {path.relative_to(root).as_posix() for path in (root / "docs/provenance").rglob("*")
                     if path.is_file() and path.relative_to(root).as_posix() not in non_successor_contracts}
