@@ -228,6 +228,29 @@ class JsonEnvelopeTests(unittest.TestCase):
 
 
 class CompleteProvenanceTests(unittest.TestCase):
+    def test_generated_replay_evidence_preserves_ten_slots_and_rejects_other_markdown(self):
+        api = importlib.import_module("tools.docs_public.provenance")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            shutil.copytree(ROOT / "docs", root / "docs")
+            (root / "contracts").mkdir()
+            shutil.copyfile(ROOT / "contracts/metric-denominators-v1.json",
+                            root / "contracts/metric-denominators-v1.json")
+            evidence = root / "docs/provenance/HOSTED-REPLAY-EVIDENCE.md"
+            evidence.unlink(missing_ok=True)
+            expected = api.validate_complete_index(root)
+            self.assertEqual(len(expected), 10)
+            evidence.write_text("# Separately validated generated replay evidence\n", encoding="utf-8")
+            self.assertEqual(api.validate_complete_index(root), expected)
+            for name in ("UNAPPROVED.md", "HOSTED-REPLAY-EVIDENCE-copy.md"):
+                extra = evidence.with_name(name)
+                extra.write_text("# Unapproved document\n", encoding="utf-8")
+                with self.assertRaises(api.ProvenanceError) as caught:
+                    api.validate_complete_index(root)
+                self.assertEqual(str(caught.exception), "provenance.index_completeness")
+                extra.unlink()
+            self.assertEqual(api.validate_complete_index(root), expected)
+
     def test_citation_contracts_are_not_successors_and_unknown_files_fail(self):
         api = importlib.import_module("tools.docs_public.provenance")
         with tempfile.TemporaryDirectory() as directory:

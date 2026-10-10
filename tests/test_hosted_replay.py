@@ -31,6 +31,7 @@ def setUpModule():
             os.environ.pop(name, None)
     os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1")
     os.environ["TMPDIR"] = str(Path(tempfile.gettempdir()).resolve())
+    os.environ["RUNNER_TEMP"] = os.environ["TMPDIR"]
 
 
 def tearDownModule():

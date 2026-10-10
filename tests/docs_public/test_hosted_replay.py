@@ -29,6 +29,7 @@ def setUpModule():
             os.environ.pop(name, None)
     os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1")
     os.environ["TMPDIR"] = str(Path(tempfile.gettempdir()).resolve())
+    os.environ["RUNNER_TEMP"] = os.environ["TMPDIR"]
 
 
 def tearDownModule():
@@ -40,6 +41,16 @@ def _envelope_bytes():
     from tools import hosted_replay as driver
     from tests import test_hosted_replay as fixtures
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    # A synthetic deployment must precede the generated evidence it cites.
+    for relative in ("docs/evidence/gate-e/hosted-replay-v1.json",
+                     "docs/provenance/HOSTED-REPLAY-EVIDENCE.md"):
+        introductions = subprocess.check_output(
+            ["git", "log", "--reverse", "--diff-filter=A", "--format=%H", "HEAD", "--", relative],
+            cwd=ROOT, text=True).splitlines()
+        if introductions:
+            head = subprocess.check_output(["git", "rev-parse", introductions[0] + "^"],
+                                           cwd=ROOT, text=True).strip()
+            break
     identity = driver.ReplayRunTuple("mrnouiouat/calico", 1, 1, head)
     with patch.object(fixtures, "_run_tuple", return_value=identity), patch.object(fixtures, "_CHECKPOINTS", {}):
         inputs = fixtures._api_fixture()
